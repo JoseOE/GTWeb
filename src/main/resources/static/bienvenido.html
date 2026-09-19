@@ -1,0 +1,1556 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel | GymTrack</title>
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/2964/2964514.png">
+    <link rel="stylesheet" href="css/fonts.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/editorial.css">
+</head>
+<body class="gym-interior bg-body-tertiary d-flex flex-column min-vh-100">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark py-3">
+        <div class="container-fluid px-3 px-lg-4">
+            <a class="navbar-brand fw-bold fs-3 d-flex align-items-center gap-2" href="index.html">
+                <i class='bx bx-dumbbell text-primary fs-2'></i>
+                <span>Gym<span class="text-primary">Track</span></span>
+            </a>
+            <div class="ms-auto d-flex align-items-center gap-2 gap-sm-3">
+                <a href="index.html" class="btn btn-outline-light btn-sm rounded-pill px-3 d-none d-sm-inline-flex align-items-center gap-1">
+                    <i class='bx bx-globe'></i> Ver sitio público
+                </a>
+                <span class="text-white-50 d-none d-md-inline" id="nav-user-name"></span>
+                <a href="login.html" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="localStorage.removeItem('userName'); localStorage.removeItem('userId'); localStorage.removeItem('gymId')">
+                    <i class='bx bx-log-out'></i> <span class="d-none d-sm-inline">Cerrar Sesión</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="dash-wrap flex-grow-1">
+        <!-- ═══════ SIDEBAR ═══════ -->
+        <aside class="dash-sidebar">
+            <nav class="dash-nav" role="tablist" aria-label="Secciones del panel">
+                <button type="button" class="dash-nav-link active" role="tab" id="tab-resumen" aria-controls="panel-resumen" aria-selected="true" data-panel="resumen">
+                    <i class='bx bx-grid-alt'></i><span>Resumen</span>
+                </button>
+                <button type="button" class="dash-nav-link" role="tab" id="tab-gimnasio" aria-controls="panel-gimnasio" aria-selected="false" data-panel="gimnasio">
+                    <i class='bx bx-store-alt'></i><span>Mi Gimnasio</span>
+                </button>
+                <button type="button" class="dash-nav-link" role="tab" id="tab-usuarios" aria-controls="panel-usuarios" aria-selected="false" data-panel="usuarios">
+                    <i class='bx bx-group'></i><span>Mis Usuarios</span>
+                </button>
+                <button type="button" class="dash-nav-link" role="tab" id="tab-membresias" aria-controls="panel-membresias" aria-selected="false" data-panel="membresias">
+                    <i class='bx bx-credit-card'></i><span>Membresías y Pagos</span>
+                </button>
+                <button type="button" class="dash-nav-link" role="tab" id="tab-rutinas" aria-controls="panel-rutinas" aria-selected="false" data-panel="rutinas">
+                    <i class='bx bx-dumbbell'></i><span>Rutinas</span>
+                </button>
+                <button type="button" class="dash-nav-link" role="tab" id="tab-maquinas" aria-controls="panel-maquinas" aria-selected="false" data-panel="maquinas">
+                    <i class='bx bx-cog'></i><span>Máquinas</span>
+                </button>
+                <button type="button" class="dash-nav-link" role="tab" id="tab-accesos" aria-controls="panel-accesos" aria-selected="false" data-panel="accesos">
+                    <i class='bx bx-id-card'></i><span>Accesos RFID</span>
+                </button>
+            </nav>
+        </aside>
+
+        <!-- ═══════ CONTENIDO ═══════ -->
+        <main class="dash-content">
+
+            <!-- ─── RESUMEN ─── -->
+            <div class="dash-panel active" id="panel-resumen" data-panel="resumen" role="tabpanel" aria-labelledby="tab-resumen" tabindex="0">
+                <div class="mb-4">
+                    <h2 class="fw-bold mb-1 d-flex align-items-center gap-2 flex-wrap">
+                        Hola, <span class="text-primary" id="dash-user-name">…</span>
+                        <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary fs-6 align-middle d-inline-flex align-items-center gap-1">
+                            <i class='bx bx-show'></i> Vista previa
+                        </span>
+                    </h2>
+                    <p class="text-body-secondary mb-0">Así se verá tu panel de administración cuando actives tu gimnasio en GymTrack.</p>
+                </div>
+
+                <!-- KPIs -->
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-lg-3">
+                        <div class="kpi-tile">
+                            <div class="icon-circle icon-brand rounded-circle d-flex align-items-center justify-content-center mb-3" style="width:46px;height:46px">
+                                <i class='bx bx-group'></i>
+                            </div>
+                            <div class="kpi-value">0</div>
+                            <p class="text-body-secondary small mb-0">Usuarios registrados</p>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="kpi-tile">
+                            <div class="icon-circle icon-success rounded-circle d-flex align-items-center justify-content-center mb-3" style="width:46px;height:46px">
+                                <i class='bx bx-credit-card'></i>
+                            </div>
+                            <div class="kpi-value">0</div>
+                            <p class="text-body-secondary small mb-0">Membresías activas</p>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="kpi-tile">
+                            <div class="icon-circle icon-warning rounded-circle d-flex align-items-center justify-content-center mb-3" style="width:46px;height:46px">
+                                <i class='bx bx-dumbbell'></i>
+                            </div>
+                            <div class="kpi-value">0</div>
+                            <p class="text-body-secondary small mb-0">Rutinas creadas</p>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="kpi-tile">
+                            <div class="icon-circle icon-info rounded-circle d-flex align-items-center justify-content-center mb-3" style="width:46px;height:46px">
+                                <i class='bx bx-id-card'></i>
+                            </div>
+                            <div class="kpi-value">0</div>
+                            <p class="text-body-secondary small mb-0">Accesos RFID registrados</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mi Gimnasio + Mis Usuarios -->
+                <div class="row g-3 mb-4">
+                    <div class="col-lg-6">
+                        <div class="feature-preview-card">
+                            <div class="d-flex align-items-start justify-content-between gap-2 mb-3">
+                                <div class="icon-circle icon-brand rounded-circle d-flex align-items-center justify-content-center" style="width:54px;height:54px">
+                                    <i class='bx bx-store-alt fs-3'></i>
+                                </div>
+                                <span class="badge rounded-pill bg-warning bg-opacity-10 text-warning px-3 py-2 flex-shrink-0"><i class='bx bx-time-five'></i> Próximamente</span>
+                            </div>
+                            <h3 class="fw-bold mb-2 fs-5">Mi Gimnasio</h3>
+                            <p class="text-body-secondary small mb-3">Configura el nombre, dirección, horario y equipamiento real de tu gimnasio. Ese equipamiento es lo que luego personaliza las rutinas que asignas a tus usuarios.</p>
+                            <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-goto="gimnasio">Ver vista previa <i class='bx bx-right-arrow-alt'></i></button>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="feature-preview-card">
+                            <div class="d-flex align-items-start justify-content-between gap-2 mb-3">
+                                <div class="icon-circle icon-info rounded-circle d-flex align-items-center justify-content-center" style="width:54px;height:54px">
+                                    <i class='bx bx-group fs-3'></i>
+                                </div>
+                                <span class="badge rounded-pill bg-warning bg-opacity-10 text-warning px-3 py-2 flex-shrink-0"><i class='bx bx-time-five'></i> Próximamente</span>
+                            </div>
+                            <h3 class="fw-bold mb-2 fs-5">Mis Usuarios</h3>
+                            <p class="text-body-secondary small mb-3">Da de alta a los clientes de tu gimnasio, asígnales una credencial RFID y consulta su membresía y estado de pago desde una sola tabla.</p>
+                            <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-goto="usuarios">Ver vista previa <i class='bx bx-right-arrow-alt'></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Roadmap secundario -->
+                <h4 class="text-uppercase fw-bold text-body-secondary small mb-3" style="letter-spacing:0.06em">También vienen en camino</h4>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="roadmap-tile" data-goto="membresias" role="button" tabindex="0">
+                            <div class="icon-circle icon-success rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:44px;height:44px">
+                                <i class='bx bx-credit-card'></i>
+                            </div>
+                            <div>
+                                <span class="fw-semibold d-block small">Membresías y Pagos</span>
+                                <small class="text-body-secondary">Vence, cobra, bloquea morosos</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="roadmap-tile" data-goto="rutinas" role="button" tabindex="0">
+                            <div class="icon-circle icon-warning rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:44px;height:44px">
+                                <i class='bx bx-dumbbell'></i>
+                            </div>
+                            <div>
+                                <span class="fw-semibold d-block small">Rutinas</span>
+                                <small class="text-body-secondary">Según tu equipamiento real</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="roadmap-tile" data-goto="accesos" role="button" tabindex="0">
+                            <div class="icon-circle icon-info rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:44px;height:44px">
+                                <i class='bx bx-id-card'></i>
+                            </div>
+                            <div>
+                                <span class="fw-semibold d-block small">Accesos RFID</span>
+                                <small class="text-body-secondary">Entradas validadas en tiempo real</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── MI GIMNASIO ─── -->
+            <div class="dash-panel" id="panel-gimnasio" data-panel="gimnasio" role="tabpanel" aria-labelledby="tab-gimnasio" tabindex="0">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+                    <div>
+                        <h3 class="fw-bold mb-1"><i class='bx bx-store-alt text-primary me-1'></i> Mi Gimnasio</h3>
+                        <p class="text-body-secondary mb-0">El perfil de tu gimnasio: quién eres, dónde estás y con qué equipo cuentas.</p>
+                    </div>
+                    <span id="gym-status-badge" class="badge rounded-pill bg-warning bg-opacity-10 text-warning px-3 py-2"><i class='bx bx-time-five'></i> Sin configurar</span>
+                </div>
+                <!-- Código de acceso: lo teclea el usuario en la app para pedir unirse -->
+                <div class="dash-empty text-start mb-4 d-none" id="gym-code-card">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                        <div>
+                            <h4 class="fw-bold mb-1 fs-6"><i class='bx bx-key text-primary me-1'></i> Código de acceso</h4>
+                            <p class="text-body-secondary small mb-0" style="max-width:46ch">
+                                Compártelo en recepción. Quien lo escriba en la app te llegará como solicitud a "Mis Usuarios" para que lo apruebes.
+                            </p>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <code class="fs-3 fw-bold text-primary bg-primary bg-opacity-10 rounded-3 px-3 py-2" id="gym-code-value">····-····</code>
+                            <button type="button" class="btn btn-outline-secondary rounded-pill px-3" id="gym-code-copy" title="Copiar código">
+                                <i class='bx bx-copy'></i> Copiar
+                            </button>
+                            <button type="button" class="btn btn-outline-danger rounded-pill px-3" id="gym-code-regen" title="Generar un código nuevo e invalidar el anterior">
+                                <i class='bx bx-refresh'></i> Regenerar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="dash-empty text-start">
+                    <form id="gym-form" class="row g-3">
+                        <div class="col-md-6">
+                            <label for="gym-nombre" class="form-label fw-semibold small">Nombre del gimnasio</label>
+                            <input type="text" id="gym-nombre" class="form-control form-control-lg" placeholder="Ej. PowerFit Pachuca" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="gym-telefono" class="form-label fw-semibold small">Teléfono de contacto</label>
+                            <input type="text" id="gym-telefono" class="form-control form-control-lg" placeholder="Ej. 771 234 5678">
+                        </div>
+                        <div class="col-12">
+                            <label for="gym-direccion" class="form-label fw-semibold small">Dirección</label>
+                            <input type="text" id="gym-direccion" class="form-control form-control-lg" placeholder="Calle, número, colonia, ciudad">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="gym-horario" class="form-label fw-semibold small">Horario de atención</label>
+                            <input type="text" id="gym-horario" class="form-control form-control-lg" placeholder="Ej. Lun-Vie 6:00-22:00">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="gym-equipamiento" class="form-label fw-semibold small">Equipamiento disponible</label>
+                            <input type="text" id="gym-equipamiento" class="form-control form-control-lg" placeholder="Ej. Pesas libres, máquinas, zona funcional">
+                        </div>
+                        <div class="col-12">
+                            <label for="gym-maquinas" class="form-label fw-semibold small">Máquinas del gimnasio</label>
+                            <textarea id="gym-maquinas" class="form-control" rows="5" placeholder="Prensa de piernas x2&#10;Jalón al pecho&#10;Press banca&#10;Caminadora x4"></textarea>
+                            <small class="text-body-secondary d-block mt-1">Una máquina por línea. Tus usuarios la ven en la app para saber con qué equipo cuentan.</small>
+                        </div>
+                        <div class="col-12"><hr class="my-2"></div>
+                        <div class="col-12">
+                            <h4 class="fw-bold fs-6 mb-1"><i class='bx bx-palette text-primary me-1'></i> Identidad de tu gimnasio</h4>
+                            <p class="text-body-secondary small mb-0">Tus usuarios ven tu logo al abrir la app y toda la interfaz toma tu color.</p>
+                        </div>
+                        <div class="col-md-5">
+                            <label for="gym-logo-input" class="form-label fw-semibold small">Logo</label>
+                            <div class="d-flex align-items-center gap-3">
+                                <div id="gym-logo-preview" class="rounded-3 border d-flex align-items-center justify-content-center bg-body-tertiary" style="width:84px;height:84px;overflow:hidden;flex:none">
+                                    <i class='bx bx-image-add fs-2 text-body-secondary'></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <input type="file" id="gym-logo-input" class="form-control form-control-sm" accept="image/png,image/jpeg,image/webp">
+                                    <div class="d-flex gap-2 mt-2">
+                                        <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3 d-none" id="gym-logo-clear">Quitar logo</button>
+                                    </div>
+                                    <small class="text-body-secondary d-block mt-1">PNG o JPG. Se reduce a 512px automáticamente.</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="gym-color" class="form-label fw-semibold small">Color del gimnasio</label>
+                            <div class="input-group">
+                                <input type="color" id="gym-color" class="form-control form-control-color" value="#FF5722" title="Color de acento">
+                                <input type="text" id="gym-color-hex" class="form-control" placeholder="#FF5722" maxlength="7">
+                            </div>
+                            <small class="text-body-secondary d-block mt-1">Se usa en botones y acentos de la app.</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="gym-cuota" class="form-label fw-semibold small">Cuota mensual</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" step="0.01" min="0" id="gym-cuota" class="form-control" placeholder="450.00">
+                            </div>
+                            <div class="form-check form-switch mt-3">
+                                <input class="form-check-input" type="checkbox" role="switch" id="gym-directorio">
+                                <label class="form-check-label small fw-semibold" for="gym-directorio">Aparecer en el directorio de la app</label>
+                            </div>
+                            <small class="text-body-secondary d-block">Si lo apagas, solo se pueden unir con tu código.</small>
+                        </div>
+
+                        <div id="gym-alert" class="col-12 alert alert-danger d-none py-2 small mb-0" role="alert"></div>
+                        <div class="col-12 pt-2">
+                            <button type="submit" class="btn btn-primary rounded-pill px-4" id="gym-save-btn"><i class='bx bx-save'></i> Guardar cambios</button>
+                            <small class="text-body-secondary d-block mt-2">Todo lo que guardes aquí queda en la base de datos y la app lo descarga sola: no hace falta tener esta página abierta.</small>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- ─── MIS USUARIOS ─── -->
+            <div class="dash-panel" id="panel-usuarios" data-panel="usuarios" role="tabpanel" aria-labelledby="tab-usuarios" tabindex="0">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+                    <div>
+                        <h3 class="fw-bold mb-1"><i class='bx bx-group text-primary me-1'></i> Mis Usuarios</h3>
+                        <p class="text-body-secondary mb-0">Aprueba a quien pidió unirse con tu código, o crea la cuenta tú mismo. Al dar de baja, pierde el acceso al gimnasio dentro de la app.</p>
+                    </div>
+                </div>
+                <div class="dash-empty text-start p-0 overflow-hidden">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 p-4 border-bottom">
+                        <div>
+                            <h4 class="fw-bold mb-0 fs-6">Usuarios de tu gimnasio</h4>
+                            <small class="text-body-secondary" id="members-count">0 usuarios registrados</small>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm rounded-pill px-3" id="member-new-btn" disabled><i class='bx bx-plus'></i> Agregar usuario</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table dash-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="ps-4">Nombre</th>
+                                    <th>Correo</th>
+                                    <th>Estado</th>
+                                    <th>Membresía</th>
+                                    <th class="pe-4 text-end">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="members-tbody">
+                                <tr>
+                                    <td colspan="5" class="text-center text-body-secondary py-5 px-4">
+                                        <i class='bx bx-group fs-1 d-block mb-2 opacity-50'></i>
+                                        Configura primero "Mi Gimnasio" para poder dar de alta usuarios.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── MODAL: AGREGAR USUARIO ─── -->
+            <div class="modal fade" id="memberModal" tabindex="-1" aria-labelledby="memberModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-0 rounded-4">
+                        <form id="member-form">
+                            <div class="modal-header border-0 pb-0">
+                                <h5 class="modal-title fw-bold" id="memberModalLabel">Agregar usuario</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label for="member-nombre" class="form-label fw-semibold small">Nombre completo</label>
+                                    <input type="text" id="member-nombre" class="form-control" placeholder="Ej. Juan Pérez" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="member-email" class="form-label fw-semibold small">Correo electrónico</label>
+                                    <input type="email" id="member-email" class="form-control" placeholder="ejemplo@correo.com" required>
+                                </div>
+                                <div class="mb-1">
+                                    <label for="member-password" class="form-label fw-semibold small">Contraseña temporal</label>
+                                    <input type="text" id="member-password" class="form-control" placeholder="El usuario podrá cambiarla después" required>
+                                </div>
+                                <small class="text-body-secondary d-block mt-2">Para altas en recepción: le creas la cuenta y entra directo. Si el usuario ya tiene la app, es más simple que se una con tu código de acceso.</small>
+                                <div id="member-alert" class="alert alert-danger d-none py-2 small mt-3 mb-0" role="alert"></div>
+                            </div>
+                            <div class="modal-footer border-0 pt-0">
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-primary rounded-pill px-4" id="member-save-btn"><i class='bx bx-user-plus'></i> Dar de alta</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── MEMBRESÍAS Y PAGOS ─── -->
+            <div class="dash-panel" id="panel-membresias" data-panel="membresias" role="tabpanel" aria-labelledby="tab-membresias" tabindex="0">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+                    <div>
+                        <h3 class="fw-bold mb-1"><i class='bx bx-credit-card text-primary me-1'></i> Membresías y Pagos</h3>
+                        <p class="text-body-secondary mb-0">Quién debe, quién está por vencer y cuánto llevas cobrado este mes.</p>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="billing-run-btn" title="Aplica las bajas por falta de pago en este momento">
+                        <i class='bx bx-refresh'></i> Revisar vencimientos ahora
+                    </button>
+                </div>
+
+                <div class="row g-3 mb-4" id="billing-kpis"></div>
+
+                <div class="dash-empty text-start p-0 overflow-hidden mb-4">
+                    <div class="p-4 border-bottom">
+                        <h4 class="fw-bold mb-0 fs-6">Estado de pago por usuario</h4>
+                        <small class="text-body-secondary">La baja por falta de pago se aplica sola todos los días a las 6:00 a.m.</small>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table dash-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="ps-4">Usuario</th>
+                                    <th>Día de pago</th>
+                                    <th>Vence</th>
+                                    <th>Estado</th>
+                                    <th class="pe-4 text-end">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="billing-tbody">
+                                <tr><td colspan="5" class="text-center text-body-secondary py-5 px-4">
+                                    <i class='bx bx-wallet fs-1 d-block mb-2 opacity-50'></i>
+                                    Configura primero "Mi Gimnasio".
+                                </td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="dash-empty text-start p-0 overflow-hidden">
+                    <div class="p-4 border-bottom">
+                        <h4 class="fw-bold mb-0 fs-6">Últimos pagos registrados</h4>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table dash-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="ps-4">Usuario</th>
+                                    <th>Fecha</th>
+                                    <th>Monto</th>
+                                    <th>Método</th>
+                                    <th class="pe-4">Cubre hasta</th>
+                                </tr>
+                            </thead>
+                            <tbody id="payments-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── MODAL: REGISTRAR PAGO ─── -->
+            <div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-0 rounded-4">
+                        <form id="payment-form">
+                            <div class="modal-header border-0 pb-0">
+                                <h5 class="modal-title fw-bold" id="paymentModalLabel">Registrar pago</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="hidden" id="payment-user-id">
+                                <p class="text-body-secondary small mb-3" id="payment-user-label"></p>
+                                <div class="row g-3">
+                                    <div class="col-6">
+                                        <label for="payment-monto" class="form-label fw-semibold small">Monto</label>
+                                        <input type="number" step="0.01" min="0" id="payment-monto" class="form-control" placeholder="450.00">
+                                    </div>
+                                    <div class="col-6">
+                                        <label for="payment-fecha" class="form-label fw-semibold small">Fecha de pago</label>
+                                        <input type="date" id="payment-fecha" class="form-control" required>
+                                    </div>
+                                    <div class="col-12">
+                                        <label for="payment-metodo" class="form-label fw-semibold small">Método</label>
+                                        <select id="payment-metodo" class="form-select">
+                                            <option value="Efectivo">Efectivo</option>
+                                            <option value="Transferencia">Transferencia</option>
+                                            <option value="Tarjeta">Tarjeta</option>
+                                            <option value="Otro">Otro</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <label for="payment-nota" class="form-label fw-semibold small">Nota (opcional)</label>
+                                        <input type="text" id="payment-nota" class="form-control" placeholder="Ej. Pagó quincena adelantada">
+                                    </div>
+                                </div>
+                                <div class="alert alert-light border mt-3 mb-0 py-2 small" id="payment-preview"></div>
+                                <div id="payment-alert" class="alert alert-danger d-none py-2 small mt-3 mb-0" role="alert"></div>
+                            </div>
+                            <div class="modal-footer border-0 pt-0">
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-primary rounded-pill px-4" id="payment-save-btn"><i class='bx bx-check'></i> Registrar pago</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── MÁQUINAS Y EJERCICIOS ─── -->
+            <div class="dash-panel" id="panel-maquinas" data-panel="maquinas" role="tabpanel" aria-labelledby="tab-maquinas" tabindex="0">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+                    <div>
+                        <h3 class="fw-bold mb-1"><i class='bx bx-cog text-primary me-1'></i> Máquinas y ejercicios</h3>
+                        <p class="text-body-secondary mb-0">Cada máquina de tu gimnasio con los ejercicios que sí se pueden hacer en ella. Es lo que tus usuarios eligen al registrar un entrenamiento.</p>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-primary rounded-pill px-3" id="machine-import-btn" disabled>
+                            <i class='bx bx-download'></i> Importar catálogo base
+                        </button>
+                        <button type="button" class="btn btn-primary rounded-pill px-4" id="machine-new-btn" disabled>
+                            <i class='bx bx-plus'></i> Nueva máquina
+                        </button>
+                    </div>
+                </div>
+                <div id="machines-container"></div>
+            </div>
+
+            <!-- ─── MODAL: MÁQUINA + EJERCICIOS ─── -->
+            <div class="modal fade" id="machineModal" tabindex="-1" aria-labelledby="machineModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content border-0 rounded-4">
+                        <form id="machine-form">
+                            <div class="modal-header border-0 pb-0">
+                                <h5 class="modal-title fw-bold" id="machineModalLabel">Nueva máquina</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="hidden" id="machine-id">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="machine-nombre" class="form-label fw-semibold small">Nombre de la máquina</label>
+                                        <input type="text" id="machine-nombre" class="form-control" placeholder="Ej. Prensa de piernas" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="machine-zona" class="form-label fw-semibold small">Zona</label>
+                                        <input type="text" id="machine-zona" class="form-control" list="machine-zona-options" placeholder="Ej. Peso libre">
+                                        <datalist id="machine-zona-options">
+                                            <option value="Peso libre"><option value="Máquinas"><option value="Cardio">
+                                            <option value="Funcional"><option value="Zona de estiramiento">
+                                        </datalist>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label for="machine-cantidad" class="form-label fw-semibold small">Cantidad</label>
+                                        <input type="number" min="1" id="machine-cantidad" class="form-control" value="1">
+                                    </div>
+                                    <div class="col-12">
+                                        <label for="machine-descripcion" class="form-label fw-semibold small">Nota (opcional)</label>
+                                        <input type="text" id="machine-descripcion" class="form-control" placeholder="Ej. Está junto a los vestidores">
+                                    </div>
+                                </div>
+
+                                <hr class="my-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div>
+                                        <h6 class="fw-bold mb-0">Ejercicios de esta máquina</h6>
+                                        <small class="text-body-secondary">Solo los que realmente se pueden hacer en ella.</small>
+                                    </div>
+                                    <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" id="exercise-add-btn">
+                                        <i class='bx bx-plus'></i> Agregar ejercicio
+                                    </button>
+                                </div>
+                                <div id="exercise-rows" class="d-flex flex-column gap-2"></div>
+
+                                <div id="machine-alert" class="alert alert-danger d-none py-2 small mt-3 mb-0" role="alert"></div>
+                            </div>
+                            <div class="modal-footer border-0 pt-0">
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-primary rounded-pill px-4" id="machine-save-btn"><i class='bx bx-save'></i> Guardar máquina</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── RUTINAS ─── -->
+            <div class="dash-panel" id="panel-rutinas" data-panel="rutinas" role="tabpanel" aria-labelledby="tab-rutinas" tabindex="0">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+                    <div>
+                        <h3 class="fw-bold mb-1"><i class='bx bx-dumbbell text-primary me-1'></i> Rutinas</h3>
+                        <p class="text-body-secondary mb-0">Crea rutinas adaptadas al equipamiento real de tu gimnasio; tus usuarios las verán en la app móvil.</p>
+                    </div>
+                    <button type="button" class="btn btn-primary rounded-pill px-4" id="routine-new-btn" disabled>
+                        <i class='bx bx-plus'></i> Nueva rutina
+                    </button>
+                </div>
+                <div id="routines-container"></div>
+            </div>
+
+            <!-- ─── MODAL: NUEVA / EDITAR RUTINA ─── -->
+            <div class="modal fade" id="routineModal" tabindex="-1" aria-labelledby="routineModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-0 rounded-4">
+                        <form id="routine-form">
+                            <div class="modal-header border-0 pb-0">
+                                <h5 class="modal-title fw-bold" id="routineModalLabel">Nueva rutina</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="hidden" id="routine-id">
+                                <div class="mb-3">
+                                    <label for="routine-nombre" class="form-label fw-semibold small">Nombre de la rutina</label>
+                                    <input type="text" id="routine-nombre" class="form-control" placeholder="Ej. Fuerza · Tren superior" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="routine-categoria" class="form-label fw-semibold small">Categoría / grupo muscular</label>
+                                    <input type="text" id="routine-categoria" class="form-control" list="routine-categoria-options" placeholder="Ej. Espalda" required>
+                                    <datalist id="routine-categoria-options">
+                                        <option value="Espalda">
+                                        <option value="Pecho">
+                                        <option value="Pierna">
+                                        <option value="Hombro">
+                                        <option value="Brazo">
+                                        <option value="Core">
+                                        <option value="Cardio">
+                                        <option value="Movilidad">
+                                    </datalist>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-6">
+                                        <label for="routine-duracion" class="form-label fw-semibold small">Duración</label>
+                                        <input type="text" id="routine-duracion" class="form-control" placeholder="Ej. 45 min">
+                                    </div>
+                                    <div class="col-6">
+                                        <label for="routine-nivel" class="form-label fw-semibold small">Nivel</label>
+                                        <select id="routine-nivel" class="form-select">
+                                            <option value="">Sin especificar</option>
+                                            <option value="Principiante">Principiante</option>
+                                            <option value="Intermedio">Intermedio</option>
+                                            <option value="Avanzado">Avanzado</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label for="routine-dia" class="form-label fw-semibold small">Día asignado</label>
+                                        <select id="routine-dia" class="form-select">
+                                            <option value="">Disponible siempre</option>
+                                            <option value="Lunes">Lunes</option>
+                                            <option value="Martes">Martes</option>
+                                            <option value="Miércoles">Miércoles</option>
+                                            <option value="Jueves">Jueves</option>
+                                            <option value="Viernes">Viernes</option>
+                                            <option value="Sábado">Sábado</option>
+                                            <option value="Domingo">Domingo</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label for="routine-coach" class="form-label fw-semibold small">Coach</label>
+                                        <input type="text" id="routine-coach" class="form-control" placeholder="Ej. Ana Ramírez">
+                                    </div>
+                                </div>
+                                <div class="mb-3 mt-3">
+                                    <label for="routine-descripcion" class="form-label fw-semibold small">Descripción</label>
+                                    <input type="text" id="routine-descripcion" class="form-control" placeholder="Breve resumen de la rutina">
+                                </div>
+                                <div class="mb-1">
+                                    <label for="routine-ejercicios" class="form-label fw-semibold small">Ejercicios (uno por línea)</label>
+                                    <textarea id="routine-ejercicios" class="form-control" rows="4" placeholder="Jalón al pecho&#10;Remo con barra&#10;Peso muerto"></textarea>
+                                </div>
+                                <div id="routine-alert" class="alert alert-danger d-none py-2 small mb-0" role="alert"></div>
+                            </div>
+                            <div class="modal-footer border-0 pt-0">
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-primary rounded-pill px-4" id="routine-save-btn"><i class='bx bx-save'></i> Guardar rutina</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── ACCESOS RFID ─── -->
+            <div class="dash-panel" id="panel-accesos" data-panel="accesos" role="tabpanel" aria-labelledby="tab-accesos" tabindex="0">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+                    <div>
+                        <h3 class="fw-bold mb-1"><i class='bx bx-id-card text-primary me-1'></i> Accesos RFID</h3>
+                        <p class="text-body-secondary mb-0">Cada vez que un usuario acerque su credencial al lector, la entrada se validará y quedará aquí.</p>
+                    </div>
+                    <span class="badge rounded-pill bg-warning bg-opacity-10 text-warning px-3 py-2"><i class='bx bx-time-five'></i> Próximamente</span>
+                </div>
+                <div class="d-flex align-items-center gap-3 p-4 rounded-4 bg-body-tertiary border mb-3">
+                    <div class="icon-circle icon-danger rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:48px;height:48px">
+                        <i class='bx bx-wifi-off fs-4'></i>
+                    </div>
+                    <div>
+                        <span class="fw-semibold d-block">Lector RFID: <span style="color:#b02a37">no configurado</span></span>
+                        <small class="text-body-secondary">Todavía no hay un dispositivo ESP32 + RFID vinculado a tu cuenta.</small>
+                    </div>
+                </div>
+                <div class="dash-empty text-start p-0 overflow-hidden">
+                    <div class="table-responsive">
+                        <table class="table dash-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="ps-4">Hora</th>
+                                    <th>Usuario</th>
+                                    <th class="pe-4">Resultado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="3" class="text-center text-body-secondary py-5 px-4">
+                                        <i class='bx bx-scan fs-1 d-block mb-2 opacity-50'></i>
+                                        Aquí aparecerá el historial de accesos en tiempo real en cuanto conectes tu lector RFID.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const userName = localStorage.getItem('userName');
+            // Protección de ruta: si no hay sesión, regresa al login
+            if (!userName) {
+                window.location.href = 'login.html';
+                return;
+            }
+            document.getElementById('nav-user-name').innerHTML = `<i class='bx bx-user-circle'></i> ${userName}`;
+            document.getElementById('dash-user-name').textContent = userName;
+
+            const navLinks = document.querySelectorAll('.dash-nav-link');
+            const panels = document.querySelectorAll('.dash-panel');
+            const content = document.querySelector('.dash-content');
+
+            function showPanel(key) {
+                panels.forEach(p => p.classList.toggle('active', p.dataset.panel === key));
+                navLinks.forEach(l => {
+                    const isActive = l.dataset.panel === key;
+                    l.classList.toggle('active', isActive);
+                    l.setAttribute('aria-selected', String(isActive));
+                });
+                content.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+
+            navLinks.forEach(link => link.addEventListener('click', () => showPanel(link.dataset.panel)));
+            document.querySelectorAll('[data-goto]').forEach(el => {
+                el.addEventListener('click', () => showPanel(el.dataset.goto));
+                el.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showPanel(el.dataset.goto); }
+                });
+            });
+
+            initGymForm();
+            initRoutines();
+            initMembers();
+            initMachines();
+            initBilling();
+        });
+
+        /* ═══════════════════════════════════════
+           MI GIMNASIO — conectado a /api/gyms
+        ═══════════════════════════════════════ */
+        function initGymForm() {
+            const userId = localStorage.getItem('userId');
+            const form = document.getElementById('gym-form');
+            const badge = document.getElementById('gym-status-badge');
+            const alertBox = document.getElementById('gym-alert');
+            const btn = document.getElementById('gym-save-btn');
+            const fields = {
+                nombre: document.getElementById('gym-nombre'),
+                telefono: document.getElementById('gym-telefono'),
+                direccion: document.getElementById('gym-direccion'),
+                horario: document.getElementById('gym-horario'),
+                equipamiento: document.getElementById('gym-equipamiento'),
+                maquinas: document.getElementById('gym-maquinas')
+            };
+
+            // ─── Identidad visual ───
+            const colorInput = document.getElementById('gym-color');
+            const colorHex = document.getElementById('gym-color-hex');
+            const cuotaInput = document.getElementById('gym-cuota');
+            const directorioInput = document.getElementById('gym-directorio');
+            const logoInput = document.getElementById('gym-logo-input');
+            const logoPreview = document.getElementById('gym-logo-preview');
+            const logoClear = document.getElementById('gym-logo-clear');
+            let logoDataUrl = null;
+
+            colorInput.addEventListener('input', () => { colorHex.value = colorInput.value.toUpperCase(); });
+            colorHex.addEventListener('input', () => {
+                if (/^#[0-9a-fA-F]{6}$/.test(colorHex.value)) colorInput.value = colorHex.value;
+            });
+
+            function showLogo(dataUrl) {
+                logoDataUrl = dataUrl || null;
+                if (logoDataUrl) {
+                    logoPreview.innerHTML = '<img src="' + logoDataUrl + '" alt="Logo del gimnasio" style="max-width:100%;max-height:100%;object-fit:contain">';
+                    logoClear.classList.remove('d-none');
+                } else {
+                    logoPreview.innerHTML = '<i class="bx bx-image-add fs-2 text-body-secondary"></i>';
+                    logoClear.classList.add('d-none');
+                }
+            }
+
+            logoClear.addEventListener('click', () => { showLogo(null); logoInput.value = ''; });
+
+            // El logo se reduce en el navegador antes de subirlo: así cabe en la
+            // base de datos sin necesitar un servicio de almacenamiento aparte.
+            logoInput.addEventListener('change', () => {
+                const file = logoInput.files && logoInput.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const MAX = 512;
+                        const escala = Math.min(1, MAX / Math.max(img.width, img.height));
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.round(img.width * escala);
+                        canvas.height = Math.round(img.height * escala);
+                        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                        showLogo(canvas.toDataURL('image/png'));
+                    };
+                    img.onerror = () => {
+                        alertBox.textContent = 'No pudimos leer esa imagen. Prueba con un PNG o JPG.';
+                        alertBox.classList.remove('d-none');
+                    };
+                    img.src = reader.result;
+                };
+                reader.readAsDataURL(file);
+            });
+
+            const codeCard = document.getElementById('gym-code-card');
+            const codeValue = document.getElementById('gym-code-value');
+
+            function showCode(codigo) {
+                if (!codigo) return;
+                codeValue.textContent = codigo;
+                codeCard.classList.remove('d-none');
+            }
+
+            document.getElementById('gym-code-copy').addEventListener('click', (e) => {
+                navigator.clipboard.writeText(codeValue.textContent.trim()).then(() => {
+                    const btn = e.currentTarget;
+                    btn.innerHTML = '<i class="bx bx-check"></i> Copiado';
+                    setTimeout(() => { btn.innerHTML = '<i class="bx bx-copy"></i> Copiar'; }, 1800);
+                });
+            });
+
+            document.getElementById('gym-code-regen').addEventListener('click', () => {
+                const id = localStorage.getItem('gymId');
+                if (!id) return;
+                if (!confirm('Se generará un código nuevo y el anterior dejará de funcionar. Quien ya sea miembro no pierde su acceso. ¿Continuar?')) return;
+                fetch('/api/gyms/' + id + '/codigo', { method: 'POST' })
+                    .then(res => res.json())
+                    .then(data => showCode(data.codigo));
+            });
+
+            function setBadge(state) {
+                if (state === 'saved') {
+                    badge.className = 'badge rounded-pill bg-success bg-opacity-10 text-success px-3 py-2';
+                    badge.innerHTML = '<i class="bx bx-check-circle"></i> Configurado';
+                } else {
+                    badge.className = 'badge rounded-pill bg-warning bg-opacity-10 text-warning px-3 py-2';
+                    badge.innerHTML = '<i class="bx bx-time-five"></i> Sin configurar';
+                }
+            }
+
+            const gymId = localStorage.getItem('gymId');
+            if (gymId) {
+                fetch('/api/gyms/' + gymId)
+                    .then(res => res.ok ? res.json() : Promise.reject())
+                    .then(gym => {
+                        fields.nombre.value = gym.nombre || '';
+                        fields.telefono.value = gym.telefono || '';
+                        fields.direccion.value = gym.direccion || '';
+                        fields.horario.value = gym.horario || '';
+                        fields.equipamiento.value = gym.equipamiento || '';
+                        fields.maquinas.value = (gym.maquinas || []).join('\n');
+                        if (gym.colorPrimario) { colorInput.value = gym.colorPrimario; colorHex.value = gym.colorPrimario.toUpperCase(); }
+                        cuotaInput.value = gym.cuotaMensual != null ? gym.cuotaMensual : '';
+                        directorioInput.checked = !!gym.enDirectorio;
+                        showLogo(gym.logo);
+                        showCode(gym.codigo);
+                        setBadge('saved');
+                    })
+                    .catch(() => { /* el gimnasio pudo eliminarse; se deja el formulario vacío */ });
+            }
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                alertBox.classList.add('d-none');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Guardando...';
+
+                fetch('/api/gyms', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        nombre: fields.nombre.value.trim(),
+                        telefono: fields.telefono.value.trim(),
+                        direccion: fields.direccion.value.trim(),
+                        horario: fields.horario.value.trim(),
+                        equipamiento: fields.equipamiento.value.trim(),
+                        maquinas: fields.maquinas.value.split('\n').map(s => s.trim()).filter(Boolean),
+                        logo: logoDataUrl,
+                        colorPrimario: colorInput.value,
+                        enDirectorio: directorioInput.checked,
+                        cuotaMensual: cuotaInput.value === '' ? null : parseFloat(cuotaInput.value),
+                        ownerUserId: userId
+                    })
+                })
+                .then(res => res.json().then(data => ({ status: res.status, body: data })))
+                .then(response => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bx bx-save"></i> Guardar cambios';
+                    if (response.status === 200) {
+                        localStorage.setItem('gymId', response.body.id);
+                        showCode(response.body.codigo);
+                        setBadge('saved');
+                        unlockGymFeatures(response.body.id);
+                    } else {
+                        alertBox.textContent = response.body.error || 'No se pudo guardar el gimnasio.';
+                        alertBox.classList.remove('d-none');
+                    }
+                })
+                .catch(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bx bx-save"></i> Guardar cambios';
+                    alertBox.textContent = 'Error de conexión con el servidor.';
+                    alertBox.classList.remove('d-none');
+                });
+            });
+        }
+
+        function unlockGymFeatures(gymId) {
+            ['routine-new-btn', 'member-new-btn', 'machine-new-btn', 'machine-import-btn']
+                .forEach(id => { document.getElementById(id).disabled = false; });
+            loadRoutines(gymId);
+            loadMembers(gymId);
+            loadMachines(gymId);
+            loadBilling(gymId);
+        }
+
+        /* ═══════════════════════════════════════
+           MÁQUINAS Y EJERCICIOS — /api/gyms/{id}/machines
+        ═══════════════════════════════════════ */
+        function initMachines() {
+            const modal = new bootstrap.Modal(document.getElementById('machineModal'));
+            const form = document.getElementById('machine-form');
+            const alertBox = document.getElementById('machine-alert');
+            const saveBtn = document.getElementById('machine-save-btn');
+            const rows = document.getElementById('exercise-rows');
+
+            // Una fila por ejercicio. El id viaja oculto para no perder la
+            // referencia de ejercicios que ya existían al editar la máquina.
+            function addExerciseRow(ej) {
+                ej = ej || {};
+                const row = document.createElement('div');
+                row.className = 'row g-2 align-items-end exercise-row';
+                row.innerHTML = `
+                    <input type="hidden" class="ex-id" value="${escapeHtml(ej.id || '')}">
+                    <div class="col-md-4">
+                        <input type="text" class="form-control form-control-sm ex-nombre" placeholder="Ejercicio" value="${escapeHtml(ej.nombre || '')}">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="text" class="form-control form-control-sm ex-musculo" list="routine-categoria-options" placeholder="Músculo" value="${escapeHtml(ej.musculo || '')}">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" min="1" class="form-control form-control-sm ex-series" placeholder="Series" value="${ej.series != null ? ej.series : ''}">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="text" class="form-control form-control-sm ex-reps" placeholder="Reps" value="${escapeHtml(ej.repeticiones || '')}">
+                    </div>
+                    <div class="col-md-1 text-end">
+                        <button type="button" class="btn btn-outline-danger btn-sm rounded-circle ex-remove" title="Quitar"><i class='bx bx-x'></i></button>
+                    </div>`;
+                row.querySelector('.ex-remove').addEventListener('click', () => row.remove());
+                rows.appendChild(row);
+            }
+
+            document.getElementById('exercise-add-btn').addEventListener('click', () => addExerciseRow());
+
+            document.getElementById('machine-new-btn').addEventListener('click', () => {
+                form.reset();
+                rows.innerHTML = '';
+                document.getElementById('machine-id').value = '';
+                document.getElementById('machine-cantidad').value = 1;
+                document.getElementById('machineModalLabel').textContent = 'Nueva máquina';
+                alertBox.classList.add('d-none');
+                addExerciseRow();
+                modal.show();
+            });
+
+            document.getElementById('machine-import-btn').addEventListener('click', () => {
+                const gymId = localStorage.getItem('gymId');
+                if (!confirm('Se agregarán las máquinas más comunes con sus ejercicios. Las que ya tengas no se duplican. ¿Continuar?')) return;
+                fetch('/api/gyms/' + gymId + '/machines/import', { method: 'POST' })
+                    .then(res => res.json())
+                    .then(data => { alert(data.message); loadMachines(gymId); });
+            });
+
+            document.getElementById('machines-container').addEventListener('click', (e) => {
+                const editBtn = e.target.closest('[data-edit-machine]');
+                const delBtn = e.target.closest('[data-delete-machine]');
+                if (editBtn) {
+                    const m = JSON.parse(editBtn.dataset.editMachine);
+                    document.getElementById('machine-id').value = m.id;
+                    document.getElementById('machine-nombre').value = m.nombre || '';
+                    document.getElementById('machine-zona').value = m.zona || '';
+                    document.getElementById('machine-cantidad').value = m.cantidad || 1;
+                    document.getElementById('machine-descripcion').value = m.descripcion || '';
+                    document.getElementById('machineModalLabel').textContent = 'Editar máquina';
+                    rows.innerHTML = '';
+                    (m.ejercicios || []).forEach(addExerciseRow);
+                    if (!(m.ejercicios || []).length) addExerciseRow();
+                    alertBox.classList.add('d-none');
+                    modal.show();
+                } else if (delBtn) {
+                    if (!confirm('¿Eliminar esta máquina y sus ejercicios?')) return;
+                    fetch('/api/machines/' + delBtn.dataset.deleteMachine, { method: 'DELETE' })
+                        .then(() => loadMachines(localStorage.getItem('gymId')));
+                }
+            });
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const gymId = localStorage.getItem('gymId');
+                const id = document.getElementById('machine-id').value;
+                const ejercicios = [...rows.querySelectorAll('.exercise-row')].map(r => ({
+                    id: r.querySelector('.ex-id').value || null,
+                    nombre: r.querySelector('.ex-nombre').value.trim(),
+                    musculo: r.querySelector('.ex-musculo').value.trim(),
+                    series: r.querySelector('.ex-series').value ? parseInt(r.querySelector('.ex-series').value, 10) : null,
+                    repeticiones: r.querySelector('.ex-reps').value.trim()
+                })).filter(ej => ej.nombre);
+
+                const payload = {
+                    nombre: document.getElementById('machine-nombre').value.trim(),
+                    zona: document.getElementById('machine-zona').value.trim() || 'Sin zona',
+                    cantidad: parseInt(document.getElementById('machine-cantidad').value, 10) || 1,
+                    descripcion: document.getElementById('machine-descripcion').value.trim(),
+                    ejercicios
+                };
+
+                saveBtn.disabled = true;
+                fetch(id ? '/api/machines/' + id : '/api/gyms/' + gymId + '/machines', {
+                    method: id ? 'PUT' : 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                })
+                .then(res => res.json().then(data => ({ status: res.status, body: data })))
+                .then(response => {
+                    saveBtn.disabled = false;
+                    if (response.status === 200) { modal.hide(); loadMachines(gymId); }
+                    else { alertBox.textContent = response.body.error || 'No se pudo guardar la máquina.'; alertBox.classList.remove('d-none'); }
+                })
+                .catch(() => {
+                    saveBtn.disabled = false;
+                    alertBox.textContent = 'Error de conexión con el servidor.';
+                    alertBox.classList.remove('d-none');
+                });
+            });
+
+            const gymId = localStorage.getItem('gymId');
+            if (gymId) {
+                document.getElementById('machine-new-btn').disabled = false;
+                document.getElementById('machine-import-btn').disabled = false;
+                loadMachines(gymId);
+            }
+        }
+
+        function loadMachines(gymId) {
+            const container = document.getElementById('machines-container');
+            if (!gymId) {
+                container.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-cog fs-1 d-block mb-2 opacity-50"></i>Configura primero "Mi Gimnasio".</div>';
+                return;
+            }
+            fetch('/api/gyms/' + gymId + '/machines')
+                .then(res => res.json())
+                .then(machines => {
+                    if (!machines.length) {
+                        container.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-cog fs-1 d-block mb-2 opacity-50"></i>Aún no registras máquinas. Usa "Importar catálogo base" para empezar rápido y luego ajústalas.</div>';
+                        return;
+                    }
+                    const zonas = {};
+                    machines.forEach(m => { (zonas[m.zona || 'Sin zona'] = zonas[m.zona || 'Sin zona'] || []).push(m); });
+
+                    container.innerHTML = Object.keys(zonas).sort().map(zona => `
+                        <h6 class="text-uppercase fw-bold text-body-secondary small mb-3 mt-2" style="letter-spacing:0.06em">${escapeHtml(zona)}</h6>
+                        <div class="row g-3 mb-4">
+                            ${zonas[zona].map(m => `
+                                <div class="col-md-6 col-xl-4">
+                                    <div class="dash-empty text-start h-100 d-flex flex-column">
+                                        <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                                            <h4 class="fw-bold fs-6 mb-0">${escapeHtml(m.nombre)}</h4>
+                                            ${m.cantidad > 1 ? '<span class="badge rounded-pill bg-secondary bg-opacity-10 text-body-secondary">x' + m.cantidad + '</span>' : ''}
+                                        </div>
+                                        ${m.descripcion ? '<p class="text-body-secondary small mb-2">' + escapeHtml(m.descripcion) + '</p>' : ''}
+                                        <div class="mb-3">
+                                            ${(m.ejercicios || []).length
+                                                ? (m.ejercicios || []).map(ej => `
+                                                    <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+                                                        <span class="small">${escapeHtml(ej.nombre)}
+                                                            ${ej.musculo ? '<span class="text-body-secondary"> · ' + escapeHtml(ej.musculo) + '</span>' : ''}
+                                                        </span>
+                                                        <span class="text-body-secondary small flex-shrink-0 ps-2">${ej.series || '-'}${ej.repeticiones ? ' x ' + escapeHtml(ej.repeticiones) : ''}</span>
+                                                    </div>`).join('')
+                                                : '<span class="text-body-secondary small fst-italic">Sin ejercicios capturados todavía.</span>'}
+                                        </div>
+                                        <div class="mt-auto d-flex gap-2">
+                                            <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-edit-machine='${JSON.stringify(m).replace(/'/g, "&#39;")}'>Editar</button>
+                                            <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" data-delete-machine="${m.id}">Eliminar</button>
+                                        </div>
+                                    </div>
+                                </div>`).join('')}
+                        </div>`).join('');
+                });
+        }
+
+        /* ═══════════════════════════════════════
+           MEMBRESÍAS Y PAGOS — /api/gyms/{id}/members/{uid}/payments
+        ═══════════════════════════════════════ */
+        function initBilling() {
+            const modal = new bootstrap.Modal(document.getElementById('paymentModal'));
+            const form = document.getElementById('payment-form');
+            const alertBox = document.getElementById('payment-alert');
+            const saveBtn = document.getElementById('payment-save-btn');
+            const fechaInput = document.getElementById('payment-fecha');
+            const preview = document.getElementById('payment-preview');
+
+            // Le enseña al dueño hasta cuándo quedará cubierto ANTES de guardar,
+            // porque el corte respeta el día de pago original, no la fecha capturada.
+            function actualizarPreview() {
+                if (!fechaInput.value) { preview.textContent = ''; return; }
+                const pago = new Date(fechaInput.value + 'T00:00:00');
+                const hasta = new Date(pago);
+                hasta.setMonth(hasta.getMonth() + 1);
+                preview.innerHTML = '<i class="bx bx-info-circle"></i> Con este pago la membresía quedará cubierta aproximadamente hasta el <strong>'
+                    + hasta.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })
+                    + '</strong>. Si el usuario ya tenía saldo, se le suma.';
+            }
+            fechaInput.addEventListener('change', actualizarPreview);
+
+            document.body.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-pay-user]');
+                if (!btn) return;
+                form.reset();
+                alertBox.classList.add('d-none');
+                document.getElementById('payment-user-id').value = btn.dataset.payUser;
+                document.getElementById('payment-user-label').textContent = 'Pago de ' + btn.dataset.payName;
+                fechaInput.value = new Date().toISOString().slice(0, 10);
+                const cuota = document.getElementById('gym-cuota').value;
+                if (cuota) document.getElementById('payment-monto').value = cuota;
+                actualizarPreview();
+                modal.show();
+            });
+
+            document.getElementById('billing-run-btn').addEventListener('click', (e) => {
+                const btn = e.currentTarget;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Revisando...';
+                fetch('/api/billing/run', { method: 'POST' })
+                    .then(() => {
+                        const gymId = localStorage.getItem('gymId');
+                        loadBilling(gymId);
+                        loadMembers(gymId);
+                    })
+                    .finally(() => {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="bx bx-refresh"></i> Revisar vencimientos ahora';
+                    });
+            });
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const gymId = localStorage.getItem('gymId');
+                const userId = document.getElementById('payment-user-id').value;
+                saveBtn.disabled = true;
+                fetch('/api/gyms/' + gymId + '/members/' + userId + '/payments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        monto: document.getElementById('payment-monto').value ? parseFloat(document.getElementById('payment-monto').value) : null,
+                        metodo: document.getElementById('payment-metodo').value,
+                        fechaPago: fechaInput.value,
+                        nota: document.getElementById('payment-nota').value.trim()
+                    })
+                })
+                .then(res => res.json().then(data => ({ status: res.status, body: data })))
+                .then(response => {
+                    saveBtn.disabled = false;
+                    if (response.status === 200) {
+                        modal.hide();
+                        loadBilling(gymId);
+                        loadMembers(gymId);
+                    } else {
+                        alertBox.textContent = response.body.error || 'No se pudo registrar el pago.';
+                        alertBox.classList.remove('d-none');
+                    }
+                })
+                .catch(() => {
+                    saveBtn.disabled = false;
+                    alertBox.textContent = 'Error de conexión con el servidor.';
+                    alertBox.classList.remove('d-none');
+                });
+            });
+
+            const gymId = localStorage.getItem('gymId');
+            if (gymId) loadBilling(gymId);
+        }
+
+        // Traduce los días restantes a algo que el dueño pueda leer de un vistazo.
+        function estadoDePago(m) {
+            if (m.diasParaVencer == null) {
+                return { texto: 'Sin pagos', clase: 'bg-secondary bg-opacity-10 text-body-secondary', icono: 'bx-minus-circle', orden: 2 };
+            }
+            if (m.diasParaVencer < 0) {
+                return { texto: 'Vencida hace ' + Math.abs(m.diasParaVencer) + ' d', clase: 'bg-danger bg-opacity-10 text-danger', icono: 'bx-error-circle', orden: 0 };
+            }
+            if (m.diasParaVencer <= 5) {
+                return { texto: 'Vence en ' + m.diasParaVencer + ' d', clase: 'bg-warning bg-opacity-10 text-warning', icono: 'bx-time-five', orden: 1 };
+            }
+            return { texto: 'Al corriente', clase: 'bg-success bg-opacity-10 text-success', icono: 'bx-check-circle', orden: 3 };
+        }
+
+        function loadBilling(gymId) {
+            const tbody = document.getElementById('billing-tbody');
+            const kpis = document.getElementById('billing-kpis');
+            const paymentsBody = document.getElementById('payments-tbody');
+            if (!gymId) return;
+
+            fetch('/api/gyms/' + gymId + '/members')
+                .then(res => res.json())
+                .then(members => {
+                    const vencidos = members.filter(m => m.diasParaVencer != null && m.diasParaVencer < 0).length;
+                    const porVencer = members.filter(m => m.diasParaVencer != null && m.diasParaVencer >= 0 && m.diasParaVencer <= 5).length;
+                    const alCorriente = members.filter(m => m.diasParaVencer != null && m.diasParaVencer > 5).length;
+                    const sinPagos = members.filter(m => m.diasParaVencer == null).length;
+
+                    kpis.innerHTML = [
+                        { n: vencidos, l: 'Vencidas', i: 'bx-error-circle', c: 'text-danger' },
+                        { n: porVencer, l: 'Vencen esta semana', i: 'bx-time-five', c: 'text-warning' },
+                        { n: alCorriente, l: 'Al corriente', i: 'bx-check-circle', c: 'text-success' },
+                        { n: sinPagos, l: 'Sin pagos registrados', i: 'bx-minus-circle', c: 'text-body-secondary' }
+                    ].map(k => `
+                        <div class="col-6 col-lg-3">
+                            <div class="kpi-tile h-100">
+                                <i class="bx ${k.i} fs-3 ${k.c}"></i>
+                                <div class="fs-3 fw-bold">${k.n}</div>
+                                <small class="text-body-secondary">${k.l}</small>
+                            </div>
+                        </div>`).join('');
+
+                    if (!members.length) {
+                        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-body-secondary py-5 px-4">Todavía no tienes usuarios.</td></tr>';
+                        return;
+                    }
+
+                    // Los problemas primero: vencidos, luego por vencer.
+                    const ordenados = [...members].sort((a, b) => estadoDePago(a).orden - estadoDePago(b).orden);
+                    tbody.innerHTML = ordenados.map(m => {
+                        const est = estadoDePago(m);
+                        return `
+                        <tr>
+                            <td class="ps-4 fw-semibold">${escapeHtml(m.nombre)}<div class="text-body-secondary fw-normal small">${escapeHtml(m.email)}</div></td>
+                            <td class="text-body-secondary">${m.diaDePago ? 'Día ' + m.diaDePago : '—'}</td>
+                            <td class="text-body-secondary">${m.fechaProximoPago ? escapeHtml(m.fechaProximoPago) : '—'}</td>
+                            <td><span class="badge rounded-pill ${est.clase} px-3 py-2"><i class="bx ${est.icono}"></i> ${est.texto}</span></td>
+                            <td class="pe-4 text-end">
+                                <button type="button" class="btn btn-primary btn-sm rounded-pill px-3" data-pay-user="${m.id}" data-pay-name="${escapeHtml(m.nombre)}">
+                                    <i class='bx bx-dollar'></i> Registrar pago
+                                </button>
+                            </td>
+                        </tr>`;
+                    }).join('');
+
+                    // El historial se arma con el de cada usuario y se ordena por fecha.
+                    Promise.all(members.map(m =>
+                        fetch('/api/gyms/' + gymId + '/members/' + m.id + '/payments')
+                            .then(r => r.json())
+                            .then(ps => ps.map(p => ({ ...p, nombre: m.nombre })))
+                            .catch(() => [])
+                    )).then(listas => {
+                        const pagos = listas.flat()
+                            .sort((a, b) => String(b.fechaPago).localeCompare(String(a.fechaPago)))
+                            .slice(0, 12);
+                        paymentsBody.innerHTML = pagos.length
+                            ? pagos.map(p => `
+                                <tr>
+                                    <td class="ps-4 fw-semibold">${escapeHtml(p.nombre)}</td>
+                                    <td class="text-body-secondary">${escapeHtml(p.fechaPago || '')}</td>
+                                    <td class="fw-semibold">${p.monto != null ? '$' + Number(p.monto).toFixed(2) : '—'}</td>
+                                    <td class="text-body-secondary">${escapeHtml(p.metodo || '—')}</td>
+                                    <td class="pe-4 text-body-secondary">${escapeHtml(p.cubreHasta || '—')}</td>
+                                </tr>`).join('')
+                            : '<tr><td colspan="5" class="text-center text-body-secondary py-4 px-4">Aún no registras pagos.</td></tr>';
+                    });
+                });
+        }
+
+        /* ═══════════════════════════════════════
+           RUTINAS — conectado a /api/gyms/{id}/routines
+        ═══════════════════════════════════════ */
+        const CATEGORY_ICONS = {
+            espalda: 'bx-body', pecho: 'bx-run', pierna: 'bx-walk', hombro: 'bx-dumbbell',
+            brazo: 'bx-dumbbell', core: 'bx-analyse', cardio: 'bx-heart', movilidad: 'bx-body'
+        };
+        function iconForCategory(cat) {
+            return CATEGORY_ICONS[(cat || '').trim().toLowerCase()] || 'bx-dumbbell';
+        }
+
+        function initRoutines() {
+            const modalEl = document.getElementById('routineModal');
+            const modal = new bootstrap.Modal(modalEl);
+            const form = document.getElementById('routine-form');
+            const alertBox = document.getElementById('routine-alert');
+            const saveBtn = document.getElementById('routine-save-btn');
+
+            document.getElementById('routine-new-btn').addEventListener('click', () => {
+                form.reset();
+                document.getElementById('routine-id').value = '';
+                document.getElementById('routineModalLabel').textContent = 'Nueva rutina';
+                alertBox.classList.add('d-none');
+                modal.show();
+            });
+
+            document.getElementById('routines-container').addEventListener('click', (e) => {
+                const editBtn = e.target.closest('[data-edit-routine]');
+                const delBtn = e.target.closest('[data-delete-routine]');
+                if (editBtn) {
+                    const r = JSON.parse(editBtn.dataset.editRoutine);
+                    document.getElementById('routine-id').value = r.id;
+                    document.getElementById('routine-nombre').value = r.nombre || '';
+                    document.getElementById('routine-categoria').value = r.categoria || '';
+                    document.getElementById('routine-duracion').value = r.duracion || '';
+                    document.getElementById('routine-descripcion').value = r.descripcion || '';
+                    document.getElementById('routine-ejercicios').value = (r.ejercicios || []).join('\n');
+                    document.getElementById('routine-dia').value = r.dia || '';
+                    document.getElementById('routine-coach').value = r.coach || '';
+                    document.getElementById('routine-nivel').value = r.nivel || '';
+                    document.getElementById('routineModalLabel').textContent = 'Editar rutina';
+                    alertBox.classList.add('d-none');
+                    modal.show();
+                } else if (delBtn) {
+                    if (!confirm('¿Eliminar esta rutina? Esta acción no se puede deshacer.')) return;
+                    fetch('/api/routines/' + delBtn.dataset.deleteRoutine, { method: 'DELETE' })
+                        .then(() => loadRoutines(localStorage.getItem('gymId')));
+                }
+            });
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const gymId = localStorage.getItem('gymId');
+                const id = document.getElementById('routine-id').value;
+                const payload = {
+                    nombre: document.getElementById('routine-nombre').value.trim(),
+                    categoria: document.getElementById('routine-categoria').value.trim(),
+                    duracion: document.getElementById('routine-duracion').value.trim(),
+                    descripcion: document.getElementById('routine-descripcion').value.trim(),
+                    ejercicios: document.getElementById('routine-ejercicios').value
+                        .split('\n').map(s => s.trim()).filter(Boolean),
+                    dia: document.getElementById('routine-dia').value,
+                    coach: document.getElementById('routine-coach').value.trim(),
+                    nivel: document.getElementById('routine-nivel').value
+                };
+                const url = id ? '/api/routines/' + id : '/api/gyms/' + gymId + '/routines';
+                const method = id ? 'PUT' : 'POST';
+
+                saveBtn.disabled = true;
+                fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+                    .then(res => res.json().then(data => ({ status: res.status, body: data })))
+                    .then(response => {
+                        saveBtn.disabled = false;
+                        if (response.status === 200) {
+                            modal.hide();
+                            loadRoutines(gymId);
+                        } else {
+                            alertBox.textContent = response.body.error || 'No se pudo guardar la rutina.';
+                            alertBox.classList.remove('d-none');
+                        }
+                    })
+                    .catch(() => {
+                        saveBtn.disabled = false;
+                        alertBox.textContent = 'Error de conexión con el servidor.';
+                        alertBox.classList.remove('d-none');
+                    });
+            });
+
+            const initialGymId = localStorage.getItem('gymId');
+            document.getElementById('routine-new-btn').disabled = !initialGymId;
+            loadRoutines(initialGymId);
+        }
+
+        function loadRoutines(gymId) {
+            const container = document.getElementById('routines-container');
+            if (!gymId) {
+                container.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-dumbbell fs-1 d-block mb-2 opacity-50"></i>Configura primero "Mi Gimnasio" para poder crear rutinas.</div>';
+                return;
+            }
+            fetch('/api/gyms/' + gymId + '/routines')
+                .then(res => res.json())
+                .then(routines => {
+                    if (!routines.length) {
+                        container.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-dumbbell fs-1 d-block mb-2 opacity-50"></i>Aún no has creado rutinas. Crea la primera con "Nueva rutina".</div>';
+                        return;
+                    }
+                    const groups = {};
+                    routines.forEach(r => {
+                        const cat = r.categoria || 'Sin categoría';
+                        (groups[cat] = groups[cat] || []).push(r);
+                    });
+                    container.innerHTML = Object.keys(groups).sort().map(cat => `
+                        <h6 class="text-uppercase fw-bold text-body-secondary small mb-3 mt-2" style="letter-spacing:0.06em">${cat}</h6>
+                        <div class="row g-3 mb-4">
+                            ${groups[cat].map(r => `
+                                <div class="col-md-4">
+                                    <div class="dash-empty text-start h-100 d-flex flex-column">
+                                        <div class="icon-circle icon-brand rounded-circle d-flex align-items-center justify-content-center mb-3" style="width:54px;height:54px">
+                                            <i class="bx ${iconForCategory(r.categoria)} fs-3"></i>
+                                        </div>
+                                        <h4 class="fw-bold fs-6">${escapeHtml(r.nombre)}</h4>
+                                        <div class="d-flex flex-wrap gap-1 mb-2">
+                                            ${r.dia ? '<span class="badge rounded-pill bg-primary bg-opacity-10 text-primary"><i class="bx bx-calendar"></i> ' + escapeHtml(r.dia) + '</span>' : ''}
+                                            ${r.nivel ? '<span class="badge rounded-pill bg-secondary bg-opacity-10 text-body-secondary">' + escapeHtml(r.nivel) + '</span>' : ''}
+                                            ${r.duracion ? '<span class="badge rounded-pill bg-secondary bg-opacity-10 text-body-secondary"><i class="bx bx-time-five"></i> ' + escapeHtml(r.duracion) + '</span>' : ''}
+                                        </div>
+                                        ${r.coach ? '<small class="text-body-secondary d-block mb-1"><i class="bx bx-user-voice"></i> Coach ' + escapeHtml(r.coach) + '</small>' : ''}
+                                        <p class="text-body-secondary small mb-3">${escapeHtml(r.descripcion || (r.ejercicios || []).join(', '))}</p>
+                                        <div class="mt-auto d-flex gap-2">
+                                            <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-edit-routine='${JSON.stringify(r).replace(/'/g, "&#39;")}'>Editar</button>
+                                            <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" data-delete-routine="${r.id}">Eliminar</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `).join('');
+                });
+        }
+
+        /* ═══════════════════════════════════════
+           MIS USUARIOS — conectado a /api/gyms/{id}/members
+        ═══════════════════════════════════════ */
+        function initMembers() {
+            const modalEl = document.getElementById('memberModal');
+            const modal = new bootstrap.Modal(modalEl);
+            const form = document.getElementById('member-form');
+            const alertBox = document.getElementById('member-alert');
+            const saveBtn = document.getElementById('member-save-btn');
+
+            document.getElementById('member-new-btn').addEventListener('click', () => {
+                form.reset();
+                alertBox.classList.add('d-none');
+                modal.show();
+            });
+
+            document.getElementById('members-tbody').addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-member-action]');
+                if (!btn) return;
+                const gymId = localStorage.getItem('gymId');
+                const action = btn.dataset.memberAction;
+                const url = '/api/gyms/' + gymId + '/members/' + btn.dataset.userId;
+
+                // "remove" desvincula del gimnasio; el resto solo cambia el estado.
+                if (action === 'remove') {
+                    if (!confirm('Se desvinculará del gimnasio. Conserva su cuenta y podrá volver a pedir acceso con el código. ¿Continuar?')) return;
+                    btn.disabled = true;
+                    fetch(url, { method: 'DELETE' }).then(() => loadMembers(gymId));
+                    return;
+                }
+
+                btn.disabled = true;
+                fetch(url, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: action })
+                })
+                .then(() => loadMembers(gymId));
+            });
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const gymId = localStorage.getItem('gymId');
+                const payload = {
+                    nombre: document.getElementById('member-nombre').value.trim(),
+                    email: document.getElementById('member-email').value.trim(),
+                    password: document.getElementById('member-password').value
+                };
+                saveBtn.disabled = true;
+                fetch('/api/gyms/' + gymId + '/members', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                })
+                .then(res => res.json().then(data => ({ status: res.status, body: data })))
+                .then(response => {
+                    saveBtn.disabled = false;
+                    if (response.status === 200) {
+                        modal.hide();
+                        loadMembers(gymId);
+                    } else {
+                        alertBox.textContent = response.body.error || 'No se pudo dar de alta al usuario.';
+                        alertBox.classList.remove('d-none');
+                    }
+                })
+                .catch(() => {
+                    saveBtn.disabled = false;
+                    alertBox.textContent = 'Error de conexión con el servidor.';
+                    alertBox.classList.remove('d-none');
+                });
+            });
+
+            const gymId = localStorage.getItem('gymId');
+            if (gymId) {
+                document.getElementById('member-new-btn').disabled = false;
+                loadMembers(gymId);
+            }
+        }
+
+        function loadMembers(gymId) {
+            const tbody = document.getElementById('members-tbody');
+            const countLabel = document.getElementById('members-count');
+            if (!gymId) return;
+            fetch('/api/gyms/' + gymId + '/members')
+                .then(res => res.json())
+                .then(members => {
+                    const pendientes = members.filter(m => m.membershipStatus === 'pending').length;
+                    countLabel.textContent = members.length + (members.length === 1 ? ' usuario' : ' usuarios')
+                        + (pendientes ? ' · ' + pendientes + (pendientes === 1 ? ' solicitud por revisar' : ' solicitudes por revisar') : '');
+
+                    if (!members.length) {
+                        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-body-secondary py-5 px-4"><i class="bx bx-group fs-1 d-block mb-2 opacity-50"></i>Todavía no hay usuarios. Comparte tu código de acceso, o usa "Agregar usuario" para crear la cuenta tú mismo.</td></tr>';
+                        return;
+                    }
+
+                    // Cada estado ofrece solo las acciones que tienen sentido desde ahí.
+                    const ESTADOS = {
+                        pending: {
+                            badge: '<span class="badge rounded-pill bg-warning bg-opacity-10 text-warning px-3 py-2"><i class="bx bx-time-five"></i> Solicitud pendiente</span>',
+                            acciones: (id) =>
+                                '<button type="button" class="btn btn-success btn-sm rounded-pill px-3" data-member-action="active" data-user-id="' + id + '">Aprobar</button>'
+                                + ' <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" data-member-action="remove" data-user-id="' + id + '">Rechazar</button>'
+                        },
+                        active: {
+                            badge: '<span class="badge rounded-pill bg-success bg-opacity-10 text-success px-3 py-2"><i class="bx bx-check-circle"></i> Activo</span>',
+                            acciones: (id) =>
+                                '<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" data-member-action="inactive" data-user-id="' + id + '">Dar de baja</button>'
+                        },
+                        inactive: {
+                            badge: '<span class="badge rounded-pill bg-danger bg-opacity-10 text-danger px-3 py-2"><i class="bx bx-block"></i> Dado de baja</span>',
+                            acciones: (id) =>
+                                '<button type="button" class="btn btn-outline-success btn-sm rounded-pill px-3" data-member-action="active" data-user-id="' + id + '">Dar de alta</button>'
+                                + ' <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-member-action="remove" data-user-id="' + id + '">Quitar</button>'
+                        }
+                    };
+
+                    tbody.innerHTML = members.map(m => {
+                        const estado = ESTADOS[m.membershipStatus] || ESTADOS.active;
+                        const pago = estadoDePago(m);
+                        return `
+                        <tr${m.membershipStatus === 'pending' ? ' class="table-warning bg-opacity-10"' : ''}>
+                            <td class="ps-4 fw-semibold">${escapeHtml(m.nombre)}</td>
+                            <td class="text-body-secondary">${escapeHtml(m.email)}</td>
+                            <td>${estado.badge}</td>
+                            <td>
+                                <span class="badge rounded-pill ${pago.clase} px-3 py-2"><i class="bx ${pago.icono}"></i> ${pago.texto}</span>
+                                ${m.fechaProximoPago ? '<div class="text-body-secondary small mt-1">Vence ' + escapeHtml(m.fechaProximoPago) + '</div>' : ''}
+                            </td>
+                            <td class="pe-4 text-end">
+                                <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3 mb-1" data-pay-user="${m.id}" data-pay-name="${escapeHtml(m.nombre)}">
+                                    <i class='bx bx-dollar'></i> Pago
+                                </button>
+                                ${estado.acciones(m.id)}
+                            </td>
+                        </tr>`;
+                    }).join('');
+                });
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str == null ? '' : String(str);
+            return div.innerHTML;
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
