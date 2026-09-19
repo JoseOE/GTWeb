@@ -129,6 +129,15 @@ a:focus-visible, button:focus-visible, .btn:focus-visible,
 }
 .btn-outline-primary:hover { box-shadow: var(--shadow-brand); }
 .btn-outline-light:hover { box-shadow: 0 14px 32px -10px rgba(255, 255, 255, 0.35); }
+/* — Botón "Cerrar Sesión" sobre navbar oscuro: el rojo Bootstrap por defecto
+   no cumple 4.5:1 sobre #212529, así que se aclara solo en este contexto — */
+.navbar-dark .btn-outline-danger {
+    --bs-btn-color: #ff8a80;
+    --bs-btn-border-color: #ff8a80;
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #dc3545;
+    --bs-btn-hover-border-color: #dc3545;
+}
 .spinner-border.text-primary { color: var(--brand) !important; }
 .whatsapp-float:active { transform: scale(1.05); }
 
@@ -574,4 +583,130 @@ footer.bg-dark::before {
     section.py-5 { padding-top: 3rem !important; padding-bottom: 3rem !important; }
     .card-hover:hover, .service-card:hover { transform: translateY(-4px); }
     .scroll-cue { display: none; }
+}
+
+/* ═══════════════════════════════════════
+   PANEL DE ADMINISTRACIÓN (vista previa)
+   — bienvenido.html —
+═══════════════════════════════════════ */
+.dash-wrap {
+    display: flex;
+    align-items: stretch;
+    min-height: calc(100vh - 76px);
+}
+.dash-sidebar {
+    width: 264px;
+    flex-shrink: 0;
+    background: #fff;
+    border-right: 1px solid rgba(20, 20, 25, 0.08);
+}
+.dash-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 1.5rem 0.9rem;
+    position: sticky;
+    top: 0;
+}
+.dash-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.7rem 0.9rem;
+    border: none;
+    background: transparent;
+    border-radius: 0.75rem;
+    color: #55586a;
+    font-weight: 500;
+    font-size: 0.92rem;
+    text-align: left;
+    position: relative;
+    transition: background-color 0.25s ease, color 0.25s ease;
+}
+.dash-nav-link i { font-size: 1.25rem; flex-shrink: 0; }
+.dash-nav-link::before {
+    content: '';
+    position: absolute;
+    left: -0.9rem; top: 18%; bottom: 18%;
+    width: 3px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, var(--brand), var(--brand-light));
+    transform: scaleY(0);
+    transition: transform 0.25s var(--ease-out);
+}
+.dash-nav-link:hover { background: rgba(var(--brand-rgb), 0.06); color: #23262e; }
+.dash-nav-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.dash-nav-link.active {
+    background: rgba(var(--brand-rgb), 0.1);
+    color: #b8390f;
+    font-weight: 600;
+}
+.dash-nav-link.active::before { transform: scaleY(1); }
+
+.dash-content {
+    flex: 1;
+    min-width: 0;
+    padding: 2rem clamp(1.25rem, 4vw, 3rem) 3rem;
+    max-height: calc(100vh - 76px);
+    overflow-y: auto;
+}
+.dash-panel { display: none; }
+.dash-panel.active { display: block; animation: fadeInUp 0.4s var(--ease-out) forwards; }
+
+.kpi-tile {
+    background: #fff;
+    border-radius: 1rem;
+    padding: 1.25rem 1.4rem;
+    border: 1px solid rgba(20, 20, 25, 0.06);
+    box-shadow: var(--shadow-soft);
+    height: 100%;
+}
+.kpi-tile .kpi-value { font-size: 1.9rem; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+
+.dash-empty {
+    background: #fff;
+    border-radius: 1.25rem;
+    border: 1px solid rgba(20, 20, 25, 0.06);
+    box-shadow: var(--shadow-soft);
+    padding: clamp(1.5rem, 4vw, 2.5rem);
+}
+
+.dash-table thead th { font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: #6c757d; border-bottom-width: 1px; }
+.dash-table td, .dash-table th { vertical-align: middle; }
+.dash-table tbody tr:hover { background: rgba(var(--brand-rgb), 0.03); }
+
+.feature-preview-card {
+    background: #fff;
+    border-radius: 1.25rem;
+    border: 1px solid rgba(20, 20, 25, 0.06);
+    box-shadow: var(--shadow-soft);
+    padding: 1.75rem;
+    height: 100%;
+    transition: transform 0.3s var(--ease-out), box-shadow 0.3s var(--ease-out);
+}
+.feature-preview-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
+
+.roadmap-tile {
+    background: #fff;
+    border-radius: 1rem;
+    border: 1px solid rgba(20, 20, 25, 0.06);
+    padding: 1.1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    cursor: pointer;
+    transition: transform 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out), border-color 0.25s ease;
+}
+.roadmap-tile:hover { transform: translateY(-3px); box-shadow: var(--shadow-soft); border-color: rgba(var(--brand-rgb), 0.3); }
+.roadmap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+@media (max-width: 991.98px) {
+    .dash-wrap { flex-direction: column; min-height: auto; }
+    .dash-sidebar { width: 100%; border-right: none; border-bottom: 1px solid rgba(20, 20, 25, 0.08); position: sticky; top: 0; z-index: 10; }
+    .dash-nav { flex-direction: row; overflow-x: auto; padding: 0.75rem; gap: 0.4rem; position: static; -webkit-overflow-scrolling: touch; }
+    .dash-nav-link { width: auto; white-space: nowrap; flex-shrink: 0; }
+    .dash-nav-link::before { left: 50%; top: auto; bottom: -0.35rem; width: 60%; height: 3px; transform: scaleX(0); }
+    .dash-nav-link.active::before { transform: scaleX(1); }
+    .dash-content { max-height: none; overflow-y: visible; }
 }

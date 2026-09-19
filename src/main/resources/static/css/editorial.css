@@ -814,6 +814,33 @@ button,a,input,summary {
 .gym-interior .form-control::placeholder {
     color:#707269
 }
+.gym-interior .dash-sidebar {
+    background:#e8e9df
+}
+.gym-interior .dash-nav-link {
+    border-radius:5px
+}
+.gym-interior .dash-nav-link.active {
+    background:var(--ink);
+    color:#ff8c66
+}
+.gym-interior .dash-nav-link::before {
+    display:none
+}
+.gym-interior .kpi-tile,.gym-interior .dash-empty,.gym-interior .feature-preview-card,.gym-interior .roadmap-tile {
+    box-shadow:none;
+    border-color:var(--line);
+    border-radius:12px
+}
+.gym-interior .kpi-value {
+    font-family:var(--identity)
+}
+.gym-interior .dash-panel.active {
+    animation:none
+}
+.gym-interior .dash-content {
+    background:var(--paper)
+}
 @media(prefers-reduced-motion:no-preference) {
     .headline-line {
         animation:headline-arrive .75s var(--ease-out) both
