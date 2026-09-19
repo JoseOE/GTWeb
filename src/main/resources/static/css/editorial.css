@@ -693,6 +693,62 @@ button,a,input,summary {
 .footer-bottom a:hover {
     color:var(--brand)
 }
+/* Supporting surfaces keep compact, legible typography for real tasks. */
+.gym-interior {
+    --bs-body-tertiary-bg:var(--paper);
+    background:var(--paper)!important
+}
+.gym-interior .bg-dark {
+    background:var(--ink)!important
+}
+.gym-interior .navbar-brand {
+    font-family:var(--identity)
+}
+.gym-interior .auth-shell {
+    background:var(--paper)
+}
+.gym-interior .auth-shell>.container {
+    max-width:1200px
+}
+.gym-interior .auth-shell .row {
+    --bs-gutter-x:5rem
+}
+.gym-interior .auth-shell .col-lg-5:first-child {
+    text-align:left!important
+}
+.gym-interior .auth-shell .col-lg-5:first-child img {
+    height:320px;
+    width:100%;
+    object-fit:cover;
+    filter:grayscale(1);
+    border-radius:6px!important;
+    box-shadow:none!important
+}
+.gym-interior .font-display {
+    font-family:var(--display);
+    font-size:48px;
+    text-transform:uppercase;
+    line-height:1
+}
+.gym-interior .auth-card {
+    background:#fff;
+    border-radius:12px!important;
+    box-shadow:0 18px 50px -28px #20221f50!important;
+    backdrop-filter:none
+}
+.gym-interior .auth-card::before {
+    background:var(--brand);
+    height:4px
+}
+.gym-interior .auth-card h3 {
+    font-family:var(--identity);
+    font-size:26px;
+    letter-spacing:-.04em
+}
+.gym-interior .auth-icon-circle {
+    background:#fbe5dc;
+    box-shadow:none
+}
 .gym-interior .btn,.gym-editorial .modal .btn {
     border-radius:5px!important;
     box-shadow:none!important
@@ -719,6 +775,22 @@ button,a,input,summary {
     border-color:var(--brand-dark);
     color:#fff
 }
+.gym-interior .text-primary {
+    color:var(--brand-dark)!important
+}
+.gym-interior .navbar .text-primary {
+    color:var(--brand)!important
+}
+.gym-interior .input-group-text {
+    background:#f4f4ee!important
+}
+.gym-interior .form-control {
+    font-size:15px;
+    min-height:48px
+}
+.gym-interior .form-control::placeholder {
+    color:#707269
+}
 @media(prefers-reduced-motion:no-preference) {
     .headline-line {
         animation:headline-arrive .75s var(--ease-out) both
@@ -737,6 +809,9 @@ button,a,input,summary {
     }
     .feature-body {
         animation:detail-arrive .3s var(--ease-out)
+    }
+    .gym-interior .auth-card {
+        animation:detail-arrive .4s var(--ease-out)
     }
     
 }
@@ -1051,6 +1126,16 @@ button,a,input,summary {
         flex-wrap:wrap;
         gap:20px
     }
+    .gym-interior .auth-shell .row {
+        --bs-gutter-x:1.5rem
+    }
+    .gym-interior .navbar .btn {
+        font-size:12px;
+        padding-inline:12px!important
+    }
+    .gym-interior .navbar-brand {
+        font-size:23px!important
+    }
     
 }
 /* Editorial carousel: all panels share one grid cell to prevent layout jumps. */
@@ -1193,6 +1278,9 @@ button,a,input,summary {
     .hero-slide-panel .hero-visual {min-height:310px;}
     .hero-slide-panel .hero-copy>p {min-height:75px;}
     .hero-slide-panel .hero-actions {flex-direction:column;align-items:flex-start;}
+}
+.gym-interior .navbar-brand>span {
+    color:var(--paper)
 }
 .route-button:disabled {
     opacity:.65;
