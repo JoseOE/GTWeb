@@ -174,6 +174,85 @@ a:focus-visible, button:focus-visible, .btn:focus-visible,
 }
 
 /* ═══════════════════════════════════════
+   HERO — profundidad cinematográfica
+═══════════════════════════════════════ */
+.hero-slide {
+    height: 92vh;
+    min-height: 620px;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+    overflow: hidden;
+}
+.hero-slide::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: inherit;
+    background-size: cover;
+    background-position: center;
+    animation: kenBurns 16s var(--ease-out) infinite alternate;
+    z-index: 0;
+}
+.hero-slide::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(5, 6, 10, 0.55) 0%, rgba(5, 6, 10, 0.45) 45%, rgba(5, 6, 10, 0.88) 100%);
+    z-index: 1;
+}
+.hero-slide, .hero-slide .carousel-caption { background-image: none; }
+.slide-1::before { background-image: url('https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1470&auto=format&fit=crop'); }
+.slide-2::before { background-image: url('https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=1470&auto=format&fit=crop'); }
+.slide-3::before { background-image: url('https://images.unsplash.com/photo-1518611012118-696072aa579a?q=80&w=1470&auto=format&fit=crop'); }
+@keyframes kenBurns {
+    from { transform: scale(1); }
+    to   { transform: scale(1.12); }
+}
+.carousel-caption { z-index: 2; }
+.hero-slide .badge {
+    backdrop-filter: blur(6px);
+    box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.5);
+}
+.hero-slide h1 { text-shadow: 0 6px 30px rgba(0, 0, 0, 0.35); }
+.carousel-indicators [data-bs-target] {
+    transition: width 0.35s var(--ease-out), opacity 0.3s ease, background-color 0.3s ease;
+    opacity: 0.55;
+}
+.carousel-indicators .active { width: 42px !important; opacity: 1; background-color: var(--brand) !important; }
+.carousel-control-prev, .carousel-control-next { width: 6%; opacity: 0; transition: opacity 0.3s ease; }
+header:hover .carousel-control-prev,
+header:hover .carousel-control-next { opacity: 0.85; }
+.carousel-control-prev-icon, .carousel-control-next-icon {
+    background-color: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(6px);
+    border-radius: 50%;
+    padding: 22px;
+    background-size: 45%;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    transition: background-color 0.25s ease, transform 0.25s ease;
+}
+.carousel-control-prev:hover .carousel-control-prev-icon,
+.carousel-control-next:hover .carousel-control-next-icon {
+    background-color: rgba(var(--brand-rgb), 0.85);
+    transform: scale(1.08);
+}
+
+/* — Scroll cue debajo del hero — */
+.scroll-cue {
+    position: absolute;
+    bottom: 18px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 1.6rem;
+    animation: bounceCue 2.2s ease-in-out infinite;
+    pointer-events: none;
+}
+@keyframes bounceCue {
+    0%, 100% { transform: translate(-50%, 0); opacity: 0.6; }
+    50% { transform: translate(-50%, 10px); opacity: 1; }
+}
+
+/* ═══════════════════════════════════════
    BLOBS DECORATIVOS (ambiente de fondo)
 ═══════════════════════════════════════ */
 .bg-blobs { position: relative; overflow: hidden; isolation: isolate; }
@@ -340,10 +419,16 @@ footer.bg-dark::before {
 
 /* — Responsive — */
 @media (max-width: 991px) and (min-width: 769px) {
+    .hero-slide { height: 82vh; }
     section.py-5 { padding-top: 4rem !important; padding-bottom: 4rem !important; }
 }
 
 @media (max-width: 768px) {
+    .hero-slide { height: 78vh; min-height: 460px; }
+    .hero-slide h1 { font-size: 2.2rem !important; }
+    .hero-slide .fs-5 { font-size: 1rem !important; }
+    .carousel-control-prev, .carousel-control-next { display: none; }
     section.py-5 { padding-top: 3rem !important; padding-bottom: 3rem !important; }
     .card-hover:hover, .service-card:hover { transform: translateY(-4px); }
+    .scroll-cue { display: none; }
 }
