@@ -142,6 +142,10 @@ function initScrollAnimations() {
 }
 
 function initEditorialInteractions() {
+    const details = document.querySelectorAll('.feature-accordion details');
+    details.forEach(item => item.addEventListener('toggle', () => {
+        if (item.open) details.forEach(other => { if (other !== item) other.open = false; });
+    }));
     const menu = document.getElementById('navbarNav');
     if (!menu || typeof bootstrap === 'undefined') return;
     menu.querySelectorAll('a[href^="#"]').forEach(link => link.addEventListener('click', () => {
