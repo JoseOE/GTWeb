@@ -207,7 +207,7 @@ function fetchServices(opciones = {}) {
             container.innerHTML = `
                 <div class="catalog-state" role="status">
                     <i class="bx bx-wifi-off" aria-hidden="true"></i><div><h3>El catálogo no está disponible por ahora</h3><p>Puedes volver a intentarlo o escribirnos para conocer las soluciones.</p></div>
-                    <button type="button" id="retry-services">Reintentar</button>
+                    <button type="button" id="retry-services">Reintentar</button><a class="text-link dark-link" href="https://wa.me/527721013839" target="_blank" rel="noopener noreferrer">Consultar al equipo <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></a>
                 </div>`;
             document.getElementById('retry-services').addEventListener('click', () => fetchServices());
         })
@@ -219,7 +219,7 @@ function renderServices() {
     if (!container) return;
 
     if (!currentServices.length) {
-        container.innerHTML = '<div class="catalog-state"><i class="bx bx-layer" aria-hidden="true"></i><div><h3>Estamos preparando el catálogo</h3><p>Cuéntanos qué necesita tu gimnasio y te orientamos.</p></div></div>';
+        container.innerHTML = '<div class="catalog-state"><i class="bx bx-layer" aria-hidden="true"></i><div><h3>Estamos preparando el catálogo</h3><p>Cuéntanos qué necesita tu gimnasio y te orientamos.</p></div><a class="text-link dark-link" href="https://wa.me/527721013839" target="_blank" rel="noopener noreferrer">Consultar al equipo <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></a></div>';
         return;
     }
 
@@ -413,4 +413,7 @@ function populateServiceModal(s) {
     } else {
         document.getElementById('sm-simple-price-text').innerHTML = precioHtml(s.precio);
     }
+
+    const waMsg = encodeURIComponent(`Hola, me interesa cotizar: ${s.nombre}`);
+    document.getElementById('sm-whatsapp-btn').href = `https://wa.me/527721013839?text=${waMsg}`;
 }
