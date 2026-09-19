@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{correos/base :: correo('Restablece tu contraseña', ~{::#cuerpo})}">
+<body>
+<div id="cuerpo">
+    <p style="margin:0 0 16px;" th:text="|${saludo}:|">Hola, Juan:</p>
+    <p style="margin:0 0 20px;">Recibimos una solicitud para restablecer la contraseña de tu cuenta de GymTrack. Usa este botón para crear una nueva:</p>
+    <p style="margin:0 0 24px;">
+        <a th:href="${enlace}" href="#" style="display:inline-block;padding:14px 24px;background-color:#f45124;color:#191b18;border-radius:4px;font-weight:700;text-decoration:none;">Crear una contraseña nueva</a>
+    </p>
+    <p style="margin:0 0 12px;font-size:13px;color:#62645d;" th:text="|El enlace vence en ${minutos} minutos y solo se puede usar una vez.|">El enlace vence en 30 minutos.</p>
+    <p style="margin:0;font-size:13px;color:#62645d;">Si tú no lo pediste, ignora este correo: tu contraseña no cambia.</p>
+</div>
+</body>
+</html>

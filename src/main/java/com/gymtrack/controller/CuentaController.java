@@ -37,6 +37,22 @@ public class CuentaController {
         return ResponseEntity.ok(Map.of("message", "Si tu cuenta tiene la verificación pendiente, te enviamos un código nuevo."));
     }
 
+    // POST /api/cuenta/recuperar → manda el enlace para restablecer la contraseña.
+    // La respuesta es la misma aunque el correo no exista.
+    @PostMapping("/recuperar")
+    public ResponseEntity<?> recuperar(@RequestBody Map<String, String> body) {
+        cuentaService.solicitarRecuperacion(body.get("email"));
+        return ResponseEntity.ok(Map.of("message",
+                "Si hay una cuenta con ese correo, te enviamos un enlace para restablecer tu contraseña. Revisa también la carpeta de spam."));
+    }
+
+    // POST /api/cuenta/restablecer → {token, password} desde restablecer.html.
+    @PostMapping("/restablecer")
+    public ResponseEntity<?> restablecer(@RequestBody Map<String, String> body) {
+        cuentaService.restablecerContrasena(body.get("token"), body.get("password"));
+        return ResponseEntity.ok(Map.of("message", "Tu contraseña se actualizó. Ya puedes iniciar sesión."));
+    }
+
     @ExceptionHandler(CuentaException.class)
     public ResponseEntity<Map<String, String>> manejarError(CuentaException e) {
         return ResponseEntity.status(e.getStatus()).body(Map.of("error", e.getMessage()));

@@ -11,6 +11,9 @@ import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -23,6 +26,7 @@ public class CorreoService {
 
     private static final Logger log = LoggerFactory.getLogger(CorreoService.class);
     private static final Locale ES_MX = Locale.forLanguageTag("es-MX");
+    private static final ZoneId ZONA_MX = ZoneId.of("America/Mexico_City");
 
     private final JavaMailSender mailSender;
     private final TemplateEngine plantillas;
@@ -54,6 +58,17 @@ public class CorreoService {
                 "saludo", saludo(user), "esMiembro", "member".equals(user.getRole()), "enlace", enlace("login.html")));
     }
 
+    public boolean recuperarContrasena(User user, String enlace, long minutos) {
+        if (!configurado()) log.warn("Correo sin configurar: el enlace para restablecer la contraseña de {} es {}", user.getEmail(), enlace);
+        return enviar(user.getEmail(), "Restablece tu contraseña de GymTrack", "recuperar-contrasena", Map.of(
+                "saludo", saludo(user), "enlace", enlace, "minutos", minutos));
+    }
+
+    public boolean contrasenaCambiada(User user) {
+        return enviar(user.getEmail(), "Tu contraseña de GymTrack cambió", "contrasena-cambiada", Map.of(
+                "saludo", saludo(user), "fecha", ahora(), "enlace", enlace("recuperar.html")));
+    }
+
     // Un correo que falla nunca tumba la operación que lo pidió: se avisa en la
     // consola y quien llama decide qué decirle al usuario.
     boolean enviar(String para, String asunto, String plantilla, Map<String, Object> variables) {
@@ -83,6 +98,11 @@ public class CorreoService {
 
     private boolean configurado() {
         return !remitente.isBlank();
+    }
+
+    // Fecha y hora del centro de México, p. ej. "19 de septiembre de 2026 a las 14:05".
+    private static String ahora() {
+        return ZonedDateTime.now(ZONA_MX).format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy 'a las' HH:mm", ES_MX));
     }
 
     // "Hola, Juan" con el primer nombre; "Hola" si la cuenta no tiene nombre.

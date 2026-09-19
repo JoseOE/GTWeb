@@ -4,6 +4,7 @@ import com.gymtrack.model.TokenCuenta;
 import com.gymtrack.model.User;
 import com.gymtrack.repository.TokenCuentaRepository;
 import com.gymtrack.repository.UserRepository;
+import com.gymtrack.util.PasswordUtil;
 import com.gymtrack.util.TokenUtil;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import java.time.Instant;
 public class CuentaService {
 
     static final Duration VIGENCIA_CODIGO = Duration.ofMinutes(15);
+    static final Duration VIGENCIA_RECUPERACION = Duration.ofMinutes(30);
     static final Duration ESPERA_REENVIO = Duration.ofSeconds(60);
     static final int MAX_INTENTOS = 5;
 
@@ -73,6 +75,44 @@ public class CuentaService {
         tokenRepository.deleteByUserIdAndTipo(user.getId(), TokenCuenta.VERIFICAR_CORREO);
         if (eraPendiente) correoService.bienvenida(user);
         return user;
+    }
+
+    // ─── Recuperar contraseña ───
+
+    // Responde igual exista o no la cuenta, para no revelar qué correos están
+    // registrados. Un segundo pedido en menos de un minuto se ignora en silencio.
+    public void solicitarRecuperacion(String email) {
+        User user = userRepository.findByEmail(limpiar(email)).orElse(null);
+        if (user == null) return;
+        try {
+            Emitido emitido = emitir(user, TokenCuenta.RECUPERAR_CONTRASENA, VIGENCIA_RECUPERACION, null);
+            correoService.recuperarContrasena(user,
+                    correoService.enlace("restablecer.html?token=" + emitido.enlace()), VIGENCIA_RECUPERACION.toMinutes());
+        } catch (CuentaException pedidoRepetido) {
+            // Ya se mandó un enlace hace menos de un minuto.
+        }
+    }
+
+    public void restablecerContrasena(String enlace, String nueva) {
+        String error = "El enlace no es válido o ya venció. Pide uno nuevo.";
+        TokenCuenta token = tokenPorEnlace(enlace, TokenCuenta.RECUPERAR_CONTRASENA, error);
+        exigirSegura(nueva);
+        User user = userRepository.findById(token.getUserId())
+                .orElseThrow(() -> new CuentaException(HttpStatus.BAD_REQUEST, error));
+
+        user.setPassword(PasswordUtil.hash(nueva));
+        // Abrir el enlace demuestra que el correo es suyo: si faltaba verificarlo, queda verificado.
+        if (user.correoPendienteDeVerificar()) user.setEmailVerificado(true);
+        userRepository.save(user);
+        tokenRepository.deleteByUserIdAndTipo(user.getId(), TokenCuenta.RECUPERAR_CONTRASENA);
+        correoService.contrasenaCambiada(user);
+    }
+
+    private static void exigirSegura(String password) {
+        if (!PasswordUtil.esSegura(password)) {
+            throw new CuentaException(HttpStatus.BAD_REQUEST,
+                    "La contraseña debe tener al menos 8 caracteres, con una letra, un número y un símbolo.");
+        }
     }
 
     // ─── Tokens ───
