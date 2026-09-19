@@ -1,3 +1,9 @@
+# ─── Secretos ───
+# Contraseñas y conexiones a la base de datos. Nunca se suben.
+.env
+.env.*
+!.env.example
+
 # ─── Backend (Spring Boot / Maven) ───
 # Carpeta generada al compilar: se reconstruye sola con mvn.
 target/
