@@ -4,6 +4,8 @@ import com.gymtrack.model.Gym;
 import com.gymtrack.model.User;
 import com.gymtrack.repository.GymRepository;
 import com.gymtrack.repository.UserRepository;
+import com.gymtrack.service.CorreoService;
+import com.gymtrack.service.CuentaService;
 import com.gymtrack.util.PasswordUtil;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,10 +22,15 @@ public class UserController {
 
     private final UserRepository userRepository;
     private final GymRepository gymRepository;
+    private final CuentaService cuentaService;
+    private final CorreoService correoService;
 
-    public UserController(UserRepository userRepository, GymRepository gymRepository) {
+    public UserController(UserRepository userRepository, GymRepository gymRepository,
+                          CuentaService cuentaService, CorreoService correoService) {
         this.userRepository = userRepository;
         this.gymRepository = gymRepository;
+        this.cuentaService = cuentaService;
+        this.correoService = correoService;
     }
 
     @PostMapping("/register")
@@ -43,10 +50,20 @@ public class UserController {
         user.setRole(esMiembro ? "member" : "owner");
         user.setGymId(null);
         user.setMembershipStatus(User.STATUS_NONE);
+        // Las cuentas de la página web confirman su correo antes de entrar. La app
+        // todavía no tiene pantalla de verificación: sus miembros entran directo.
+        user.setEmailVerificado(esMiembro ? null : false);
         user.setPassword(PasswordUtil.hash(user.getPassword()));
         userRepository.save(user);
 
-        return ResponseEntity.ok(accountView(user, "Usuario registrado exitosamente"));
+        Map<String, Object> view = accountView(user, "Usuario registrado exitosamente");
+        if (esMiembro) {
+            correoService.bienvenida(user);
+        } else {
+            view.put("verificacionPendiente", true);
+            view.put("correoEnviado", cuentaService.enviarCodigoDeVerificacion(user));
+        }
+        return ResponseEntity.ok(view);
     }
 
     @PostMapping("/login")
@@ -56,6 +73,13 @@ public class UserController {
         if (userOpt.isPresent()) {
             User user = userOpt.get();
             if (user.getPassword().equals(PasswordUtil.hash(loginRequest.getPassword()))) {
+                if (user.correoPendienteDeVerificar()) {
+                    Map<String, Object> pendiente = new HashMap<>();
+                    pendiente.put("error", "Verifica tu correo antes de iniciar sesión.");
+                    pendiente.put("verificacionPendiente", true);
+                    pendiente.put("email", user.getEmail());
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(pendiente);
+                }
                 return ResponseEntity.ok(accountView(user, "Login exitoso"));
             }
         }
@@ -97,6 +121,7 @@ public class UserController {
         view.put("gymId", user.getGymId());
         view.put("membershipStatus", user.getMembershipStatus());
         view.put("membershipActive", user.getMembershipActive());
+        view.put("emailVerificado", user.getEmailVerificado());
         view.put("hasGymAccess", user.tieneAccesoAlGimnasio());
         // Datos de cobranza: la app los usa para avisar "te quedan N días".
         view.put("fechaProximoPago", user.getFechaProximoPago());

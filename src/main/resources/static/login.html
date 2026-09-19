@@ -122,6 +122,13 @@
                         localStorage.removeItem('gymId');
                     }
                     window.location.href = 'bienvenido.html';
+                } else if (response.body.verificacionPendiente) {
+                    // Cuenta creada pero sin confirmar el correo: se manda a verificarlo.
+                    sessionStorage.setItem('correoPorVerificar', response.body.email || email);
+                    alertError.innerHTML = '<i class="bx bx-error-circle"></i> ' + response.body.error + ' <a href="verificar.html" class="alert-link">Verificar ahora</a>';
+                    alertError.classList.remove('d-none');
+                    btn.innerHTML = 'Entrar';
+                    btn.disabled = false;
                 } else {
                     alertError.innerHTML = '<i class="bx bx-error-circle"></i> ' + (response.body.error || 'Credenciales incorrectas.');
                     alertError.classList.remove('d-none');

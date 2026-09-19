@@ -35,6 +35,10 @@ public class User {
     private LocalDate fechaProximoPago;
     // Token de Expo para mandarle notificaciones push a su teléfono.
     private String pushToken;
+    // false = se registró en la página web y aún no confirma su correo: no puede
+    // iniciar sesión. null = cuenta anterior a la verificación o creada desde la
+    // app (que todavía no tiene esa pantalla), a la que no se le exige.
+    private Boolean emailVerificado;
 
     public User() {}
 
@@ -87,6 +91,13 @@ public class User {
 
     public String getPushToken() { return pushToken; }
     public void setPushToken(String pushToken) { this.pushToken = pushToken; }
+
+    public Boolean getEmailVerificado() { return emailVerificado; }
+    public void setEmailVerificado(Boolean emailVerificado) { this.emailVerificado = emailVerificado; }
+
+    public boolean correoPendienteDeVerificar() {
+        return Boolean.FALSE.equals(emailVerificado);
+    }
 
     // Días que faltan para la fecha de corte. Negativo = ya venció.
     // null cuando el gimnasio no le ha registrado ningún pago todavía.

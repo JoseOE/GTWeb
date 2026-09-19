@@ -22,11 +22,13 @@ Este repositorio contiene la **página web de GymTrack**: el backend en Spring B
 * **Maven** instalado (`mvn -version`).
 * Conexión activa a Internet (para conectar con la base de datos en MongoDB Atlas).
 
-### 2. Configurar la conexión a MongoDB Atlas
+### 2. Configurar MongoDB Atlas y el correo
 1. Copia el archivo `.env.example` como `.env` en la raíz del proyecto (junto a `pom.xml`).
-2. Sustituye los valores entre `< >` por el usuario, la contraseña y el cluster de MongoDB Atlas.
+2. En `MONGODB_URI` sustituye los valores entre `< >` por el usuario, la contraseña y el cluster de MongoDB Atlas.
+3. En `MAIL_USERNAME` y `MAIL_PASSWORD` pon el Gmail de GymTrack y su **contraseña de aplicación** (se crea en https://myaccount.google.com/apppasswords con la verificación en dos pasos activada). Con esa cuenta se envían los correos de verificación, recuperación de contraseña y avisos.
 
-> El archivo `.env` está en `.gitignore`: la contraseña nunca se sube a GitHub.
+> El archivo `.env` está en `.gitignore`: las contraseñas nunca se suben a GitHub.
+> Si dejas vacío el correo, la página funciona igual y los códigos de verificación aparecen en la consola.
 
 ### 3. Levantar la página web
 1. En una terminal, dentro de la carpeta del proyecto, ejecuta:
@@ -40,7 +42,8 @@ Este repositorio contiene la **página web de GymTrack**: el backend en Spring B
 **Flujo de prueba sugerido:**
 1. Recorre la página principal: menú, slider, nosotros, catálogo de soluciones y mapa de ubicación.
 2. Entra a `http://localhost:8080/registro.html` y crea una cuenta.
-3. Inicia sesión en `http://localhost:8080/login.html` con la cuenta que acabas de crear.
+3. Escribe el código de 6 dígitos que llega a tu correo (o usa el botón del correo) para verificarla.
+4. Inicia sesión en `http://localhost:8080/login.html` con la cuenta que acabas de crear.
 
 > La aplicación móvil (AppMovil) consume esta misma API y se trabaja en un repositorio aparte.
 

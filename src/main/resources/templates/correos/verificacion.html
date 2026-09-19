@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{correos/base :: correo('Verifica tu correo', ~{::#cuerpo})}">
+<body>
+<div id="cuerpo">
+    <p style="margin:0 0 16px;" th:text="|${saludo}:|">Hola, Juan:</p>
+    <p style="margin:0 0 20px;">Usa este código para confirmar tu correo y activar tu cuenta de GymTrack:</p>
+    <p style="margin:0 0 24px;padding:18px;background-color:#f4f2eb;border-radius:8px;text-align:center;font-size:32px;font-weight:800;letter-spacing:8px;color:#20221f;" th:text="${codigo}">123456</p>
+    <p style="margin:0 0 14px;">O verifica tu correo con un clic:</p>
+    <p style="margin:0 0 24px;">
+        <a th:href="${enlace}" href="#" style="display:inline-block;padding:14px 24px;background-color:#f45124;color:#191b18;border-radius:4px;font-weight:700;text-decoration:none;">Verificar mi correo</a>
+    </p>
+    <p style="margin:0;font-size:13px;color:#62645d;" th:text="|El código y el botón vencen en ${minutos} minutos. Si tú no creaste esta cuenta, ignora este correo.|">El código vence en 15 minutos.</p>
+</div>
+</body>
+</html>
