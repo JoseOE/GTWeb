@@ -495,6 +495,45 @@ footer.bg-dark::before {
     background-color: #fff !important;
 }
 
+/* ═══════════════════════════════════════
+   FORMULARIOS (login / registro / contacto)
+═══════════════════════════════════════ */
+.auth-shell {
+    position: relative;
+    background:
+        radial-gradient(circle at 12% 15%, rgba(var(--brand-rgb), 0.14), transparent 42%),
+        radial-gradient(circle at 90% 85%, rgba(var(--glow-2), 0.14), transparent 45%),
+        var(--bs-body-tertiary-bg, #f5f6f8);
+    overflow: hidden;
+}
+.auth-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 30px 60px -20px rgba(20, 20, 25, 0.25);
+    position: relative;
+    overflow: hidden;
+}
+.auth-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, var(--brand), var(--brand-light), var(--glow-2));
+}
+.auth-icon-circle {
+    background: linear-gradient(145deg, rgba(var(--brand-rgb), 0.18), rgba(var(--brand-rgb), 0.05));
+    box-shadow: 0 10px 24px -10px rgba(var(--brand-rgb), 0.5);
+}
+.input-group-text {
+    background-color: #f5f6f8 !important;
+    transition: background-color 0.25s ease, color 0.25s ease;
+}
+.input-group:focus-within .input-group-text {
+    background-color: rgba(var(--brand-rgb), 0.1) !important;
+    color: var(--brand) !important;
+}
+.input-group:focus-within .input-group-text i { color: var(--brand) !important; }
+
 /* — Responsive — */
 @media (max-width: 991px) and (min-width: 769px) {
     .hero-slide { height: 82vh; }
