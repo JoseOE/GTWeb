@@ -31,13 +31,16 @@ public class BillingService {
     private final GymRepository gymRepository;
     private final PaymentRepository paymentRepository;
     private final PushService pushService;
+    private final CorreoService correoService;
 
     public BillingService(UserRepository userRepository, GymRepository gymRepository,
-                          PaymentRepository paymentRepository, PushService pushService) {
+                          PaymentRepository paymentRepository, PushService pushService,
+                          CorreoService correoService) {
         this.userRepository = userRepository;
         this.gymRepository = gymRepository;
         this.paymentRepository = paymentRepository;
         this.pushService = pushService;
+        this.correoService = correoService;
     }
 
     // Registra un pago y empuja la fecha de corte un mes hacia adelante.
@@ -102,11 +105,13 @@ public class BillingService {
                 pushService.enviar(member, "Tu membresía venció",
                         nombreGym(member) + " pausó tu acceso porque no se registró tu pago. Ponte al corriente para recuperarlo.",
                         Map.of("tipo", "membresia_vencida"));
+                correoService.membresiaVencida(member, nombreGym(member));
             } else if (dias == DIAS_DE_AVISO && User.STATUS_ACTIVE.equals(member.getMembershipStatus())) {
                 avisados++;
                 pushService.enviar(member, "Tienes 5 días para pagar",
                         "Tu mensualidad en " + nombreGym(member) + " vence el " + member.getFechaProximoPago() + ".",
                         Map.of("tipo", "recordatorio_pago", "dias", dias));
+                correoService.pagoPorVencer(member, nombreGym(member), member.getFechaProximoPago(), dias);
             }
         }
         log.info("Revisión de membresías: {} dadas de baja, {} avisadas de {} revisadas.",

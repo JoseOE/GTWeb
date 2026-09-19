@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -81,6 +82,23 @@ public class CorreoService {
                 "saludo", saludo(user), "nuevo", user.getEmail(), "fecha", ahora()));
     }
 
+    // ─── Avisos de la membresía (acompañan al push de la app) ───
+
+    public boolean miembroAprobado(User member, String nombreGym) {
+        return enviar(member.getEmail(), "¡Bienvenido a " + nombreGym + "!", "miembro-aprobado", Map.of(
+                "saludo", saludo(member), "gimnasio", nombreGym));
+    }
+
+    public boolean pagoPorVencer(User member, String nombreGym, LocalDate fecha, long dias) {
+        return enviar(member.getEmail(), "Tu mensualidad en " + nombreGym + " vence en " + dias + " días", "pago-por-vencer", Map.of(
+                "saludo", saludo(member), "gimnasio", nombreGym, "fecha", fecha(fecha), "dias", dias));
+    }
+
+    public boolean membresiaVencida(User member, String nombreGym) {
+        return enviar(member.getEmail(), "Tu membresía en " + nombreGym + " venció", "membresia-vencida", Map.of(
+                "saludo", saludo(member), "gimnasio", nombreGym));
+    }
+
     // false = falta MAIL_USERNAME en el .env; los códigos se escriben en la consola.
     public boolean estaConfigurado() {
         return configurado();
@@ -120,6 +138,11 @@ public class CorreoService {
     // Fecha y hora del centro de México, p. ej. "19 de septiembre de 2026 a las 14:05".
     private static String ahora() {
         return ZonedDateTime.now(ZONA_MX).format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy 'a las' HH:mm", ES_MX));
+    }
+
+    // "24 de septiembre de 2026"
+    private static String fecha(LocalDate fecha) {
+        return fecha.format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", ES_MX));
     }
 
     // "Hola, Juan" con el primer nombre; "Hola" si la cuenta no tiene nombre.

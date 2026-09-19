@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{correos/base :: correo('Tu membresía venció', ~{::#cuerpo})}">
+<body>
+<div id="cuerpo">
+    <p style="margin:0 0 16px;" th:text="|${saludo}:|">Hola, Juan:</p>
+    <p style="margin:0 0 20px;" th:text="|${gimnasio} pausó tu acceso porque no se registró el pago de tu mensualidad.|">Tu acceso se pausó.</p>
+    <p style="margin:0;">Tus rutinas y tu progreso siguen guardados. Ponte al corriente en recepción para recuperar el acceso.</p>
+</div>
+</body>
+</html>
