@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<!-- Marco común de todos los correos. Tablas y estilos en línea porque es lo que
+     mejor respetan Gmail, Outlook y los clientes de correo del celular. -->
+<html xmlns:th="http://www.thymeleaf.org" lang="es-MX" th:fragment="correo(titulo, contenido)">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${titulo}">GymTrack</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f2eb;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f2eb;">
+    <tr>
+        <td align="center" style="padding:32px 16px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;">
+                <tr>
+                    <td style="background-color:#20221f;padding:22px 32px;font-family:Arial,Helvetica,sans-serif;font-size:24px;font-weight:800;letter-spacing:-0.5px;color:#f4f2eb;">
+                        Gym<span style="color:#f45124;">Track</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="height:4px;line-height:4px;font-size:0;background-color:#f45124;">&nbsp;</td>
+                </tr>
+                <tr>
+                    <td style="padding:32px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#20221f;">
+                        <h1 style="margin:0 0 18px;font-size:22px;line-height:1.3;color:#20221f;" th:text="${titulo}">Título</h1>
+                        <div th:replace="${contenido}">Contenido del correo</div>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding:20px 32px;background-color:#f4f2eb;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:#62645d;">
+                        Recibiste este correo por actividad en tu cuenta de GymTrack.<br>
+                        ¿Dudas? Escríbenos por WhatsApp al <a href="https://wa.me/527721013839" style="color:#b73511;">772 101 3839</a>.<br>
+                        © 2026 GymTrack · Hidalgo, México
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{correos/base :: correo('Confirma tu correo nuevo', ~{::#cuerpo})}">
+<body>
+<div id="cuerpo">
+    <p style="margin:0 0 16px;" th:text="|${saludo}:|">Hola, Juan:</p>
+    <p style="margin:0 0 20px;" th:text="|Pediste usar ${nuevo} como el correo de tu cuenta de GymTrack. Escribe este código en Mi cuenta para confirmarlo:|">Pediste cambiar tu correo.</p>
+    <p style="margin:0 0 24px;padding:18px;background-color:#f4f2eb;border-radius:8px;text-align:center;font-size:32px;font-weight:800;letter-spacing:8px;color:#20221f;" th:text="${codigo}">123456</p>
+    <p style="margin:0;font-size:13px;color:#62645d;" th:text="|El código vence en ${minutos} minutos. Si tú no lo pediste, ignora este correo: la cuenta no cambia.|">El código vence en 15 minutos.</p>
+</div>
+</body>
+</html>

@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{correos/base :: correo('¡Tu solicitud fue aprobada!', ~{::#cuerpo})}">
+<body>
+<div id="cuerpo">
+    <p style="margin:0 0 16px;" th:text="|${saludo}:|">Hola, Juan:</p>
+    <p style="margin:0 0 20px;" th:text="|${gimnasio} aprobó tu solicitud. Ya eres parte de su comunidad en GymTrack.|">Tu gimnasio aprobó tu solicitud.</p>
+    <p style="margin:0;">Abre la app de GymTrack para ver sus rutinas, máquinas y horarios, y para registrar tu progreso.</p>
+</div>
+</body>
+</html>

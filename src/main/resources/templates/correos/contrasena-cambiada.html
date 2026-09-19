@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{correos/base :: correo('Tu contraseña cambió', ~{::#cuerpo})}">
+<body>
+<div id="cuerpo">
+    <p style="margin:0 0 16px;" th:text="|${saludo}:|">Hola, Juan:</p>
+    <p style="margin:0 0 20px;" th:text="|La contraseña de tu cuenta de GymTrack se cambió el ${fecha} (hora del centro de México).|">La contraseña de tu cuenta cambió.</p>
+    <p style="margin:0 0 20px;">Si fuiste tú, no tienes que hacer nada.</p>
+    <p style="margin:0 0 14px;"><strong>¿No fuiste tú?</strong> Restablece tu contraseña de inmediato y escríbenos:</p>
+    <p style="margin:0;">
+        <a th:href="${enlace}" href="#" style="display:inline-block;padding:14px 24px;background-color:#20221f;color:#f4f2eb;border-radius:4px;font-weight:700;text-decoration:none;">Restablecer mi contraseña</a>
+    </p>
+</div>
+</body>
+</html>

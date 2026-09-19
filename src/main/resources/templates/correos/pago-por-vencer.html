@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{correos/base :: correo('Tu mensualidad está por vencer', ~{::#cuerpo})}">
+<body>
+<div id="cuerpo">
+    <p style="margin:0 0 16px;" th:text="|${saludo}:|">Hola, Juan:</p>
+    <p style="margin:0 0 20px;" th:text="|Tu mensualidad en ${gimnasio} vence el ${fecha} (en ${dias} días).|">Tu mensualidad vence pronto.</p>
+    <p style="margin:0;">Ponte al corriente en recepción antes de esa fecha para seguir entrando sin interrupciones.</p>
+</div>
+</body>
+</html>

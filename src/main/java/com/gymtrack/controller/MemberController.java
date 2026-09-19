@@ -4,6 +4,7 @@ import com.gymtrack.model.Gym;
 import com.gymtrack.model.User;
 import com.gymtrack.repository.GymRepository;
 import com.gymtrack.repository.UserRepository;
+import com.gymtrack.service.CorreoService;
 import com.gymtrack.service.PushService;
 import com.gymtrack.util.PasswordUtil;
 import org.springframework.http.HttpStatus;
@@ -35,11 +36,14 @@ public class MemberController {
     private final UserRepository userRepository;
     private final GymRepository gymRepository;
     private final PushService pushService;
+    private final CorreoService correoService;
 
-    public MemberController(UserRepository userRepository, GymRepository gymRepository, PushService pushService) {
+    public MemberController(UserRepository userRepository, GymRepository gymRepository,
+                            PushService pushService, CorreoService correoService) {
         this.userRepository = userRepository;
         this.gymRepository = gymRepository;
         this.pushService = pushService;
+        this.correoService = correoService;
     }
 
     @GetMapping
@@ -127,6 +131,7 @@ public class MemberController {
             pushService.enviar(member, "¡Bienvenido a " + nombreGym + "!",
                     "Tu solicitud fue aprobada. Ya puedes ver sus rutinas, máquinas y horarios.",
                     Map.of("tipo", "solicitud_aprobada", "gymId", gymId));
+            correoService.miembroAprobado(member, nombreGym);
         } else if (User.STATUS_INACTIVE.equals(nuevo)) {
             pushService.enviar(member, "Tu acceso fue pausado",
                     nombreGym + " dio de baja tu membresía. Tus rutinas y tu progreso siguen disponibles.",

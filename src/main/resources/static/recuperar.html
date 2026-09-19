@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recuperar contraseña | GymTrack</title>
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/2964/2964514.png">
+    <link rel="stylesheet" href="css/fonts.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/editorial.css">
+</head>
+<body class="gym-interior bg-body-tertiary d-flex flex-column min-vh-100">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark py-3">
+        <div class="container">
+            <a class="navbar-brand fw-bold fs-3 d-flex align-items-center gap-2" href="index.html">
+                <i class='bx bx-dumbbell text-primary fs-2'></i>
+                <span>Gym<span class="text-primary">Track</span></span>
+            </a>
+            <div class="ms-auto d-flex gap-2">
+                <a href="index.html" aria-label="Volver al inicio" class="btn btn-outline-light rounded-pill px-3 d-flex align-items-center gap-1"><i class='bx bx-home-alt'></i> <span class="d-none d-sm-inline">Inicio</span></a>
+                <a href="login.html" class="btn btn-outline-light rounded-pill px-4">Iniciar Sesión</a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="flex-grow-1 d-flex align-items-center py-5 auth-shell">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-md-8 col-lg-5 page-fade-in">
+                    <div class="card auth-card border-0 shadow-lg rounded-4 p-4 p-md-5">
+                        <div class="text-center mb-4">
+                            <div class="auth-icon-circle rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width:60px;height:60px">
+                                <i class='bx bx-key text-primary fs-2'></i>
+                            </div>
+                            <h3 class="fw-bold">¿Olvidaste tu contraseña?</h3>
+                            <p class="text-body-secondary small mb-0">Escribe el correo de tu cuenta y te enviaremos un enlace para crear una nueva.</p>
+                        </div>
+
+                        <form id="recuperar-form">
+                            <div class="mb-4">
+                                <label for="email" class="form-label fw-semibold small">Correo Electrónico</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-body-tertiary border-end-0"><i class='bx bx-envelope text-body-secondary'></i></span>
+                                    <input type="email" class="form-control form-control-lg rounded-end-3 border-start-0" id="email" autocomplete="email" placeholder="ejemplo@correo.com" required>
+                                </div>
+                            </div>
+
+                            <div id="alerta" class="alert d-none" role="alert"></div>
+
+                            <button type="submit" class="btn btn-primary btn-lg w-100 rounded-pill fw-bold shadow-sm" id="btn-enviar">Enviar enlace</button>
+
+                            <div class="text-center mt-4">
+                                <span class="text-body-secondary small">¿Ya la recordaste?</span>
+                                <a href="login.html" class="text-primary fw-semibold text-decoration-none small">Inicia sesión</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script src="js/cuenta.js"></script>
+    <script>
+        const form = document.getElementById('recuperar-form');
+        const alerta = document.getElementById('alerta');
+        const btn = document.getElementById('btn-enviar');
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            ocultarAlerta(alerta);
+            botonCargando(btn, true, 'Enviando...');
+            enviarJSON('/api/cuenta/recuperar', { email: document.getElementById('email').value.trim() }).then(r => {
+                botonCargando(btn, false);
+                if (!r.ok) {
+                    mostrarAlerta(alerta, 'danger', r.body.error || 'No pudimos procesar la solicitud.');
+                    return;
+                }
+                mostrarAlerta(alerta, 'success', r.body.message);
+                // Evita pedir varios enlaces seguidos: el servidor manda uno por minuto.
+                btn.disabled = true;
+                setTimeout(() => { btn.disabled = false; }, 60000);
+            });
+        });
+    </script>
+</body>
+</html>

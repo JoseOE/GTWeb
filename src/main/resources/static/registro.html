@@ -84,8 +84,9 @@
                                 <label for="email" class="form-label fw-semibold small">Correo Electrónico</label>
                                 <div class="input-group">
                                     <span class="input-group-text bg-body-tertiary border-end-0"><i class='bx bx-envelope text-body-secondary'></i></span>
-                                    <input type="email" class="form-control form-control-lg rounded-end-3 border-start-0" id="email" autocomplete="email" placeholder="ejemplo@correo.com" required>
+                                    <input type="email" class="form-control form-control-lg rounded-end-3 border-start-0" id="email" autocomplete="email" placeholder="ejemplo@correo.com" aria-describedby="email-ayuda" required>
                                 </div>
+                                <div id="email-ayuda" class="form-text">Te enviaremos un código para confirmarlo.</div>
                             </div>
                             <div class="mb-3">
                                 <label for="password" class="form-label fw-semibold small">Contraseña</label>
@@ -205,9 +206,13 @@
             .then(res => res.json().then(data => ({ status: res.status, body: data })))
             .then(response => {
                 if (response.status === 200) {
-                    alertSuccess.innerHTML = '<i class="bx bx-check-circle"></i> ¡Registro exitoso! Redirigiendo al login...';
+                    // verificar.html toma el correo de aquí para no pedirlo otra vez.
+                    sessionStorage.setItem('correoPorVerificar', email);
+                    alertSuccess.innerHTML = response.body.correoEnviado === false
+                        ? '<i class="bx bx-check-circle"></i> ¡Cuenta creada! No pudimos enviar el código; pide uno nuevo en la siguiente pantalla.'
+                        : '<i class="bx bx-check-circle"></i> ¡Cuenta creada! Te enviamos un código a tu correo para verificarla...';
                     alertSuccess.classList.remove('d-none');
-                    setTimeout(() => window.location.href = 'login.html', 2000);
+                    setTimeout(() => window.location.href = 'verificar.html', 2000);
                 } else {
                     alertError.innerHTML = '<i class="bx bx-error-circle"></i> ' + (response.body.error || 'Error en el servidor.');
                     alertError.classList.remove('d-none');

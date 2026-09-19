@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{correos/base :: correo('El correo de tu cuenta cambió', ~{::#cuerpo})}">
+<body>
+<div id="cuerpo">
+    <p style="margin:0 0 16px;" th:text="|${saludo}:|">Hola, Juan:</p>
+    <p style="margin:0 0 20px;" th:text="|El ${fecha} (hora del centro de México) el correo de tu cuenta de GymTrack cambió a ${nuevo}. A partir de ahora los avisos llegarán a esa dirección.|">El correo de tu cuenta cambió.</p>
+    <p style="margin:0 0 20px;">Si fuiste tú, no tienes que hacer nada.</p>
+    <p style="margin:0;"><strong>¿No fuiste tú?</strong> Escríbenos de inmediato por WhatsApp al <a href="https://wa.me/527721013839" style="color:#b73511;">772 101 3839</a> para recuperar tu cuenta.</p>
+</div>
+</body>
+</html>

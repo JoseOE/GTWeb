@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nueva contraseña | GymTrack</title>
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/2964/2964514.png">
+    <link rel="stylesheet" href="css/fonts.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/editorial.css">
+</head>
+<body class="gym-interior bg-body-tertiary d-flex flex-column min-vh-100">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark py-3">
+        <div class="container">
+            <a class="navbar-brand fw-bold fs-3 d-flex align-items-center gap-2" href="index.html">
+                <i class='bx bx-dumbbell text-primary fs-2'></i>
+                <span>Gym<span class="text-primary">Track</span></span>
+            </a>
+            <div class="ms-auto d-flex gap-2">
+                <a href="index.html" aria-label="Volver al inicio" class="btn btn-outline-light rounded-pill px-3 d-flex align-items-center gap-1"><i class='bx bx-home-alt'></i> <span class="d-none d-sm-inline">Inicio</span></a>
+                <a href="login.html" class="btn btn-outline-light rounded-pill px-4">Iniciar Sesión</a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="flex-grow-1 d-flex align-items-center py-5 auth-shell">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-md-8 col-lg-5 page-fade-in">
+                    <div class="card auth-card border-0 shadow-lg rounded-4 p-4 p-md-5">
+                        <div class="text-center mb-4">
+                            <div class="auth-icon-circle rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width:60px;height:60px">
+                                <i class='bx bx-lock-open-alt text-primary fs-2'></i>
+                            </div>
+                            <h3 class="fw-bold">Crea una contraseña nueva</h3>
+                            <p class="text-body-secondary small mb-0">Elige una contraseña que no uses en otros sitios.</p>
+                        </div>
+
+                        <form id="restablecer-form">
+                            <div class="mb-3">
+                                <label for="password" class="form-label fw-semibold small">Contraseña nueva</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-body-tertiary border-end-0"><i class='bx bx-lock-alt text-body-secondary'></i></span>
+                                    <input type="password" class="form-control form-control-lg border-start-0 border-end-0" id="password" autocomplete="new-password" placeholder="Mín. 8 caracteres" required>
+                                    <button class="input-group-text bg-body-tertiary border-start-0 btn" type="button" id="toggle-pw" aria-label="Mostrar u ocultar contraseña" title="Mostrar/Ocultar">
+                                        <i class='bx bx-hide text-body-secondary'></i>
+                                    </button>
+                                </div>
+                                <div class="mt-2 small" id="requisitos"></div>
+                            </div>
+                            <div class="mb-4">
+                                <label for="confirmar" class="form-label fw-semibold small">Confirmar contraseña</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-body-tertiary border-end-0"><i class='bx bx-lock text-body-secondary'></i></span>
+                                    <input type="password" class="form-control form-control-lg rounded-end-3 border-start-0" id="confirmar" autocomplete="new-password" placeholder="Repite tu contraseña" required>
+                                </div>
+                            </div>
+
+                            <div id="alerta" class="alert d-none" role="alert"></div>
+
+                            <button type="submit" class="btn btn-primary btn-lg w-100 rounded-pill fw-bold shadow-sm" id="btn-guardar">Guardar contraseña</button>
+                        </form>
+
+                        <div id="listo" class="text-center d-none">
+                            <div id="alerta-final" class="alert small py-2" role="status"></div>
+                            <a href="login.html" class="btn btn-primary btn-lg w-100 rounded-pill fw-bold shadow-sm" id="btn-final">Iniciar sesión</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script src="js/cuenta.js"></script>
+    <script>
+        const form = document.getElementById('restablecer-form');
+        const password = document.getElementById('password');
+        const confirmar = document.getElementById('confirmar');
+        const alerta = document.getElementById('alerta');
+        const btn = document.getElementById('btn-guardar');
+
+        vigilarRequisitos(password, document.getElementById('requisitos'));
+        alternarVisibilidad(document.getElementById('toggle-pw'), password);
+
+        function terminar(tipo, mensaje, textoBoton, destino) {
+            form.classList.add('d-none');
+            document.getElementById('listo').classList.remove('d-none');
+            mostrarAlerta(document.getElementById('alerta-final'), tipo, mensaje);
+            const final = document.getElementById('btn-final');
+            final.textContent = textoBoton;
+            final.href = destino;
+        }
+
+        // El token viene en el enlace del correo; se quita de la barra de direcciones
+        // para que no quede en el historial ni se comparta por error.
+        const token = new URLSearchParams(location.search).get('token');
+        if (token) {
+            history.replaceState(null, '', 'restablecer.html');
+        } else {
+            terminar('danger', 'Abre esta página desde el enlace que te enviamos por correo.', 'Pedir un enlace', 'recuperar.html');
+        }
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            ocultarAlerta(alerta);
+            if (!contrasenaSegura(password.value)) {
+                mostrarAlerta(alerta, 'danger', 'La contraseña no cumple los requisitos de seguridad.');
+                return;
+            }
+            if (password.value !== confirmar.value) {
+                mostrarAlerta(alerta, 'danger', 'Las contraseñas no coinciden.');
+                return;
+            }
+            botonCargando(btn, true, 'Guardando...');
+            enviarJSON('/api/cuenta/restablecer', { token, password: password.value }).then(r => {
+                botonCargando(btn, false);
+                if (r.ok) terminar('success', r.body.message, 'Iniciar sesión', 'login.html');
+                else if (r.status === 400 && /enlace/.test(r.body.error || '')) terminar('danger', r.body.error, 'Pedir un enlace nuevo', 'recuperar.html');
+                else mostrarAlerta(alerta, 'danger', r.body.error || 'No pudimos guardar la contraseña.');
+            });
+        });
+    </script>
+</body>
+</html>

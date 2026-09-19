@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{correos/base :: correo('¡Bienvenido a GymTrack!', ~{::#cuerpo})}">
+<body>
+<div id="cuerpo">
+    <p style="margin:0 0 16px;" th:text="|${saludo}:|">Hola, Juan:</p>
+    <th:block th:if="${esMiembro}">
+        <p style="margin:0 0 20px;">Tu cuenta quedó lista. Desde la app de GymTrack puedes unirte a tu gimnasio con su código, ver tus rutinas y registrar tu progreso.</p>
+    </th:block>
+    <th:block th:unless="${esMiembro}">
+        <p style="margin:0 0 20px;">Tu correo quedó verificado y tu cuenta está lista. Inicia sesión para dar de alta tu gimnasio, registrar a tus miembros y llevar el control de sus pagos.</p>
+        <p style="margin:0 0 24px;">
+            <a th:href="${enlace}" href="#" style="display:inline-block;padding:14px 24px;background-color:#f45124;color:#191b18;border-radius:4px;font-weight:700;text-decoration:none;">Iniciar sesión</a>
+        </p>
+    </th:block>
+    <p style="margin:0;">Gracias por confiar en GymTrack.</p>
+</div>
+</body>
+</html>
