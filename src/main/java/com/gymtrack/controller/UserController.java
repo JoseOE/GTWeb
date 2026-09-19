@@ -72,7 +72,12 @@ public class UserController {
 
         if (userOpt.isPresent()) {
             User user = userOpt.get();
-            if (user.getPassword().equals(PasswordUtil.hash(loginRequest.getPassword()))) {
+            if (PasswordUtil.coincide(loginRequest.getPassword(), user.getPassword())) {
+                // Las contraseñas guardadas con el SHA-256 anterior se pasan a BCrypt al entrar.
+                if (PasswordUtil.necesitaActualizarse(user.getPassword())) {
+                    user.setPassword(PasswordUtil.hash(loginRequest.getPassword()));
+                    userRepository.save(user);
+                }
                 if (user.correoPendienteDeVerificar()) {
                     Map<String, Object> pendiente = new HashMap<>();
                     pendiente.put("error", "Verifica tu correo antes de iniciar sesión.");
