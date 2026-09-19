@@ -1,0 +1,295 @@
+/* ═══════════════════════════════════════
+   GYMTRACK — SISTEMA DE DISEÑO
+   Bootstrap 5 como base + capa de marca
+═══════════════════════════════════════ */
+
+:root {
+    --brand: #ff5722;
+    --brand-rgb: 255, 87, 34;
+    --brand-dark: #d84315;
+    --brand-light: #ff8a65;
+    --glow-2: 43, 92, 230;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --shadow-soft: 0 10px 30px rgba(20, 20, 25, 0.08);
+    --shadow-hover: 0 22px 45px rgba(20, 20, 25, 0.14);
+    --shadow-brand: 0 14px 32px -10px rgba(var(--brand-rgb), 0.55);
+}
+
+/* ─── Unifica la paleta de Bootstrap con la marca ───
+   Bootstrap 5.3 resuelve .text-primary/.bg-primary/.border-primary
+   con rgba(var(--bs-primary-rgb)), así que sobreescribir la variable
+   raíz repinta automáticamente esos utilitarios en todo el sitio. */
+:root {
+    --bs-primary: var(--brand);
+    --bs-primary-rgb: var(--brand-rgb);
+    --bs-link-color: var(--brand);
+    --bs-link-color-rgb: var(--brand-rgb);
+    --bs-link-hover-color: var(--brand-dark);
+    --bs-link-hover-color-rgb: 216, 67, 21;
+}
+
+html { scroll-behavior: smooth; }
+
+/* — Base global — */
+body {
+    font-family: 'Poppins', sans-serif;
+    color: #23262e;
+    -webkit-font-smoothing: antialiased;
+}
+.fw-900 { font-weight: 900 !important; }
+.letter-spacing-2 { letter-spacing: 2px; }
+.opacity-10 { opacity: 0.1; }
+h1, h2, h3, .display-2, .display-4, .display-5, .display-6 { text-wrap: balance; letter-spacing: -0.01em; }
+
+/* — Voz de marca: titulares en Barlow Condensed (atlético, de impacto),
+   cuerpo y UI se quedan en Poppins. Solo en los grandes titulares
+   persuasivos del sitio, nunca en formularios, tablas o el panel — */
+.display-2, .display-4, .display-5, .display-6, .font-display {
+    font-family: 'Barlow Condensed', 'Poppins', sans-serif;
+    letter-spacing: 0;
+    line-height: 1.05;
+}
+
+/* — Selección de texto y scrollbar a juego con la marca — */
+::selection { background: var(--brand); color: #fff; }
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: #f1f1f3; }
+::-webkit-scrollbar-thumb { background: linear-gradient(var(--brand), var(--brand-dark)); border-radius: 10px; border: 2px solid #f1f1f3; }
+::-webkit-scrollbar-thumb:hover { background: var(--brand-dark); }
+html { scrollbar-color: var(--brand) #f1f1f3; scrollbar-width: thin; }
+
+/* — Accesibilidad: respeta preferencia de movimiento reducido — */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+    .scroll-animate, .card-animate { opacity: 1 !important; transform: none !important; }
+}
+
+/* — Foco visible accesible, coherente con la marca — */
+a:focus-visible, button:focus-visible, .btn:focus-visible,
+.form-control:focus-visible, input:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+}
+.form-control:focus, .form-select:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 0.2rem rgba(var(--brand-rgb), 0.15);
+}
+.form-control, .form-select {
+    transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
+}
+
+/* ═══════════════════════════════════════
+   BOTONES — degradado de marca + brillo
+═══════════════════════════════════════ */
+.btn { font-weight: 600; letter-spacing: 0.01px; }
+.btn:not(.input-group-text) {
+    transition: transform 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out), background-color 0.25s ease, background-image 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+}
+.btn:not(.input-group-text):hover, .btn:not(.input-group-text):focus-visible {
+    transform: translateY(-3px);
+}
+.btn:not(.input-group-text):active {
+    transform: translateY(-1px);
+}
+
+.btn-primary {
+    --bs-btn-bg: var(--brand);
+    --bs-btn-border-color: var(--brand);
+    --bs-btn-hover-bg: var(--brand-dark);
+    --bs-btn-hover-border-color: var(--brand-dark);
+    --bs-btn-active-bg: var(--brand-dark);
+    --bs-btn-active-border-color: var(--brand-dark);
+    --bs-btn-disabled-bg: var(--brand);
+    --bs-btn-disabled-border-color: var(--brand);
+    --bs-btn-focus-shadow-rgb: var(--brand-rgb);
+    background-image: linear-gradient(135deg, var(--brand-light), var(--brand) 55%, var(--brand-dark));
+    border: none;
+    box-shadow: var(--shadow-brand);
+}
+.btn-primary:hover, .btn-primary:focus-visible {
+    background-image: linear-gradient(135deg, var(--brand), var(--brand-dark) 65%, var(--brand-dark));
+    box-shadow: 0 18px 38px -8px rgba(var(--brand-rgb), 0.65);
+}
+.btn-outline-primary {
+    --bs-btn-color: var(--brand);
+    --bs-btn-border-color: var(--brand);
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: var(--brand);
+    --bs-btn-hover-border-color: var(--brand);
+    --bs-btn-active-bg: var(--brand);
+    --bs-btn-active-border-color: var(--brand);
+    --bs-btn-disabled-color: var(--brand);
+    --bs-btn-disabled-border-color: var(--brand);
+}
+.btn-outline-primary:hover { box-shadow: var(--shadow-brand); }
+.btn-outline-light:hover { box-shadow: 0 14px 32px -10px rgba(255, 255, 255, 0.35); }
+.spinner-border.text-primary { color: var(--brand) !important; }
+
+/* ═══════════════════════════════════════
+   BLOBS DECORATIVOS (ambiente de fondo)
+═══════════════════════════════════════ */
+.bg-blobs { position: relative; overflow: hidden; isolation: isolate; }
+.bg-blobs::before, .bg-blobs::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(90px);
+    z-index: -1;
+    pointer-events: none;
+}
+.bg-blobs::before {
+    width: 420px; height: 420px;
+    background: rgba(var(--brand-rgb), 0.22);
+    top: -140px; left: -120px;
+}
+.bg-blobs::after {
+    width: 460px; height: 460px;
+    background: rgba(var(--glow-2), 0.14);
+    bottom: -160px; right: -140px;
+}
+
+/* — Animaciones de entrada — */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(28px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+.animate-fade-in-up { animation: fadeInUp 0.9s var(--ease-out) forwards; opacity: 0; }
+.delay-1 { animation-delay: 0.15s; }
+.delay-2 { animation-delay: 0.3s;  }
+.delay-3 { animation-delay: 0.45s; }
+
+.scroll-animate {
+    opacity: 0; transform: translateY(24px);
+    transition: opacity 0.6s var(--ease-out), transform 0.6s var(--ease-out);
+    will-change: opacity, transform;
+}
+.scroll-animate.visible { opacity: 1; transform: translateY(0); }
+
+.card-animate {
+    opacity: 0; transform: translateY(20px);
+    transition: opacity 0.5s var(--ease-out), transform 0.5s var(--ease-out);
+    will-change: opacity, transform;
+}
+.card-animate.visible { opacity: 1; transform: translateY(0); }
+.stagger-1 { transition-delay: 0.08s; }
+.stagger-2 { transition-delay: 0.16s; }
+.stagger-3 { transition-delay: 0.24s; }
+.stagger-4 { transition-delay: 0.32s; }
+.stagger-5 { transition-delay: 0.4s; }
+.stagger-6 { transition-delay: 0.48s; }
+.stagger-7 { transition-delay: 0.56s; }
+.stagger-8 { transition-delay: 0.64s; }
+
+/* — Entrada suave para páginas internas (login, registro, contacto, bienvenido) — */
+.page-fade-in { animation: fadeInUp 0.7s var(--ease-out) forwards; opacity: 0; }
+
+/* ═══════════════════════════════════════
+   MÉTRICAS DE IMPACTO
+═══════════════════════════════════════ */
+.stat-block { position: relative; padding: 0.5rem 0.5rem; }
+.stat-block:not(:last-child)::after {
+    content: '';
+    position: absolute; top: 10%; right: 0; bottom: 10%;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.12);
+    display: none;
+}
+@media (min-width: 768px) { .stat-block:not(:last-child)::after { display: block; } }
+.stat-icon {
+    width: 44px; height: 44px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    background: rgba(var(--brand-rgb), 0.14);
+    color: var(--brand);
+    font-size: 1.3rem;
+    margin-bottom: 0.6rem;
+    transition: transform 0.3s var(--ease-spring);
+}
+.stat-block:hover .stat-icon { transform: scale(1.12) rotate(-6deg); }
+.stat-number { font-variant-numeric: tabular-nums; }
+
+/* ═══════════════════════════════════════
+   TARJETAS — elevación y profundidad
+═══════════════════════════════════════ */
+.card-hover {
+    transition: transform 0.35s var(--ease-out), box-shadow 0.35s var(--ease-out), border-color 0.35s ease;
+}
+.card-hover:hover {
+    transform: translateY(-10px);
+    box-shadow: var(--shadow-hover) !important;
+}
+.icon-circle {
+    transition: transform 0.35s var(--ease-spring), box-shadow 0.35s var(--ease-out);
+}
+.card-hover:hover .icon-circle { transform: scale(1.1) rotate(-4deg); }
+
+/* — Marcos con degradado suave para íconos de beneficio/problema — */
+.icon-circle.icon-brand   { background: linear-gradient(145deg, rgba(var(--brand-rgb), 0.18), rgba(var(--brand-rgb), 0.06)); color: var(--brand); box-shadow: 0 10px 24px -10px rgba(var(--brand-rgb), 0.55); }
+.icon-circle.icon-danger  { background: linear-gradient(145deg, rgba(220, 53, 69, 0.2), rgba(220, 53, 69, 0.06)); color: #dc3545; box-shadow: 0 10px 24px -10px rgba(220, 53, 69, 0.5); }
+.icon-circle.icon-warning { background: linear-gradient(145deg, rgba(255, 193, 7, 0.28), rgba(255, 193, 7, 0.08)); color: #b8860b; box-shadow: 0 10px 24px -10px rgba(255, 193, 7, 0.5); }
+.icon-circle.icon-info    { background: linear-gradient(145deg, rgba(13, 202, 240, 0.22), rgba(13, 202, 240, 0.06)); color: #0aa2c0; box-shadow: 0 10px 24px -10px rgba(13, 202, 240, 0.5); }
+.icon-circle.icon-success { background: linear-gradient(145deg, rgba(25, 135, 84, 0.2), rgba(25, 135, 84, 0.06)); color: #198754; box-shadow: 0 10px 24px -10px rgba(25, 135, 84, 0.5); }
+
+/* ═══════════════════════════════════════
+   CTA — degradado de marca con brillo animado
+═══════════════════════════════════════ */
+.cta-section {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, var(--brand-light) 0%, var(--brand) 45%, var(--brand-dark) 100%);
+}
+.cta-section::before {
+    content: '';
+    position: absolute; inset: -50%;
+    background: radial-gradient(closest-side, rgba(255, 255, 255, 0.18), transparent);
+    animation: ctaGlow 9s ease-in-out infinite;
+}
+.cta-section > * { position: relative; z-index: 1; }
+@keyframes ctaGlow {
+    0%, 100% { transform: translate(-10%, -10%) scale(1); }
+    50% { transform: translate(10%, 10%) scale(1.15); }
+}
+.cta-section .btn-light {
+    box-shadow: 0 16px 34px -10px rgba(0, 0, 0, 0.35);
+}
+
+/* — Footer — */
+footer.bg-dark {
+    position: relative;
+    background: linear-gradient(180deg, #0e0e11, #0a0a0c) !important;
+}
+footer.bg-dark::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--brand), var(--brand-light), var(--glow-2));
+}
+.footer-link {
+    display: inline-flex;
+    transition: color 0.3s ease, border-color 0.3s ease, transform 0.3s var(--ease-out), background-color 0.3s ease;
+}
+.footer-link:hover {
+    color: var(--brand) !important;
+    border-color: var(--brand) !important;
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-brand);
+}
+
+/* — Responsive — */
+@media (max-width: 991px) and (min-width: 769px) {
+    section.py-5 { padding-top: 4rem !important; padding-bottom: 4rem !important; }
+}
+
+@media (max-width: 768px) {
+    section.py-5 { padding-top: 3rem !important; padding-bottom: 3rem !important; }
+    .card-hover:hover, .service-card:hover { transform: translateY(-4px); }
+}

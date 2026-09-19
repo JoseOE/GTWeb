@@ -1,0 +1,12 @@
+# ─── Backend (Spring Boot / Maven) ───
+# Carpeta generada al compilar: se reconstruye sola con mvn.
+target/
+
+# ─── Editores ───
+.idea/
+*.iml
+.vscode/
+
+# ─── Sistema ───
+.DS_Store
+Thumbs.db
