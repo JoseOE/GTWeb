@@ -1,51 +1,229 @@
-# Propuesta de Proyecto: GymTrack
-
-## Descripción General
+# GymTrack — Página web
 
 **GymTrack** es un ecosistema tecnológico **B2B2C** diseñado para modernizar la administración y la experiencia de usuario en gimnasios locales y medianos.
 
 El sistema integra una **plataforma web administrativa**, una **aplicación móvil**, servicios backend y un **módulo físico IoT basado en tecnología RFID** para automatizar el control de acceso al gimnasio.
 
-La **página web** será la herramienta principal para los dueños de los gimnasios, permitiéndoles contratar el servicio de GymTrack (modelo SaaS), gestionar a sus usuarios, registrar pagos, administrar membresías y diseñar rutinas de entrenamiento. Por su parte, los usuarios finales utilizarán la **aplicación móvil** para consultar el estado de su membresía, visualizar las rutinas asignadas y registrar su progreso, accediendo físicamente al gimnasio mediante una credencial RFID.
+La **página web** es la herramienta principal para los dueños de los gimnasios: les permite conocer y contratar el servicio de GymTrack (modelo SaaS), gestionar a sus usuarios, registrar pagos, administrar membresías y diseñar rutinas de entrenamiento. Por su parte, los usuarios finales utilizan la **aplicación móvil** para consultar el estado de su membresía, visualizar las rutinas asignadas y registrar su progreso, accediendo físicamente al gimnasio mediante una credencial RFID.
 
 El sistema busca centralizar los principales procesos del gimnasio en un único ecosistema tecnológico, conectando la administración web, el control de acceso IoT y la experiencia deportiva móvil del usuario.
 
+> **Este repositorio contiene solo la página web:** el backend en Java Spring Boot, que expone la API REST y a la vez sirve la página (HTML, CSS y JavaScript). La aplicación móvil consume esta misma API y se trabaja en un repositorio aparte.
+
+## Contenido
+
+- [La página web](#-la-página-web)
+- [Ejecución local paso a paso](#-ejecución-local-paso-a-paso)
+- [Variables de entorno](#-variables-de-entorno)
+- [Problemas comunes](#-problemas-comunes)
+- [Estructura del proyecto](#-estructura-del-proyecto)
+- [API que usa la página](#-api-que-usa-la-página)
+- [Correos de la cuenta](#-correos-de-la-cuenta)
+- [Contexto del proyecto](#problemática)
+- [Equipo y sprints](#-equipo-y-flujo-de-trabajo)
 
 ---
 
-## 🚀 Ejecución y pruebas locales (paso a paso)
+## 💻 La página web
 
-Este repositorio contiene la **página web de GymTrack**: el backend en Spring Boot expone la API REST y además sirve la página (HTML/CSS/JS).
+| Página | Qué hace |
+|---|---|
+| `index.html` | Página principal: menú de secciones, slider, "Nosotros", ecosistema, catálogo de soluciones (desde MongoDB Atlas) con cotizador por volumen, franja de WhatsApp y ubicación con mapa y ruta. |
+| `contacto.html` | Formulario de contacto: el mensaje llega al Gmail del equipo mediante EmailJS. |
+| `registro.html` | Crear cuenta de dueño de gimnasio. |
+| `verificar.html` | Verificar el correo con el código de 6 dígitos o con el botón del correo. |
+| `login.html` | Iniciar sesión; incluye "¿Olvidaste tu contraseña?". |
+| `recuperar.html` y `restablecer.html` | Pedir un enlace por correo y crear una contraseña nueva. |
+| `bienvenido.html` | Panel del gimnasio: datos del gimnasio, miembros, pagos, máquinas y rutinas. |
+| `cuenta.html` | Mi cuenta: cambiar contraseña y correo. |
+
+---
+
+## 🚀 Ejecución local paso a paso
+
+La página y su API se levantan juntas con un solo comando. No hace falta instalar Node.js ni nada de la aplicación móvil.
 
 ### 1. Requisitos previos
-* **Java 17** instalado (`java -version`).
-* **Maven** instalado (`mvn -version`).
-* Conexión activa a Internet (para conectar con la base de datos en MongoDB Atlas).
 
-### 2. Configurar MongoDB Atlas y el correo
-1. Copia el archivo `.env.example` como `.env` en la raíz del proyecto (junto a `pom.xml`).
-2. En `MONGODB_URI` sustituye los valores entre `< >` por el usuario, la contraseña y el cluster de MongoDB Atlas.
-3. En `MAIL_USERNAME` y `MAIL_PASSWORD` pon el Gmail de GymTrack y su **contraseña de aplicación** (se crea en https://myaccount.google.com/apppasswords con la verificación en dos pasos activada). Con esa cuenta se envían los correos de verificación, recuperación de contraseña y avisos.
+| Requisito | Para qué | Cómo comprobarlo |
+|---|---|---|
+| **Java 17** (JDK) | Ejecutar Spring Boot | `java -version` |
+| **Maven 3.9+** | Descargar dependencias y levantar el proyecto | `mvn -version` |
+| **Git** | Clonar el repositorio | `git --version` |
+| Internet | MongoDB Atlas, librerías de la página y la primera descarga de dependencias | — |
 
-> El archivo `.env` está en `.gitignore`: las contraseñas nunca se suben a GitHub.
-> Si dejas vacío el correo, la página funciona igual y los códigos de verificación aparecen en la consola.
+> Descargas: Java 17 en https://adoptium.net y Maven en https://maven.apache.org/download.cgi (agrega la carpeta `bin` de Maven al `PATH`).
 
-### 3. Levantar la página web
-1. En una terminal, dentro de la carpeta del proyecto, ejecuta:
-   ```bash
-   mvn spring-boot:run
-   ```
-   *(También puedes abrir el proyecto en IntelliJ o VS Code y ejecutar la clase `GymTrackApplication.java`).*
-2. Cuando la consola indique que inició (puerto 8080), abre en tu navegador:
-   👉 **http://localhost:8080**
+### 2. Clonar el repositorio
 
-**Flujo de prueba sugerido:**
-1. Recorre la página principal: menú, slider, nosotros, catálogo de soluciones y mapa de ubicación.
-2. Entra a `http://localhost:8080/registro.html` y crea una cuenta.
-3. Escribe el código de 6 dígitos que llega a tu correo (o usa el botón del correo) para verificarla.
-4. Inicia sesión en `http://localhost:8080/login.html` con la cuenta que acabas de crear.
+```bash
+git clone https://github.com/JoseOE/GTWeb.git
+```
 
-> La aplicación móvil (AppMovil) consume esta misma API y se trabaja en un repositorio aparte.
+```bash
+cd GTWeb
+```
+
+### 3. Crear el archivo `.env`
+
+Las contraseñas no se guardan en el código: se leen de un archivo `.env` en la raíz del proyecto (junto a `pom.xml`). Cópialo desde la plantilla.
+
+En PowerShell (Windows):
+
+```powershell
+Copy-Item .env.example .env
+```
+
+En Git Bash, macOS o Linux:
+
+```bash
+cp .env.example .env
+```
+
+Después abre `.env` y rellena los valores (ver [Variables de entorno](#-variables-de-entorno)):
+
+```properties
+MONGODB_URI=mongodb+srv://<usuario>:<contraseña>@<cluster>.mongodb.net/gymtrackdb?retryWrites=true&w=majority
+MAIL_USERNAME=<correo>@gmail.com
+MAIL_PASSWORD=<contraseña de aplicación>
+```
+
+> `.env` está en `.gitignore`: nunca se sube a GitHub. Pide los datos de MongoDB Atlas y del Gmail de GymTrack al equipo.
+
+### 4. Levantar la página
+
+Desde la carpeta del proyecto:
+
+```bash
+mvn spring-boot:run
+```
+
+La primera vez tarda un poco más porque Maven descarga las dependencias. Cuando la consola muestre `Started GymTrackApplication`, abre:
+
+👉 **http://localhost:8080**
+
+*(También puedes abrir el proyecto en IntelliJ IDEA o VS Code y ejecutar la clase `GymTrackApplication.java`; ejecútala con la carpeta del proyecto como directorio de trabajo para que encuentre el `.env`).*
+
+Para detener el servidor presiona **Ctrl + C** en la terminal.
+
+> Si la colección `servicios` está vacía, el catálogo se llena solo con 8 soluciones de ejemplo al arrancar.
+
+### 5. Flujo de prueba sugerido
+
+1. **Página principal:** recorre el menú, el slider, "Nosotros", el catálogo (abre un servicio y prueba el cotizador y el botón de WhatsApp) y el mapa con "Cómo llegar".
+2. **Contacto:** en `contacto.html` envía un mensaje de prueba.
+3. **Registro:** crea una cuenta en `registro.html`; llegará un código de 6 dígitos a tu correo.
+4. **Verificación:** escribe el código en `verificar.html` (o usa el botón del correo).
+5. **Login y panel:** inicia sesión y registra tu gimnasio, miembros, pagos, máquinas y rutinas en el panel.
+6. **Mi cuenta:** desde el panel prueba cambiar la contraseña y el correo.
+7. **Recuperación:** cierra sesión y usa "¿Olvidaste tu contraseña?".
+
+### Opcional: cambiar el puerto
+
+Si el puerto 8080 está ocupado:
+
+```powershell
+mvn spring-boot:run "-Dspring-boot.run.arguments=--server.port=8081"
+```
+
+### Opcional: ver solo el diseño (sin backend)
+
+Para revisar HTML y CSS sin Java ni base de datos, sirve la carpeta `static` con cualquier servidor estático, por ejemplo:
+
+```bash
+python -m http.server 5500 --directory src/main/resources/static
+```
+
+Y abre http://localhost:5500. **Ojo:** así no funcionan el catálogo, el registro, el login ni el panel, porque dependen de la API.
+
+---
+
+## 🔧 Variables de entorno
+
+| Variable | ¿Obligatoria? | Para qué sirve |
+|---|---|---|
+| `MONGODB_URI` | **Sí** | Conexión a MongoDB Atlas (usuario, contraseña y cluster). |
+| `MAIL_USERNAME` | No* | Gmail de GymTrack que envía los correos de la cuenta. |
+| `MAIL_PASSWORD` | No* | **Contraseña de aplicación** de ese Gmail (16 letras, no la contraseña normal). Se crea en https://myaccount.google.com/apppasswords con la verificación en dos pasos activada. Puede pegarse con o sin espacios. |
+| `APP_URL` | No | Dirección con la que se arman los enlaces de los correos. Por defecto `http://localhost:8080`; cámbiala al publicar la página. |
+
+\* Sin `MAIL_USERNAME` la página funciona igual: los códigos de verificación y los enlaces de recuperación se escriben en la consola en lugar de enviarse.
+
+---
+
+## 🩺 Problemas comunes
+
+| Síntoma | Solución |
+|---|---|
+| `Could not resolve placeholder 'MONGODB_URI'` al arrancar | Falta el `.env` o no está en la raíz del proyecto. Ejecuta `mvn spring-boot:run` desde la carpeta donde está `pom.xml`. |
+| El catálogo dice "no está disponible" o la consola muestra *timeout* con MongoDB | Revisa tu conexión y que tu IP esté permitida en MongoDB Atlas → **Network Access**. |
+| `Port 8080 was already in use` | Cierra el otro programa que usa el puerto o [cambia el puerto](#opcional-cambiar-el-puerto). |
+| `mvn` no se reconoce como comando | Maven no está instalado o su carpeta `bin` no está en el `PATH`. |
+| No llega el código de verificación | Revisa spam. Confirma que `MAIL_PASSWORD` sea una contraseña de aplicación. La consola indica si el correo no se pudo enviar. |
+| El botón del correo abre `localhost` y no carga | Es normal en local: los enlaces apuntan a la computadora donde corre la página. En otro equipo usa el código de 6 dígitos. |
+| Cambié HTML/CSS/JS y no se ve el cambio | Detén el servidor (Ctrl + C), vuelve a ejecutarlo y recarga con Ctrl + F5. |
+
+---
+
+## 📁 Estructura del proyecto
+
+```plaintext
+GTWeb/
+├── pom.xml                       # Dependencias y build (Maven)
+├── .env.example                  # Plantilla de variables (copiar como .env)
+└── src/main/
+    ├── java/com/gymtrack/
+    │   ├── GymTrackApplication.java   # Arranque y datos iniciales del catálogo
+    │   ├── config/                    # CORS para la app y cliente de correo
+    │   ├── controller/                # Endpoints REST (/api/...)
+    │   ├── model/                     # Documentos de MongoDB
+    │   ├── repository/                # Acceso a MongoDB (Spring Data)
+    │   ├── service/                   # Correos, cuenta, cobranza y notificaciones push
+    │   └── util/                      # Contraseñas (BCrypt), códigos y tokens
+    └── resources/
+        ├── application.properties     # Configuración (lee el .env)
+        ├── templates/correos/         # Plantillas HTML de los correos
+        └── static/                    # La página web
+            ├── *.html
+            ├── css/                   # Estilos de la marca
+            ├── js/                    # Slider, catálogo, mapa y utilidades de la cuenta
+            └── fonts/                 # Tipografías autoalojadas
+```
+
+---
+
+## 🔌 API que usa la página
+
+| Método | Ruta | Uso |
+|---|---|---|
+| GET | `/api/servicios` | Catálogo de soluciones |
+| POST | `/api/users/register` | Crear cuenta |
+| POST | `/api/users/login` | Iniciar sesión |
+| GET | `/api/users/{id}/me` | Datos de la cuenta |
+| POST | `/api/cuenta/verificar` · `/api/cuenta/verificar/reenviar` | Verificar el correo · pedir otro código |
+| POST | `/api/cuenta/recuperar` · `/api/cuenta/restablecer` | Enlace de recuperación · guardar contraseña nueva |
+| POST | `/api/cuenta/contrasena` | Cambiar contraseña (Mi cuenta) |
+| POST | `/api/cuenta/correo` · `/api/cuenta/correo/confirmar` | Cambiar correo con código |
+| GET/POST | `/api/gyms`, `/api/gyms/{gymId}/members`, `/api/gyms/{gymId}/machines`, `/api/gyms/{gymId}/routines` | Panel del gimnasio |
+| GET/POST | `/api/gyms/{gymId}/members/{userId}/payments` | Pagos de cada miembro |
+| POST | `/api/billing/run` | Revisar vencimientos ahora (también corre sola todos los días a las 6:00) |
+
+---
+
+## 📧 Correos de la cuenta
+
+Se envían por el SMTP de Gmail con plantillas HTML (Thymeleaf). Los códigos se guardan cifrados en MongoDB Atlas y se borran solos al vencer.
+
+| Correo | Cuándo llega |
+|---|---|
+| Código de verificación | Al registrarse en la página (vence en 15 min; máximo 5 intentos). |
+| Bienvenida | Al verificar la cuenta. |
+| Restablecer contraseña | Desde "¿Olvidaste tu contraseña?" (enlace de un solo uso, vence en 30 min). |
+| Tu contraseña cambió | Al restablecerla o cambiarla en Mi cuenta. |
+| Código para el correo nuevo · aviso al anterior | Al cambiar el correo en Mi cuenta. |
+| Solicitud aprobada · pago por vencer · membresía vencida | Avisos de la membresía para los miembros del gimnasio. |
+
+> Las cuentas creadas desde la app móvil entran sin verificar el correo, porque la app todavía no tiene esa pantalla.
 
 ---
 
@@ -98,7 +276,7 @@ Desarrollar e implementar un **ecosistema tecnológico integral denominado GymTr
 
 # 🧩 Componentes Principales
 
-GymTrack estará compuesto por cuatro componentes tecnológicos principales:
+GymTrack está compuesto por cuatro componentes tecnológicos principales:
 
 ```plaintext
                          GYMTRACK
@@ -116,7 +294,7 @@ GymTrack estará compuesto por cuatro componentes tecnológicos principales:
                          Gimnasio
 ```
 
-💻 1. Plataforma Web (Administración)
+💻 1. Plataforma Web (Administración) — **este repositorio**
 La plataforma web es el núcleo de administración comercial y operativa del proyecto. Aquí es donde los dueños de gimnasios interactúan con el ecosistema.
 
 El dueño o Administrador podrá:
@@ -195,7 +373,7 @@ Gimnasio
 ```
 
 🔐 Seguridad y Multi-tenancy
-Dado que la plataforma web permitirá a múltiples gimnasios contratar el servicio, la información se aisla a nivel lógico y de base de datos para asegurar que cada administrador solo pueda ver y modificar los datos de su propio gimnasio.
+Dado que la plataforma web permitirá a múltiples gimnasios contratar el servicio, la información se aísla a nivel lógico y de base de datos para asegurar que cada administrador solo pueda ver y modificar los datos de su propio gimnasio. Las contraseñas se guardan cifradas con BCrypt y las cuentas de la página confirman su correo antes de entrar.
 
 🌐 Comunicación IoT (Próximamente)
 La comunicación entre el dispositivo IoT y los servicios backend utilizará protocolos ligeros como MQTT sobre redes Wi-Fi, asegurados mediante encriptación TLS.
@@ -204,33 +382,40 @@ La comunicación entre el dispositivo IoT y los servicios backend utilizará pro
 
 # 🛠️ Stack tecnológico
 
-**Plataforma Web (SaaS y Landing)**
-* Tecnología: HTML5, CSS3, JavaScript (Vanilla)
-* Uso: Interfaz y lógica del frontend web (Servida directamente por Spring Boot)
-* Tecnología: Bootstrap 5
-* Uso: Framework principal para diseño responsivo
+**Página web (frontend)**
 
-**Aplicación Móvil**
-* Tecnología: React Native
-* Uso: Desarrollo multiplataforma
-* Tecnología: Expo y Expo Router
-* Uso: Framework de desarrollo y manejo de navegación
-* Tecnología: TypeScript
-* Uso: Tipado estático
+| Tecnología | Uso |
+|---|---|
+| HTML5, CSS3 y JavaScript (Vanilla) | Interfaz y lógica de la página, servida directamente por Spring Boot |
+| Bootstrap 5.3 y Boxicons | Diseño responsivo, componentes e íconos |
+| Leaflet + Leaflet Routing Machine | Mapa de ubicación y ruta desde la ubicación del usuario |
+| EmailJS | Envío del formulario de contacto al Gmail del equipo |
+| Barlow Condensed, DM Sans y Manrope | Tipografías de la marca, autoalojadas |
 
-**Backend y Seguridad**
-* Tecnología: Java Spring Boot
-* Uso: Framework principal para construir la API REST
-* Tecnología: MongoDB (Atlas)
-* Uso: Base de datos NoSQL en la nube
+**Backend y seguridad**
 
-**IoT (Arquitectura Planeada)**
-* Tecnología: ESP32
-* Uso: Microcontrolador
-* Tecnología: RFID
-* Uso: Identificación física
-* Tecnología: MQTT + TLS
-* Uso: Comunicación remota segura
+| Tecnología | Uso |
+|---|---|
+| Java 17 + Spring Boot 3.2 | API REST y servidor de la página |
+| MongoDB Atlas + Spring Data MongoDB | Base de datos NoSQL en la nube |
+| Spring Boot Mail (SMTP de Gmail) + Thymeleaf | Correos de la cuenta con plantillas HTML |
+| BCrypt (spring-security-crypto) | Cifrado de contraseñas |
+
+**Aplicación móvil** (repositorio aparte)
+
+| Tecnología | Uso |
+|---|---|
+| React Native | Desarrollo multiplataforma |
+| Expo y Expo Router | Framework de desarrollo y manejo de navegación |
+| TypeScript | Tipado estático |
+
+**IoT (arquitectura planeada)**
+
+| Tecnología | Uso |
+|---|---|
+| ESP32 | Microcontrolador |
+| RFID | Identificación física |
+| MQTT + TLS | Comunicación remota segura |
 
 ---
 
@@ -246,8 +431,12 @@ Fase 2 — Plataforma Web & Backend
 - [x] Configurar proyecto en Spring Boot y conectar MongoDB Atlas.
 - [x] Crear endpoints básicos (Usuarios, Gimnasios, Máquinas, Rutinas, Workouts).
 - [x] Desarrollar Landing Page comercial funcional (HTML/CSS/JS + Bootstrap).
-- [ ] Refactorizar seguridad (Reemplazar SHA-256 plano por Bcrypt e implementar JWT).
-- [ ] Desarrollar y conectar el Dashboard administrativo para dueños de gimnasios.
+- [x] Desarrollar y conectar el panel administrativo para dueños de gimnasios.
+- [x] Formulario de contacto (EmailJS) y mensajes de WhatsApp.
+- [x] Verificación por correo, recuperación y cambio de contraseña.
+- [x] Reemplazar SHA-256 por BCrypt en las contraseñas.
+- [ ] Implementar sesiones seguras con tokens (JWT).
+- [ ] Publicar la página y la API en un hosting (hoy corren en local).
 
 Fase 3 — Aplicación Móvil (Usuarios)
 - [x] Crear proyecto base en Expo.
@@ -283,7 +472,19 @@ Fase 5 — Integración e Investigación
 # 📌 Estado del proyecto
 Estado: 🚧 En desarrollo activo
 
-GymTrack se encuentra actualmente desarrollando su plataforma base; la comunicación entre la API (Spring Boot) y la Aplicación Móvil ya está establecida en un ambiente local, y se prepara para recibir la capa de hardware y mejorar la seguridad en producción.
+La página web funciona completa en local:
+- página principal;
+- catálogo conectado a MongoDB Atlas;
+- contacto;
+- registro con verificación por correo;
+- inicio de sesión;
+- panel del gimnasio;
+- correos de la cuenta.
+
+La aplicación móvil ya consume la misma API en un ambiente local. Faltan tres cosas:
+- publicar la página y la API en un hosting;
+- implementar sesiones con tokens (JWT);
+- integrar la capa de hardware IoT.
 
 ```plaintext
         Desarrollo de Apps
@@ -331,26 +532,30 @@ Negocios ─── GymTrack ─── IoT
 | Valeria | [@ValeSot0](https://github.com/ValeSot0) | `valeria` |
 | Edwin | [@EdwinSotoHz](https://github.com/EdwinSotoHz) | `edwin` |
 
-Cada integrante trabaja en su propia rama. Antes de empezar, actualiza su rama con `main`; al terminar, sus cambios llegan a `main` mediante un Pull Request.
+Cada integrante trabaja en su propia rama:
+1. Antes de empezar, actualiza su rama con `main`.
+2. Al terminar, sus cambios llegan a `main` mediante un Pull Request.
 
-**Sprint 1**
+**Sprint 1** — ✅ terminado
 
-| Integrante | Entregable |
-|---|---|
-| Yael | Menú de secciones del proyecto y ubicación en el mapa |
-| Eduardo | Slider del proyecto |
-| José | Sección "Nosotros" en el frontend |
-| Valeria | Conexión de la base de datos de MongoDB Atlas a la página |
-| Edwin | Backend de la página web funcional para el catálogo del proyecto |
+| Integrante | Entregable | PR |
+|---|---|---|
+| Yael | Menú de secciones del proyecto y ubicación en el mapa | [#1](https://github.com/JoseOE/GTWeb/pull/1) |
+| Eduardo | Slider del proyecto | [#2](https://github.com/JoseOE/GTWeb/pull/2) |
+| José | Sección "Nosotros" en el frontend | [#3](https://github.com/JoseOE/GTWeb/pull/3) |
+| Valeria | Conexión de la base de datos de MongoDB Atlas a la página | [#4](https://github.com/JoseOE/GTWeb/pull/4) |
+| Edwin | Backend de la página web funcional para el catálogo del proyecto | [#5](https://github.com/JoseOE/GTWeb/pull/5) |
 
-**Sprint 2**
+**Sprint 2** — ✅ terminado
 
-| Integrante | Entregable |
-|---|---|
-| Yael | Formulario de contacto con Gmail (EmailJS) |
-| Eduardo | Formulario de registro con verificación por correo electrónico (MongoDB Atlas, JavaScript y HTML5) |
-| José | Formulario de inicio de sesión |
-| Valeria | Mensaje de WhatsApp |
+| Integrante | Entregable | PR |
+|---|---|---|
+| Yael | Formulario de contacto con Gmail (EmailJS) | [#10](https://github.com/JoseOE/GTWeb/pull/10) |
+| Eduardo | Formulario de registro con verificación por correo electrónico (MongoDB Atlas, JavaScript y HTML5) | [#6](https://github.com/JoseOE/GTWeb/pull/6), [#11](https://github.com/JoseOE/GTWeb/pull/11) |
+| José | Formulario de inicio de sesión | [#7](https://github.com/JoseOE/GTWeb/pull/7) |
+| Valeria | Mensaje de WhatsApp | [#8](https://github.com/JoseOE/GTWeb/pull/8) |
+
+**Fuera de sprint:** panel del gimnasio y API de la app móvil ([#9](https://github.com/JoseOE/GTWeb/pull/9)).
 
 🏋️ GymTrack
 Administra. Identifica. Accede. Entrena. Analiza. Mejora.
