@@ -14,6 +14,9 @@
 
     <!-- Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
     <!-- BoxIcons -->
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <!-- Custom (mínimo) -->
@@ -22,12 +25,25 @@
 </head>
 
 <body class="gym-editorial">
+<a class="skip-link" href="#contenido">Saltar al contenido</a>
+<nav id="main-navbar" class="navbar navbar-expand-lg navbar-dark fixed-top transition-nav" aria-label="Navegación principal">
+  <div class="container">
+    <a class="navbar-brand" href="#inicio" aria-label="GymTrack, inicio"><i class="bx bx-dumbbell" aria-hidden="true"></i> Gym<span>Track</span></a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Abrir menú"><span class="navbar-toggler-icon"></span></button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav mx-auto"><li class="nav-item"><a class="nav-link" href="#quienes-somos">Nosotros</a></li><li class="nav-item"><a class="nav-link" href="#ecosistema">Ecosistema</a></li><li class="nav-item"><a class="nav-link" href="#servicios">Soluciones</a></li><li class="nav-item"><a class="nav-link" href="#ubicacion">Ubicación</a></li></ul>
+    </div>
+  </div>
+</nav>
 <main id="contenido">
+<section id="ubicacion" class="editorial-section location-section"><div class="container location-grid"><div><h2>CERCA<br><em>DE TI.</em></h2><p>Conoce dónde encontrarnos.<br>Escríbenos para organizar tu visita.</p><a class="text-link dark-link" href="mailto:josemariaortizescamilla@gmail.com">Escribir al equipo <i class="bx bx-up-arrow-alt" aria-hidden="true"></i></a><button class="route-button" id="show-route" type="button"><i class="bx bx-navigation" aria-hidden="true"></i> Cómo llegar desde mi ubicación</button><p id="route-status" class="route-status" role="status"></p></div><div class="map-frame"><div id="map" aria-label="Mapa de ubicación de GymTrack"></div></div></div></section>
 </main>
 <footer class="editorial-footer"><div class="container"><div class="footer-top"><a class="navbar-brand" href="#inicio"><i class="bx bx-dumbbell" aria-hidden="true"></i> Gym<span>Track</span></a><p>Administra. Identifica. Accede.<br>Entrena. Analiza. Mejora.</p><a href="mailto:josemariaortizescamilla@gmail.com" class="text-link">Conectemos <i class="bx bx-up-arrow-alt" aria-hidden="true"></i></a></div><div class="footer-bottom"><span>© 2026 GymTrack · Hidalgo, México</span><div><a href="#servicios">Soluciones</a></div></div></div></footer>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>
