@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.regex.Pattern;
 
 // Reglas de los códigos y enlaces que llegan por correo: cuánto duran, cuántos
 // intentos se permiten y cada cuánto se puede pedir otro.
@@ -21,6 +22,7 @@ public class CuentaService {
     static final Duration VIGENCIA_RECUPERACION = Duration.ofMinutes(30);
     static final Duration ESPERA_REENVIO = Duration.ofSeconds(60);
     static final int MAX_INTENTOS = 5;
+    private static final Pattern CORREO_VALIDO = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
     private final UserRepository userRepository;
     private final TokenCuentaRepository tokenRepository;
@@ -47,7 +49,7 @@ public class CuentaService {
     public void reenviarVerificacion(String email) {
         User user = userRepository.findByEmail(limpiar(email)).orElse(null);
         if (user == null || !user.correoPendienteDeVerificar()) return;
-        if (!enviarCodigoDeVerificacion(user)) {
+        if (!enviarCodigoDeVerificacion(user) && correoService.estaConfigurado()) {
             throw new CuentaException(HttpStatus.SERVICE_UNAVAILABLE, "No pudimos enviar el correo. Inténtalo en unos minutos.");
         }
     }
@@ -106,6 +108,73 @@ public class CuentaService {
         userRepository.save(user);
         tokenRepository.deleteByUserIdAndTipo(user.getId(), TokenCuenta.RECUPERAR_CONTRASENA);
         correoService.contrasenaCambiada(user);
+    }
+
+    // ─── Mi cuenta ───
+
+    public void cambiarContrasena(String userId, String actual, String nueva) {
+        User user = usuario(userId);
+        if (!PasswordUtil.coincide(actual, user.getPassword())) {
+            throw new CuentaException(HttpStatus.BAD_REQUEST, "La contraseña actual no es correcta.");
+        }
+        exigirSegura(nueva);
+        user.setPassword(PasswordUtil.hash(nueva));
+        userRepository.save(user);
+        correoService.contrasenaCambiada(user);
+    }
+
+    // Paso 1: manda un código al correo nuevo. La cuenta conserva su correo
+    // hasta que ese código se confirma.
+    public void solicitarCambioDeCorreo(String userId, String password, String nuevoCorreo) {
+        User user = usuario(userId);
+        if (!PasswordUtil.coincide(password, user.getPassword())) {
+            throw new CuentaException(HttpStatus.BAD_REQUEST, "La contraseña no es correcta.");
+        }
+        String nuevo = limpiar(nuevoCorreo);
+        if (!CORREO_VALIDO.matcher(nuevo).matches()) {
+            throw new CuentaException(HttpStatus.BAD_REQUEST, "Escribe un correo válido.");
+        }
+        if (nuevo.equalsIgnoreCase(user.getEmail())) {
+            throw new CuentaException(HttpStatus.BAD_REQUEST, "Ese ya es el correo de tu cuenta.");
+        }
+        if (userRepository.findByEmail(nuevo).isPresent()) {
+            throw new CuentaException(HttpStatus.BAD_REQUEST, "Ese correo ya está registrado en otra cuenta.");
+        }
+
+        Emitido emitido = emitir(user, TokenCuenta.CAMBIAR_CORREO, VIGENCIA_CODIGO, nuevo);
+        boolean enviado = correoService.codigoCambioDeCorreo(user, nuevo, emitido.codigo(), VIGENCIA_CODIGO.toMinutes());
+        if (!enviado && correoService.estaConfigurado()) {
+            tokenRepository.deleteByUserIdAndTipo(user.getId(), TokenCuenta.CAMBIAR_CORREO);
+            throw new CuentaException(HttpStatus.SERVICE_UNAVAILABLE, "No pudimos enviar el código a ese correo. Revisa que esté bien escrito.");
+        }
+    }
+
+    // Paso 2: con el código correcto el correo nuevo queda en la cuenta y se
+    // avisa al anterior, por si no fue el dueño quien lo cambió.
+    public User confirmarCambioDeCorreo(String userId, String codigo) {
+        User user = usuario(userId);
+        TokenCuenta token = tokenVigente(user.getId(), TokenCuenta.CAMBIAR_CORREO);
+        comprobarCodigo(token, codigo);
+        String nuevo = token.getDato();
+        if (userRepository.findByEmail(nuevo).isPresent()) {
+            throw new CuentaException(HttpStatus.BAD_REQUEST, "Ese correo ya está registrado en otra cuenta.");
+        }
+
+        String anterior = user.getEmail();
+        user.setEmail(nuevo);
+        user.setEmailVerificado(true);
+        userRepository.save(user);
+        tokenRepository.deleteByUserIdAndTipo(user.getId(), TokenCuenta.CAMBIAR_CORREO);
+        correoService.correoCambiado(user, anterior);
+        return user;
+    }
+
+    private User usuario(String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new CuentaException(HttpStatus.UNAUTHORIZED, "Tu sesión terminó. Inicia sesión de nuevo.");
+        }
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new CuentaException(HttpStatus.NOT_FOUND, "Usuario no encontrado."));
     }
 
     private static void exigirSegura(String password) {

@@ -53,6 +53,27 @@ public class CuentaController {
         return ResponseEntity.ok(Map.of("message", "Tu contraseña se actualizó. Ya puedes iniciar sesión."));
     }
 
+    // POST /api/cuenta/contrasena → {userId, actual, nueva} desde Mi cuenta.
+    @PostMapping("/contrasena")
+    public ResponseEntity<?> cambiarContrasena(@RequestBody Map<String, String> body) {
+        cuentaService.cambiarContrasena(body.get("userId"), body.get("actual"), body.get("nueva"));
+        return ResponseEntity.ok(Map.of("message", "Tu contraseña se actualizó."));
+    }
+
+    // POST /api/cuenta/correo → {userId, password, nuevoCorreo}: manda un código al correo nuevo.
+    @PostMapping("/correo")
+    public ResponseEntity<?> solicitarCambioDeCorreo(@RequestBody Map<String, String> body) {
+        cuentaService.solicitarCambioDeCorreo(body.get("userId"), body.get("password"), body.get("nuevoCorreo"));
+        return ResponseEntity.ok(Map.of("message", "Te enviamos un código al correo nuevo. Escríbelo para confirmar el cambio."));
+    }
+
+    // POST /api/cuenta/correo/confirmar → {userId, codigo}: aplica el cambio.
+    @PostMapping("/correo/confirmar")
+    public ResponseEntity<?> confirmarCambioDeCorreo(@RequestBody Map<String, String> body) {
+        User user = cuentaService.confirmarCambioDeCorreo(body.get("userId"), body.get("codigo"));
+        return ResponseEntity.ok(Map.of("message", "Listo, tu correo ahora es " + user.getEmail() + ".", "email", user.getEmail()));
+    }
+
     @ExceptionHandler(CuentaException.class)
     public ResponseEntity<Map<String, String>> manejarError(CuentaException e) {
         return ResponseEntity.status(e.getStatus()).body(Map.of("error", e.getMessage()));

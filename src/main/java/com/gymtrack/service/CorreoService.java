@@ -69,6 +69,23 @@ public class CorreoService {
                 "saludo", saludo(user), "fecha", ahora(), "enlace", enlace("recuperar.html")));
     }
 
+    public boolean codigoCambioDeCorreo(User user, String nuevoCorreo, String codigo, long minutos) {
+        if (!configurado()) log.warn("Correo sin configurar: el código para cambiar el correo de {} a {} es {}", user.getEmail(), nuevoCorreo, codigo);
+        return enviar(nuevoCorreo, "Tu código para confirmar tu correo: " + codigo, "cambio-correo-codigo", Map.of(
+                "saludo", saludo(user), "codigo", codigo, "minutos", minutos, "nuevo", nuevoCorreo));
+    }
+
+    // Va al correo ANTERIOR: si el cambio no lo hizo el dueño, así se entera.
+    public boolean correoCambiado(User user, String correoAnterior) {
+        return enviar(correoAnterior, "El correo de tu cuenta de GymTrack cambió", "correo-cambiado", Map.of(
+                "saludo", saludo(user), "nuevo", user.getEmail(), "fecha", ahora()));
+    }
+
+    // false = falta MAIL_USERNAME en el .env; los códigos se escriben en la consola.
+    public boolean estaConfigurado() {
+        return configurado();
+    }
+
     // Un correo que falla nunca tumba la operación que lo pidió: se avisa en la
     // consola y quien llama decide qué decirle al usuario.
     boolean enviar(String para, String asunto, String plantilla, Map<String, Object> variables) {
