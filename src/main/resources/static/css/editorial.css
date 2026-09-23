@@ -678,6 +678,35 @@ button,a,input,summary {
     font-size:12px;
     margin-top:12px
 }
+/* Indicaciones de la ruta: el panel de Leaflet arma su contenido con h2 y h3,
+   que aquí heredaban los titulares gigantes en mayúsculas de la sección. */
+.location-section .leaflet-routing-container {
+    font-family:var(--body);
+    font-size:13px;
+    line-height:1.5;
+    color:var(--ink);
+    max-width:250px
+}
+.location-section .leaflet-routing-container h2 {
+    font-family:var(--identity);
+    font-size:14px;
+    font-weight:700;
+    line-height:1.4;
+    letter-spacing:-.01em;
+    text-transform:none;
+    margin:0 0 4px
+}
+.location-section .leaflet-routing-container h3 {
+    font-family:var(--body);
+    font-size:12px;
+    font-weight:600;
+    color:var(--muted);
+    margin:0 0 8px
+}
+.location-section .leaflet-routing-alt td {
+    padding:4px 6px;
+    font-size:12px
+}
 .editorial-footer {
     background:var(--ink);
     color:var(--paper);
