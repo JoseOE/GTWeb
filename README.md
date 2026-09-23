@@ -10,6 +10,10 @@ El sistema busca centralizar los principales procesos del gimnasio en un único 
 
 > **Este repositorio contiene solo la página web:** el backend en Java Spring Boot, que expone la API REST y a la vez sirve la página (HTML, CSS y JavaScript). La aplicación móvil consume esta misma API y se trabaja en un repositorio aparte.
 
+🌐 **Página publicada:** **https://joseoe.github.io/GTWeb/**
+
+GitHub Pages solo sirve archivos estáticos, así que ahí funcionan la página principal, el formulario de contacto, el mapa y los enlaces de WhatsApp. El catálogo de soluciones, el registro, el inicio de sesión y el panel necesitan el backend, que por ahora se ejecuta en local (ver [Ejecución local paso a paso](#-ejecución-local-paso-a-paso)).
+
 ## Contenido
 
 - [La página web](#-la-página-web)
@@ -436,7 +440,8 @@ Fase 2 — Plataforma Web & Backend
 - [x] Verificación por correo, recuperación y cambio de contraseña.
 - [x] Reemplazar SHA-256 por BCrypt en las contraseñas.
 - [ ] Implementar sesiones seguras con tokens (JWT).
-- [ ] Publicar la página y la API en un hosting (hoy corren en local).
+- [x] Publicar la parte estática de la página en GitHub Pages.
+- [ ] Publicar la API en un hosting para que el catálogo, el registro y el panel también funcionen en línea.
 
 Fase 3 — Aplicación Móvil (Usuarios)
 - [x] Crear proyecto base en Expo.

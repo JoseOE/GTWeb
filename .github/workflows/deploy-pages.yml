@@ -1,0 +1,49 @@
+# Publica la página web (src/main/resources/static) en GitHub Pages cada vez que
+# llegan cambios a main.
+#
+# GitHub Pages solo sirve archivos estáticos: la página principal, contacto,
+# el mapa y los enlaces de WhatsApp funcionan, pero el catálogo, el registro,
+# el inicio de sesión y el panel necesitan el backend de Spring Boot, que por
+# ahora corre en local.
+name: Publicar página en GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/main/resources/static/**"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un despliegue a la vez, sin cancelar el que ya esté corriendo.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+
+      - name: Subir la carpeta static
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: src/main/resources/static
+
+      - name: Publicar en GitHub Pages
+        id: despliegue
+        uses: actions/deploy-pages@v4
