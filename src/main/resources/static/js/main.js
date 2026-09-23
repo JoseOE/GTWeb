@@ -92,41 +92,107 @@ function initMap() {
     const routeButton = document.getElementById('show-route');
     const routeStatus = document.getElementById('route-status');
     if (!routeButton) return;
+
+    // Se guardan para poder recalcular la ruta sin encimar marcadores ni líneas.
+    let marcadorUsuario = null;
+    let controlDeRuta = null;
+
     routeButton.addEventListener('click', () => {
-    if (!navigator.geolocation) {
-        routeStatus.textContent = 'Tu navegador no permite consultar la ubicación.';
-        return;
-    }
-    routeButton.disabled = true;
-    routeStatus.textContent = 'Buscando tu ubicación…';
-    navigator.geolocation.getCurrentPosition(
-        pos => {
-            const uLat = pos.coords.latitude, uLng = pos.coords.longitude;
+        if (!navigator.geolocation) {
+            avisar('Tu navegador no permite consultar la ubicación.');
+            return;
+        }
+        routeButton.disabled = true;
+        avisar('Buscando tu ubicación…');
 
-            L.marker([uLat, uLng], {
-                icon: L.divIcon({
-                    html: '<i class="bx bxs-user-circle" style="font-size:28px;color:#1a73e8"></i>',
-                    iconSize: [28, 28], className: 'user-marker'
-                })
-            }).addTo(map).bindPopup('<b>Tu ubicación</b>');
-
-            addRoute(map, uLat, uLng, destLat, destLng);
-            map.fitBounds([[uLat, uLng],[destLat, destLng]], { padding: [50, 50] });
-            routeStatus.textContent = 'Tu ubicación aparece en el mapa.';
-            routeButton.disabled = false;
-        },
-        () => {
-            routeStatus.textContent = 'No pudimos obtener tu ubicación. Puedes volver a intentarlo o consultar el mapa.';
-            routeButton.disabled = false;
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-    );
+        // Primero se pide la ubicación precisa (GPS). En una computadora sin GPS eso
+        // suele tardar o fallar, así que se reintenta con la ubicación aproximada
+        // en lugar de quedarse sin ruta.
+        ubicacionActual({ enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 })
+            .catch(() => ubicacionActual({ enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }))
+            .then(trazarRuta)
+            .catch(error => {
+                avisar(mensajeDeUbicacion(error));
+                routeButton.disabled = false;
+            });
     });
+
+    function trazarRuta(pos) {
+        const uLat = pos.coords.latitude, uLng = pos.coords.longitude;
+
+        if (marcadorUsuario) map.removeLayer(marcadorUsuario);
+        marcadorUsuario = L.marker([uLat, uLng], {
+            icon: L.divIcon({
+                html: '<i class="bx bxs-user-circle" style="font-size:28px;color:#1a73e8"></i>',
+                iconSize: [28, 28], className: 'user-marker'
+            })
+        }).addTo(map).bindPopup('<b>Tu ubicación</b>');
+
+        map.fitBounds([[uLat, uLng],[destLat, destLng]], { padding: [50, 50] });
+        avisar('Calculando la ruta…');
+
+        if (controlDeRuta) map.removeControl(controlDeRuta);
+        controlDeRuta = crearRuta(map, uLat, uLng, destLat, destLng);
+        if (!controlDeRuta) {          // el complemento de rutas no cargó
+            rutaNoDisponible(uLat, uLng);
+            return;
+        }
+
+        // Si el servicio tarda demasiado en contestar, no se deja al usuario
+        // esperando: a los 12 segundos se ofrece la ruta por otro lado.
+        const espera = setTimeout(() => rutaNoDisponible(uLat, uLng), 12000);
+
+        controlDeRuta.on('routesfound', evento => {
+            clearTimeout(espera);
+            const resumen = evento.routes[0].summary;
+            const km = (resumen.totalDistance / 1000).toFixed(1);
+            const minutos = Math.max(1, Math.round(resumen.totalTime / 60));
+            avisar('Ruta lista: ' + km + ' km, unos ' + minutos + ' min en coche.');
+            routeButton.disabled = false;
+        });
+        // El servicio de rutas es gratuito y a veces no responde: conviene avisarlo
+        // y ofrecer otra forma de llegar, en vez de dejar el mapa sin ruta y sin explicación.
+        controlDeRuta.on('routingerror', () => {
+            clearTimeout(espera);
+            rutaNoDisponible(uLat, uLng);
+        });
+    }
+
+    function rutaNoDisponible(uLat, uLng) {
+        avisar('No pudimos calcular la ruta en el mapa. ');
+        const enlace = document.createElement('a');
+        enlace.href = 'https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route='
+            + uLat + '%2C' + uLng + '%3B' + destLat + '%2C' + destLng;
+        enlace.target = '_blank';
+        enlace.rel = 'noopener noreferrer';
+        enlace.textContent = 'Ábrela en OpenStreetMap';
+        routeStatus.append(enlace);
+        routeButton.disabled = false;
+    }
+
+    function avisar(texto) {
+        routeStatus.textContent = texto;
+    }
+
+    // Un mensaje distinto por cada motivo: así se sabe si hay que dar permiso,
+    // encender la ubicación o solo volver a intentarlo.
+    function mensajeDeUbicacion(error) {
+        if (!error || typeof error.code !== 'number') return 'No pudimos obtener tu ubicación. Vuelve a intentarlo.';
+        if (error.code === error.PERMISSION_DENIED) return 'No diste permiso para usar tu ubicación. Actívalo en el candado de la barra de direcciones y vuelve a intentarlo.';
+        if (error.code === error.POSITION_UNAVAILABLE) return 'Tu dispositivo no pudo obtener la ubicación. Revisa que la ubicación del sistema esté encendida.';
+        if (error.code === error.TIMEOUT) return 'Tardó demasiado en obtener tu ubicación. Vuelve a intentarlo.';
+        return 'No pudimos obtener tu ubicación. Vuelve a intentarlo.';
+    }
 }
 
-function addRoute(map, fromLat, fromLng, toLat, toLng) {
-    if (!L.Routing) return;
-    L.Routing.control({
+function ubicacionActual(opciones) {
+    return new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, opciones));
+}
+
+// Dibuja la ruta en coche entre dos puntos; null si el complemento de rutas no está disponible.
+function crearRuta(map, fromLat, fromLng, toLat, toLng) {
+    if (!L.Routing) return null;
+    return L.Routing.control({
         waypoints: [L.latLng(fromLat, fromLng), L.latLng(toLat, toLng)],
         routeWhileDragging: false,
         addWaypoints: false,
