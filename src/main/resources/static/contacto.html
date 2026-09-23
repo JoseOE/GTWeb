@@ -98,6 +98,20 @@
                                 Enviar Mensaje <i class='bx bx-send ms-1'></i>
                             </button>
                         </form>
+
+                        <!-- Confirmación: reemplaza al formulario cuando el mensaje sale bien. -->
+                        <div id="enviado" class="text-center d-none">
+                            <svg class="check-enviado" viewBox="0 0 72 72" width="84" height="84" role="img" aria-label="Mensaje enviado">
+                                <circle class="check-circulo" cx="36" cy="36" r="32" fill="none" stroke="#f45124" stroke-width="4"></circle>
+                                <path class="check-palomita" d="M22 37.5 32 47.5 51 27" fill="none" stroke="#f45124" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"></path>
+                            </svg>
+                            <h3 class="fw-bold mt-4 mb-2">¡Mensaje enviado!</h3>
+                            <p class="text-body-secondary small mb-4">Gracias por escribirnos. Te responderemos al correo que nos dejaste.</p>
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-primary btn-lg rounded-pill fw-bold shadow-sm" id="btn-otro">Enviar otro mensaje</button>
+                                <a href="index.html" class="btn btn-outline-primary btn-lg rounded-pill fw-bold">Volver al inicio</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -133,12 +147,47 @@
 
             emailjs.sendForm('service_69aedda', 'template_f15t27g', this)
                 .then(() => {
-                    alertSuccess.innerHTML = '<i class="bx bx-check-circle"></i> Mensaje enviado correctamente. Te contactaremos pronto.';
-                    alertSuccess.classList.remove('d-none');
                     btn.innerHTML = textoBoton;
                     btn.disabled = false;
                     this.reset();
+                    mostrarEnviado();
                 }, mostrarError);
+        });
+
+        const formulario = document.getElementById('contact-form');
+        const confirmacion = document.getElementById('enviado');
+
+        // Cambia el formulario por la confirmación con la palomita.
+        function mostrarEnviado() {
+            formulario.classList.add('d-none');
+            confirmacion.classList.remove('d-none');
+            reiniciarPalomita();
+            confirmacion.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            document.getElementById('btn-otro').focus({ preventScroll: true });
+        }
+
+        // Copia limpia del SVG, tal como viene en el HTML.
+        const palomitaOriginal = confirmacion.querySelector('.check-enviado').cloneNode(true);
+        let esperaPalomita;
+
+        // El dibujo solo corre al aparecer el elemento: se repone el SVG desde la
+        // copia limpia para que la animación arranque de nuevo cada vez.
+        function reiniciarPalomita() {
+            clearTimeout(esperaPalomita);
+            const nuevo = palomitaOriginal.cloneNode(true);
+            confirmacion.querySelector('.check-enviado').replaceWith(nuevo);
+            // Red de seguridad: si la animación no llega a correr (movimiento reducido,
+            // pestaña en segundo plano), la palomita queda dibujada de todos modos.
+            esperaPalomita = setTimeout(() => nuevo.querySelectorAll('circle,path').forEach(t => {
+                t.style.animation = 'none';
+                t.style.strokeDashoffset = '0';
+            }), 1000);
+        }
+
+        document.getElementById('btn-otro').addEventListener('click', () => {
+            confirmacion.classList.add('d-none');
+            formulario.classList.remove('d-none');
+            document.getElementById('user_name').focus();
         });
     </script>
 </body>
