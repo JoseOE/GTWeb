@@ -1,0 +1,9 @@
+target/
+.env
+.env.*
+!.env.example
+.git/
+.github/
+.idea/
+*.iml
+.vscode/
