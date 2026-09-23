@@ -97,7 +97,30 @@ function initMap() {
     let marcadorUsuario = null;
     let controlDeRuta = null;
 
-    routeButton.addEventListener('click', () => {
+    routeButton.addEventListener('click', pedirRuta);
+    rutaAutomatica();
+
+    // La ruta se traza sola al abrir la página, sin pulsar nada. Si el permiso está
+    // denegado no se insiste: se explica cómo activarlo y el botón queda para
+    // volver a intentarlo.
+    function rutaAutomatica() {
+        if (!navigator.geolocation) return;
+        if (!navigator.permissions || !navigator.permissions.query) {
+            pedirRuta();
+            return;
+        }
+        navigator.permissions.query({ name: 'geolocation' })
+            .then(permiso => {
+                if (permiso.state === 'denied') {
+                    avisar('Activa el permiso de ubicación de tu navegador para ver la ruta desde donde estás.');
+                    return;
+                }
+                pedirRuta();
+            })
+            .catch(() => pedirRuta());
+    }
+
+    function pedirRuta() {
         if (!navigator.geolocation) {
             avisar('Tu navegador no permite consultar la ubicación.');
             return;
@@ -115,7 +138,7 @@ function initMap() {
                 avisar(mensajeDeUbicacion(error));
                 routeButton.disabled = false;
             });
-    });
+    }
 
     function trazarRuta(pos) {
         const uLat = pos.coords.latitude, uLng = pos.coords.longitude;
