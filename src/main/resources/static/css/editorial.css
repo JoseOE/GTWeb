@@ -876,6 +876,46 @@ button,a,input,summary {
 .gym-interior .form-control::placeholder {
     color:#707269
 }
+/* Confirmación del formulario de contacto: el círculo y la palomita se dibujan solos. */
+.check-enviado {
+    display:block;
+    margin:0 auto
+}
+.check-enviado .check-circulo {
+    stroke-dasharray:202
+}
+.check-enviado .check-palomita {
+    stroke-dasharray:45
+}
+@media(prefers-reduced-motion:no-preference) {
+    .check-enviado .check-circulo {
+        animation:trazo-circulo .55s var(--ease-out) both
+    }
+    .check-enviado .check-palomita {
+        animation:trazo-palomita .3s .45s var(--ease-out) both
+    }
+    #enviado {
+        animation:detail-arrive .5s var(--ease-out)
+    }
+}
+@keyframes trazo-circulo {
+    from {
+        stroke-dashoffset:202
+    }
+    to {
+        stroke-dashoffset:0
+    }
+
+}
+@keyframes trazo-palomita {
+    from {
+        stroke-dashoffset:45
+    }
+    to {
+        stroke-dashoffset:0
+    }
+
+}
 .gym-interior .dash-sidebar {
     background:#e8e9df
 }
