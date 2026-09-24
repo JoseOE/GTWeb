@@ -1,13 +1,12 @@
 package com.gymtrack.service;
 
 import com.gymtrack.model.User;
-import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
@@ -16,12 +15,14 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
 // Arma los correos de la cuenta con las plantillas de templates/correos y los
-// manda por SMTP (Gmail). Si el correo no está configurado en el .env, la página
-// sigue funcionando: el aviso se escribe en la consola en lugar de enviarse.
+// manda por la API HTTP de Brevo (no por SMTP: Render bloquea los puertos SMTP
+// salientes en todos sus planes). Si el correo no está configurado en el .env,
+// la página sigue funcionando: el aviso se escribe en la consola en lugar de enviarse.
 @Service
 public class CorreoService {
 
@@ -29,18 +30,25 @@ public class CorreoService {
     private static final Locale ES_MX = Locale.forLanguageTag("es-MX");
     private static final ZoneId ZONA_MX = ZoneId.of("America/Mexico_City");
 
-    private final JavaMailSender mailSender;
+    private final RestClient brevo;
     private final TemplateEngine plantillas;
+    private final String apiKey;
     private final String remitente;
     private final String urlPublica;
 
-    public CorreoService(JavaMailSender mailSender, TemplateEngine plantillas,
-                         @Value("${spring.mail.username:}") String remitente,
+    public CorreoService(TemplateEngine plantillas,
+                         @Value("${brevo.api-key:}") String apiKey,
+                         @Value("${brevo.remitente:}") String remitente,
                          @Value("${app.url-publica:http://localhost:8080}") String urlPublica) {
-        this.mailSender = mailSender;
         this.plantillas = plantillas;
+        this.apiKey = apiKey == null ? "" : apiKey.trim();
         this.remitente = remitente == null ? "" : remitente.trim();
         this.urlPublica = urlPublica.replaceAll("/+$", "");
+        this.brevo = RestClient.builder()
+                .baseUrl("https://api.brevo.com/v3")
+                .defaultHeader("api-key", this.apiKey)
+                .defaultHeader("accept", "application/json")
+                .build();
     }
 
     // Enlace absoluto a una página del sitio, para los botones de los correos.
@@ -108,7 +116,7 @@ public class CorreoService {
     // consola y quien llama decide qué decirle al usuario.
     boolean enviar(String para, String asunto, String plantilla, Map<String, Object> variables) {
         if (!configurado()) {
-            log.warn("Correo sin configurar (falta MAIL_USERNAME en el .env): no se envió \"{}\" a {}", asunto, para);
+            log.warn("Correo sin configurar (falta BREVO_API_KEY o MAIL_USERNAME en el .env): no se envió \"{}\" a {}", asunto, para);
             return false;
         }
         try {
@@ -116,13 +124,19 @@ public class CorreoService {
             datos.put("urlPublica", urlPublica);
             String html = plantillas.process("correos/" + plantilla, new Context(ES_MX, datos));
 
-            MimeMessage mensaje = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mensaje, "UTF-8");
-            helper.setFrom(remitente, "GymTrack");
-            helper.setTo(para);
-            helper.setSubject(asunto);
-            helper.setText(html, true);
-            mailSender.send(mensaje);
+            Map<String, Object> cuerpo = Map.of(
+                    "sender", Map.of("name", "GymTrack", "email", remitente),
+                    "to", List.of(Map.of("email", para)),
+                    "subject", asunto,
+                    "htmlContent", html);
+
+            brevo.post()
+                    .uri("/smtp/email")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(cuerpo)
+                    .retrieve()
+                    .toBodilessEntity();
+
             log.info("Correo \"{}\" enviado a {}", asunto, para);
             return true;
         } catch (Exception e) {
@@ -132,7 +146,7 @@ public class CorreoService {
     }
 
     private boolean configurado() {
-        return !remitente.isBlank();
+        return !apiKey.isBlank() && !remitente.isBlank();
     }
 
     // Fecha y hora del centro de México, p. ej. "19 de septiembre de 2026 a las 14:05".
