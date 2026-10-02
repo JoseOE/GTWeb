@@ -132,6 +132,7 @@ public class UserController {
         view.put("fechaProximoPago", user.getFechaProximoPago());
         view.put("diaDePago", user.getDiaDePago());
         view.put("diasParaVencer", user.diasParaVencer(LocalDate.now()));
+        view.put("planActual", user.getPlanActual());
 
         Map<String, Object> gymView = null;
         if (user.getGymId() != null && !user.getGymId().isBlank()) {

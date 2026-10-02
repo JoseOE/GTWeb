@@ -5,6 +5,8 @@ import com.gymtrack.model.User;
 import com.gymtrack.repository.PaymentRepository;
 import com.gymtrack.repository.UserRepository;
 import com.gymtrack.service.BillingService;
+import com.gymtrack.service.CatalogoService;
+import com.gymtrack.service.PlanPagado;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,7 +17,8 @@ import java.util.Map;
 import java.util.Optional;
 
 // Registro de mensualidades. El dueño cobra como quiera y lo marca aquí;
-// eso es lo que reactiva la membresía y mueve la fecha de corte.
+// eso es lo que reactiva la membresía y mueve la fecha de corte. Si elige uno
+// de sus planes, la fecha se mueve según la duración del plan (sin plan, un mes).
 @RestController
 @RequestMapping("/api/gyms/{gymId}/members/{userId}/payments")
 public class PaymentController {
@@ -23,12 +26,14 @@ public class PaymentController {
     private final UserRepository userRepository;
     private final PaymentRepository paymentRepository;
     private final BillingService billingService;
+    private final CatalogoService catalogo;
 
     public PaymentController(UserRepository userRepository, PaymentRepository paymentRepository,
-                             BillingService billingService) {
+                             BillingService billingService, CatalogoService catalogo) {
         this.userRepository = userRepository;
         this.paymentRepository = paymentRepository;
         this.billingService = billingService;
+        this.catalogo = catalogo;
     }
 
     @GetMapping
@@ -57,8 +62,13 @@ public class PaymentController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Fecha de pago inválida (usa AAAA-MM-DD)."));
         }
 
+        // La duración se lee del plan guardado en la tienda, no de lo que mande la página.
+        PlanPagado plan = request.getPlanId() == null || request.getPlanId().isBlank()
+                ? PlanPagado.MENSUAL
+                : catalogo.planParaPago(gymId, request.getPlanId());
+
         Payment pago = billingService.registrarPago(
-                memberOpt.get(), gymId, request.getMonto(), request.getMetodo(), fecha, request.getNota());
+                memberOpt.get(), gymId, request.getMonto(), request.getMetodo(), fecha, request.getNota(), plan, null);
 
         User actualizado = userRepository.findById(userId).orElseThrow();
         return ResponseEntity.ok(Map.of(
@@ -73,6 +83,8 @@ public class PaymentController {
         private String metodo;
         private String fechaPago;
         private String nota;
+        // Plan de la tienda que se está cobrando (opcional).
+        private String planId;
 
         public Double getMonto() { return monto; }
         public void setMonto(Double monto) { this.monto = monto; }
@@ -85,5 +97,8 @@ public class PaymentController {
 
         public String getNota() { return nota; }
         public void setNota(String nota) { this.nota = nota; }
+
+        public String getPlanId() { return planId; }
+        public void setPlanId(String planId) { this.planId = planId; }
     }
 }
