@@ -369,7 +369,7 @@ Respuestas de `/checkout`:
   "avisos": ["El precio de «Proteína Whey Gold» cambió de $899.50 a $949.50."],
   "items": [
     {"id": "cali_...", "varianteId": "variant_...", "productoId": "prod_...", "titulo": "Proteína Whey Gold",
-     "variante": "Bote 2 lb · Vainilla", "imagen": "https://...", "esPlan": false,
+     "variante": "Bote 1 kg · Vainilla", "imagen": "https://...", "esPlan": false,
      "cantidad": 2, "maximo": 6, "precioUnitario": 899.5, "total": 1799.0}
   ]
 }
@@ -430,7 +430,7 @@ Los rechazos llegan al checkout como 402 con el mensaje para el comprador, y el 
   "variantes": [
     {"id": "variant_...", "nombre": "Scoop · Vainilla", "presentacion": "Scoop", "sabor": "Vainilla",
      "precio": 35.0, "controlarInventario": false, "existencias": null, "disponible": null},
-    {"id": "variant_...", "nombre": "Bote 2 lb · Vainilla", "presentacion": "Bote 2 lb", "sabor": "Vainilla",
+    {"id": "variant_...", "nombre": "Bote 1 kg · Vainilla", "presentacion": "Bote 1 kg", "sabor": "Vainilla",
      "precio": 899.5, "controlarInventario": true, "existencias": 8, "disponible": 6}
   ]
 }
