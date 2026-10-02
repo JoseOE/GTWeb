@@ -1,0 +1,65 @@
+/* ═══════════════════════════════════════
+   Ficha de pago del simulador de Paynet (js/pagos/paynet-sim.js)
+═══════════════════════════════════════ */
+.pn-ficha {
+    background: #fff;
+    border: 1px solid var(--line, #d5d6cc);
+    border-radius: 12px;
+    padding: 18px 16px;
+}
+.pn-simulacion {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--brand-dark, #b73511);
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    padding: 2px 8px;
+}
+.pn-monto {
+    font-family: var(--display, sans-serif);
+    font-weight: 700;
+    font-size: 40px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+.pn-codigo {
+    display: block;
+    width: 100%;
+    max-width: 420px;
+    height: 96px;
+    object-fit: fill;
+    image-rendering: pixelated;
+    margin: 14px auto 6px;
+    background: #fff;
+}
+.pn-referencia {
+    font-family: var(--identity, monospace);
+    font-weight: 800;
+    font-size: clamp(17px, 5.4vw, 22px);
+    letter-spacing: .06em;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+.pn-tiendas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.pn-tiendas span {
+    font-size: 13px;
+    border: 1px dashed var(--line, #d5d6cc);
+    border-radius: 999px;
+    padding: 4px 10px;
+    color: var(--muted, #62645d);
+}
+.pn-pasos {
+    padding-left: 1.2rem;
+    margin: 0;
+    font-size: 15px;
+}
+.pn-pasos li {
+    padding: 2px 0;
+}

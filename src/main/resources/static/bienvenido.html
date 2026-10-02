@@ -427,7 +427,8 @@
                                     <th>Fecha</th>
                                     <th>Monto</th>
                                     <th>Método</th>
-                                    <th class="pe-4">Cubre hasta</th>
+                                    <th>Cubre hasta</th>
+                                    <th class="pe-4 text-end">Recibo</th>
                                 </tr>
                             </thead>
                             <tbody id="payments-tbody"></tbody>
@@ -1531,6 +1532,27 @@
                 });
             });
 
+            document.getElementById('payments-tbody').addEventListener('click', (e) => {
+                const boton = e.target.closest('[data-recibo-pago]');
+                if (!boton) return;
+                // fetch y no un enlace: el recibo exige el encabezado X-User-Id.
+                boton.disabled = true;
+                fetch('/api/recibos/pagos/' + encodeURIComponent(boton.dataset.reciboPago) + '.pdf', { headers: { 'X-User-Id': localStorage.getItem('userId') || '' } })
+                    .then(res => res.ok ? res.blob() : Promise.reject(new Error('No se pudo generar el recibo.')))
+                    .then(blob => {
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'recibo-membresia.pdf';
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        setTimeout(() => URL.revokeObjectURL(url), 10000);
+                    })
+                    .catch(err => alert(err.message))
+                    .finally(() => { boton.disabled = false; });
+            });
+
             const gymId = localStorage.getItem('gymId');
             if (gymId) loadBilling(gymId);
         }
@@ -1617,9 +1639,14 @@
                                     <td class="text-body-secondary">${escapeHtml(p.fechaPago || '')}</td>
                                     <td class="fw-semibold">${p.monto != null ? '$' + Number(p.monto).toFixed(2) : '—'}</td>
                                     <td class="text-body-secondary">${escapeHtml(p.metodo || '—')}${p.plan ? '<div class="small">' + escapeHtml(p.plan) + '</div>' : ''}</td>
-                                    <td class="pe-4 text-body-secondary">${escapeHtml(p.cubreHasta || '—')}</td>
+                                    <td class="text-body-secondary">${escapeHtml(p.cubreHasta || '—')}</td>
+                                    <td class="pe-4 text-end">
+                                        <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-recibo-pago="${escapeHtml(p.id)}" title="Descargar el recibo en PDF">
+                                            <i class='bx bx-receipt'></i> Recibo
+                                        </button>
+                                    </td>
                                 </tr>`).join('')
-                            : '<tr><td colspan="5" class="text-center text-body-secondary py-4 px-4">Aún no registras pagos.</td></tr>';
+                            : '<tr><td colspan="6" class="text-center text-body-secondary py-4 px-4">Aún no registras pagos.</td></tr>';
                     });
                 });
         }

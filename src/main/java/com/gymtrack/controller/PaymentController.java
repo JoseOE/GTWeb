@@ -4,6 +4,7 @@ import com.gymtrack.model.Payment;
 import com.gymtrack.model.User;
 import com.gymtrack.repository.PaymentRepository;
 import com.gymtrack.repository.UserRepository;
+import com.gymtrack.service.AvisosPedidoService;
 import com.gymtrack.service.BillingService;
 import com.gymtrack.service.CatalogoService;
 import com.gymtrack.service.PlanPagado;
@@ -27,13 +28,16 @@ public class PaymentController {
     private final PaymentRepository paymentRepository;
     private final BillingService billingService;
     private final CatalogoService catalogo;
+    private final AvisosPedidoService avisos;
 
     public PaymentController(UserRepository userRepository, PaymentRepository paymentRepository,
-                             BillingService billingService, CatalogoService catalogo) {
+                             BillingService billingService, CatalogoService catalogo,
+                             AvisosPedidoService avisos) {
         this.userRepository = userRepository;
         this.paymentRepository = paymentRepository;
         this.billingService = billingService;
         this.catalogo = catalogo;
+        this.avisos = avisos;
     }
 
     @GetMapping
@@ -69,6 +73,8 @@ public class PaymentController {
 
         Payment pago = billingService.registrarPago(
                 memberOpt.get(), gymId, request.getMonto(), request.getMetodo(), fecha, request.getNota(), plan, null);
+        // El miembro recibe su recibo en PDF por correo (en segundo plano).
+        avisos.pagoRegistrado(pago);
 
         User actualizado = userRepository.findById(userId).orElseThrow();
         return ResponseEntity.ok(Map.of(

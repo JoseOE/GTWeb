@@ -62,15 +62,18 @@ public class PedidoService {
     private final UserRepository userRepository;
     private final BillingService billingService;
     private final ObjectMapper json;
+    private final AvisosPedidoService avisos;
 
     public PedidoService(MedusaClient medusa, PedidoRepository pedidoRepository, GymRepository gymRepository,
-                         UserRepository userRepository, BillingService billingService, ObjectMapper json) {
+                         UserRepository userRepository, BillingService billingService, ObjectMapper json,
+                         AvisosPedidoService avisos) {
         this.medusa = medusa;
         this.pedidoRepository = pedidoRepository;
         this.gymRepository = gymRepository;
         this.userRepository = userRepository;
         this.billingService = billingService;
         this.json = json;
+        this.avisos = avisos;
     }
 
     public Pedido sincronizar(String orderId) {
@@ -86,6 +89,8 @@ public class PedidoService {
         if (Pedido.ESTADO_PAGADO.equals(p.getEstado()) && !p.isPlanAplicado() && p.incluyePlan()) {
             aplicarPlan(p, o);
         }
+        // Correos y push del pedido (en segundo plano; cada uno sale una sola vez).
+        avisos.alSincronizar(p, vista(p));
         return p;
     }
 
@@ -225,6 +230,11 @@ public class PedidoService {
         v.put("metodo", MetodosPago.nombre(p.getProveedorPago()));
         v.put("detallePago", detallePago(p));
         v.put("cliente", p.getCliente());
+        // Para la pantalla de la ficha (web y app): referencia y fecha límite.
+        Object referencia = p.getDatosPago() == null ? null : p.getDatosPago().get("referencia");
+        v.put("paynet", referencia == null ? null : Map.of(
+                "referencia", referenciaLegible(referencia.toString()),
+                "vence", String.valueOf(p.getDatosPago().getOrDefault("vence", ""))));
         v.put("proveedorPago", p.getProveedorPago());
         v.put("canal", p.getCanal());
         v.put("total", p.getTotal());
@@ -281,7 +291,15 @@ public class PedidoService {
         if (d.get("recibido") != null) {
             return "Efectivo · recibido " + dinero(d.get("recibido")) + ", cambio " + dinero(d.get("cambio"));
         }
+        if (d.get("referencia") != null) {
+            return "Paynet · referencia " + referenciaLegible(String.valueOf(d.get("referencia")));
+        }
         return MetodosPago.nombre(p.getProveedorPago());
+    }
+
+    // "930123456789012345" → "9301 2345 6789 0123 45": así se dicta en la tienda.
+    public static String referenciaLegible(String referencia) {
+        return referencia.replaceAll("(.{4})(?!$)", "$1 ");
     }
 
     private static final Map<String, String> MARCAS = Map.of(

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{correos/base :: correo('¡Gracias por tu compra!', ~{::#cuerpo})}">
+<body>
+<div id="cuerpo">
+    <p style="margin:0 0 16px;" th:text="|${saludo}:|">Hola, Juan:</p>
+    <p style="margin:0 0 20px;" th:text="|Tu pedido #${pedido['folio']} en ${gimnasio} quedó pagado. Te dejamos el recibo en PDF.|">Tu pedido quedó pagado.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px;border-collapse:collapse;">
+        <tr th:each="p : ${pedido['partidas']}">
+            <td style="padding:8px 0;border-bottom:1px solid #d5d6cc;" th:text="|${p['cantidad']} × ${p['titulo']}${p['variante'] != null ? ' · ' + p['variante'] : ''}|">1 × Producto</td>
+            <td align="right" style="padding:8px 0;border-bottom:1px solid #d5d6cc;white-space:nowrap;" th:text="|$${#numbers.formatDecimal(p['total'], 1, 'COMMA', 2, 'POINT')}|">$0.00</td>
+        </tr>
+        <tr>
+            <td style="padding:10px 0;font-weight:700;">Total</td>
+            <td align="right" style="padding:10px 0;font-weight:700;" th:text="|$${#numbers.formatDecimal(pedido['total'], 1, 'COMMA', 2, 'POINT')}|">$0.00</td>
+        </tr>
+    </table>
+    <p style="margin:0 0 20px;" th:text="|Pagaste con: ${pedido['detallePago']}|">Pagaste con tarjeta.</p>
+    <p style="margin:0 0 24px;" th:if="${pedido['canal'] != 'mostrador'}" th:text="|Recógelo en la recepción de ${gimnasio}: muestra tu número de pedido.|">Recógelo en recepción.</p>
+    <p style="margin:0 0 24px;">
+        <a th:href="${enlace}" href="#" style="display:inline-block;padding:14px 24px;background-color:#f45124;color:#191b18;border-radius:4px;font-weight:700;text-decoration:none;">Ver mi pedido</a>
+    </p>
+    <p style="margin:0;font-size:12px;color:#62645d;">Comprobante simulado, sin validez fiscal.</p>
+</div>
+</body>
+</html>

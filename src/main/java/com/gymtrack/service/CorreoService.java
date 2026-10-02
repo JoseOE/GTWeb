@@ -14,6 +14,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -107,28 +108,80 @@ public class CorreoService {
                 "saludo", saludo(member), "gimnasio", nombreGym));
     }
 
+    // ─── Tienda y recibos (llevan el PDF adjunto) ───
+
+    public boolean compraConfirmada(User comprador, String nombreGym, Map<String, Object> pedido, byte[] recibo) {
+        return enviar(comprador.getEmail(), "Tu compra en " + nombreGym + " · pedido #" + pedido.get("folio"), "compra-confirmada",
+                Map.of("saludo", saludo(comprador), "gimnasio", nombreGym, "pedido", pedido,
+                        "enlace", enlace("confirmacion.html?pedido=" + pedido.get("orderId"))),
+                List.of(new Adjunto("recibo-" + pedido.get("folio") + ".pdf", recibo)));
+    }
+
+    public boolean fichaPaynet(User comprador, String nombreGym, Map<String, Object> pedido, String referencia,
+                               String vence, byte[] ficha) {
+        return enviar(comprador.getEmail(), "Tu ficha de pago Paynet · pedido #" + pedido.get("folio"), "ficha-paynet",
+                Map.of("saludo", saludo(comprador), "gimnasio", nombreGym, "pedido", pedido, "referencia", referencia,
+                        "vence", vence, "enlace", enlace("confirmacion.html?pedido=" + pedido.get("orderId"))),
+                List.of(new Adjunto("ficha-paynet-" + pedido.get("folio") + ".pdf", ficha)));
+    }
+
+    public boolean pagoPaynetRecibido(User comprador, String nombreGym, Map<String, Object> pedido, byte[] recibo) {
+        return enviar(comprador.getEmail(), "Recibimos tu pago · pedido #" + pedido.get("folio"), "pago-paynet-recibido",
+                Map.of("saludo", saludo(comprador), "gimnasio", nombreGym, "pedido", pedido,
+                        "enlace", enlace("confirmacion.html?pedido=" + pedido.get("orderId"))),
+                List.of(new Adjunto("recibo-" + pedido.get("folio") + ".pdf", recibo)));
+    }
+
+    public boolean reciboMensualidad(User member, String nombreGym, String concepto, double monto, LocalDate cubreHasta,
+                                     String folio, byte[] recibo) {
+        return enviar(member.getEmail(), "Tu recibo de " + nombreGym, "recibo-mensualidad",
+                Map.of("saludo", saludo(member), "gimnasio", nombreGym, "concepto", concepto,
+                        "monto", String.format(ES_MX, "$%,.2f", monto),
+                        "cubreHasta", cubreHasta == null ? "" : fecha(cubreHasta)),
+                List.of(new Adjunto("recibo-" + folio + ".pdf", recibo)));
+    }
+
+    // Archivo adjunto: Brevo lo recibe en base64.
+    public record Adjunto(String nombre, byte[] contenido) {}
+
     // false = falta MAIL_USERNAME en el .env; los códigos se escriben en la consola.
     public boolean estaConfigurado() {
         return configurado();
     }
 
+    boolean enviar(String para, String asunto, String plantilla, Map<String, Object> variables) {
+        return enviar(para, asunto, plantilla, variables, List.of());
+    }
+
     // Un correo que falla nunca tumba la operación que lo pidió: se avisa en la
     // consola y quien llama decide qué decirle al usuario.
-    boolean enviar(String para, String asunto, String plantilla, Map<String, Object> variables) {
+    boolean enviar(String para, String asunto, String plantilla, Map<String, Object> variables, List<Adjunto> adjuntos) {
         if (!configurado()) {
-            log.warn("Correo sin configurar (falta BREVO_API_KEY o MAIL_USERNAME en el .env): no se envió \"{}\" a {}", asunto, para);
+            // La plantilla se arma de todos modos: así un error en ella aparece
+            // en la consola también en local, sin Brevo.
+            try {
+                html(plantilla, variables);
+            } catch (Exception e) {
+                log.error("La plantilla de correo \"{}\" tiene un error: {}", plantilla, e.getMessage());
+                return false;
+            }
+            log.warn("Correo sin configurar (falta BREVO_API_KEY o MAIL_USERNAME en el .env): no se envió \"{}\" a {}{}", asunto, para,
+                    adjuntos.isEmpty() ? "" : " (" + adjuntos.size() + " adjunto(s))");
             return false;
         }
         try {
-            Map<String, Object> datos = new HashMap<>(variables);
-            datos.put("urlPublica", urlPublica);
-            String html = plantillas.process("correos/" + plantilla, new Context(ES_MX, datos));
+            String html = html(plantilla, variables);
 
-            Map<String, Object> cuerpo = Map.of(
+            Map<String, Object> cuerpo = new HashMap<>(Map.of(
                     "sender", Map.of("name", "GymTrack", "email", remitente),
                     "to", List.of(Map.of("email", para)),
                     "subject", asunto,
-                    "htmlContent", html);
+                    "htmlContent", html));
+            if (!adjuntos.isEmpty()) {
+                cuerpo.put("attachment", adjuntos.stream()
+                        .map(a -> Map.of("name", a.nombre(), "content", Base64.getEncoder().encodeToString(a.contenido())))
+                        .toList());
+            }
 
             brevo.post()
                     .uri("/smtp/email")
@@ -143,6 +196,12 @@ public class CorreoService {
             log.warn("No se pudo enviar \"{}\" a {}: {}", asunto, para, e.getMessage());
             return false;
         }
+    }
+
+    private String html(String plantilla, Map<String, Object> variables) {
+        Map<String, Object> datos = new HashMap<>(variables);
+        datos.put("urlPublica", urlPublica);
+        return plantillas.process("correos/" + plantilla, new Context(ES_MX, datos));
     }
 
     private boolean configurado() {
