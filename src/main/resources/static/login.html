@@ -119,12 +119,14 @@
                 if (response.status === 200) {
                     localStorage.setItem('userName', response.body.nombre);
                     localStorage.setItem('userId', response.body.id || '');
+                    localStorage.setItem('role', response.body.role || 'owner');
                     if (response.body.gymId) {
                         localStorage.setItem('gymId', response.body.gymId);
                     } else {
                         localStorage.removeItem('gymId');
                     }
-                    window.location.href = 'bienvenido.html';
+                    // El panel es del dueño; un miembro de un gimnasio entra directo a su tienda.
+                    window.location.href = response.body.role === 'member' ? 'tienda.html' : 'bienvenido.html';
                 } else if (response.body.verificacionPendiente) {
                     // Cuenta creada pero sin confirmar el correo: se manda a verificarlo.
                     sessionStorage.setItem('correoPorVerificar', response.body.email || email);

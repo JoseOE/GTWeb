@@ -157,6 +157,7 @@ public class MemberController {
         view.put("membershipActive", user.getMembershipActive());
         view.put("fechaProximoPago", user.getFechaProximoPago());
         view.put("diaDePago", user.getDiaDePago());
+        view.put("planActual", user.getPlanActual());
         view.put("diasParaVencer", user.diasParaVencer(LocalDate.now()));
         view.put("tienePush", user.getPushToken() != null && !user.getPushToken().isBlank());
         return view;

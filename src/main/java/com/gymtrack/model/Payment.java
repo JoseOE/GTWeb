@@ -1,13 +1,14 @@
 package com.gymtrack.model;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
 
-// Un pago de mensualidad registrado por el dueño del gimnasio.
-// No hay pasarela: el gimnasio cobra como quiera y aquí queda el registro,
-// que es lo que mueve la fecha de corte del usuario.
+// Un pago de membresía. Llega de dos formas: el dueño lo registra a mano
+// desde el panel (cobró como quiera) o lo genera una compra pagada en la
+// tienda. En ambos casos es lo que mueve la fecha de corte del usuario.
 @Document(collection = "payments")
 public class Payment {
 
@@ -21,6 +22,18 @@ public class Payment {
     // Hasta cuándo queda cubierta la membresía con este pago
     private LocalDate cubreHasta;
     private String nota;
+
+    // ─── Plan ───
+    // Producto "membresia" de Medusa que se pagó (null en los pagos anteriores a la tienda,
+    // que siempre fueron de un mes).
+    private String planId;
+    private String plan;
+    private String duracionUnidad;
+    private Integer duracionCantidad;
+    // Pedido de la tienda que originó el pago. Único: es lo que impide que un
+    // aviso repetido de Medusa extienda la membresía dos veces.
+    @Indexed(unique = true, sparse = true)
+    private String orderId;
 
     public Payment() {}
 
@@ -47,4 +60,19 @@ public class Payment {
 
     public String getNota() { return nota; }
     public void setNota(String nota) { this.nota = nota; }
+
+    public String getPlanId() { return planId; }
+    public void setPlanId(String planId) { this.planId = planId; }
+
+    public String getPlan() { return plan; }
+    public void setPlan(String plan) { this.plan = plan; }
+
+    public String getDuracionUnidad() { return duracionUnidad; }
+    public void setDuracionUnidad(String duracionUnidad) { this.duracionUnidad = duracionUnidad; }
+
+    public Integer getDuracionCantidad() { return duracionCantidad; }
+    public void setDuracionCantidad(Integer duracionCantidad) { this.duracionCantidad = duracionCantidad; }
+
+    public String getOrderId() { return orderId; }
+    public void setOrderId(String orderId) { this.orderId = orderId; }
 }

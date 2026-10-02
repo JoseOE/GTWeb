@@ -33,6 +33,9 @@ public class User {
     // Hasta cuándo está cubierta su mensualidad. El día siguiente a esta fecha
     // el cobrador automático lo pasa a "inactive".
     private LocalDate fechaProximoPago;
+    // Nombre del último plan pagado ("Mensual", "Trimestral"...). null si sus
+    // pagos se registraron antes de que existieran los planes.
+    private String planActual;
     // Token de Expo para mandarle notificaciones push a su teléfono.
     private String pushToken;
     // false = se registró en la página web y aún no confirma su correo: no puede
@@ -88,6 +91,9 @@ public class User {
 
     public LocalDate getFechaProximoPago() { return fechaProximoPago; }
     public void setFechaProximoPago(LocalDate fechaProximoPago) { this.fechaProximoPago = fechaProximoPago; }
+
+    public String getPlanActual() { return planActual; }
+    public void setPlanActual(String planActual) { this.planActual = planActual; }
 
     public String getPushToken() { return pushToken; }
     public void setPushToken(String pushToken) { this.pushToken = pushToken; }

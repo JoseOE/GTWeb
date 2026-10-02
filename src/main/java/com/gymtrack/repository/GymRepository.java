@@ -9,4 +9,6 @@ import java.util.Optional;
 public interface GymRepository extends MongoRepository<Gym, String> {
     Optional<Gym> findByCodigo(String codigo);
     List<Gym> findByEnDirectorioTrue();
+    // A qué gimnasio pertenece un pedido de Medusa (por su canal de venta).
+    Optional<Gym> findByTiendaSalesChannelId(String salesChannelId);
 }
