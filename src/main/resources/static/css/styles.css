@@ -710,3 +710,28 @@ footer.bg-dark::before {
     .dash-nav-link.active::before { transform: scaleX(1); }
     .dash-content { max-height: none; overflow-y: visible; }
 }
+
+/* ─── Mostrador: botones de producto y ticket ─── */
+.mostrador-tile {
+    text-align: left;
+    background: #fff;
+    border: 1px solid rgba(20, 20, 25, 0.12);
+    border-radius: 10px;
+    padding: 0.75rem;
+    min-height: 92px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    color: inherit;
+    transition: border-color 0.15s ease, transform 0.1s ease;
+}
+.mostrador-tile:hover:not(:disabled) { border-color: var(--brand); }
+.mostrador-tile:active:not(:disabled) { transform: scale(0.98); }
+.mostrador-tile:disabled { opacity: 0.5; }
+@media (min-width: 992px) {
+    .mostrador-ticket { position: sticky; top: 1rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .mostrador-tile { transition: none; }
+    .mostrador-tile:active:not(:disabled) { transform: none; }
+}
