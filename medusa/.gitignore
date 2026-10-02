@@ -1,0 +1,14 @@
+# Dependencias y compilados: se reconstruyen con npm install / npm run build
+node_modules/
+.medusa/
+dist/
+build/
+.cache/
+uploads/
+
+# Secretos (DATABASE_URL de Neon, JWT_SECRET...). Nunca se suben.
+.env
+.env.*
+!.env.template
+
+*.log
