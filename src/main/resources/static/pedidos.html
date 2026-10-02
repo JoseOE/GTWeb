@@ -50,7 +50,7 @@
                         <div class="d-flex justify-content-between align-items-start gap-2">
                             <div>
                                 <h2 class="seccion-titulo mb-0">Pedido #${Tienda.escapar(p.folio)}</h2>
-                                <small class="text-body-secondary">${Tienda.escapar(Tienda.fecha(p.creadoEn))} · ${Tienda.escapar(p.metodo)}${p.gym ? ' · ' + Tienda.escapar(p.gym.nombre) : ''}</small>
+                                <small class="text-body-secondary">${Tienda.escapar(Tienda.fecha(p.creadoEn))} · ${Tienda.escapar(p.detallePago || p.metodo)}${p.gym ? ' · ' + Tienda.escapar(p.gym.nombre) : ''}</small>
                             </div>
                             <span class="estado-pedido ${Tienda.escapar(p.estado)}">${Tienda.escapar(p.estadoTexto)}</span>
                         </div>

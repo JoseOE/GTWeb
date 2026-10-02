@@ -1,0 +1,149 @@
+/* ═══════════════════════════════════════
+   Tarjeta virtual del simulador de Stripe (js/pagos/stripe-sim.js)
+   Refleja lo que se escribe y gira al enfocar el CVC.
+═══════════════════════════════════════ */
+.tv {
+    --tv-fondo: linear-gradient(135deg, #2b2e29 0%, #20221f 60%, #3a2a22 100%);
+    max-width: 340px;
+    margin: 0 auto 16px;
+    perspective: 1000px;
+}
+.tv[data-marca="visa"] { --tv-fondo: linear-gradient(135deg, #1d3b8b 0%, #142a63 55%, #0d1c43 100%); }
+.tv[data-marca="mastercard"] { --tv-fondo: linear-gradient(135deg, #2a2a2a 0%, #3b2216 55%, #b5481d 100%); }
+.tv[data-marca="amex"] { --tv-fondo: linear-gradient(135deg, #1f6f78 0%, #17545b 55%, #0f3b40 100%); }
+
+.tv-giro {
+    position: relative;
+    aspect-ratio: 1.586 / 1;
+    transform-style: preserve-3d;
+    transition: transform .6s var(--ease-out, cubic-bezier(.16, 1, .3, 1));
+}
+.tv.girada .tv-giro {
+    transform: rotateY(180deg);
+}
+.tv-cara {
+    position: absolute;
+    inset: 0;
+    border-radius: 14px;
+    background: var(--tv-fondo);
+    color: #f4f2eb;
+    padding: 18px 20px;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    box-shadow: 0 18px 36px -18px #20221fb0;
+    overflow: hidden;
+    font-variant-numeric: tabular-nums;
+    transition: background .4s ease;
+}
+.tv-cara.atras {
+    transform: rotateY(180deg);
+    padding: 0;
+}
+.tv-cara .tv-simulacion {
+    position: absolute;
+    top: 16px;
+    right: 18px;
+    font-size: 10px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    border: 1px solid #f4f2eb66;
+    border-radius: 4px;
+    padding: 2px 6px;
+}
+.tv-chip {
+    width: 42px;
+    height: 32px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #e9c46a, #b8892e);
+    margin-top: 6px;
+}
+.tv-numero {
+    font-family: var(--identity, monospace);
+    font-size: clamp(17px, 5.6vw, 22px);
+    letter-spacing: .08em;
+    margin-top: 16px;
+    white-space: nowrap;
+}
+.tv-pie {
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 12px;
+}
+.tv-etiqueta {
+    font-size: 9px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    opacity: .7;
+}
+.tv-titular {
+    font-size: 14px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+}
+.tv-marca {
+    font-family: var(--display, sans-serif);
+    font-weight: 700;
+    font-size: 22px;
+    font-style: italic;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.tv-banda {
+    height: 42px;
+    background: #111;
+    margin-top: 22px;
+}
+.tv-firma {
+    margin: 16px 20px 0;
+    height: 38px;
+    border-radius: 4px;
+    background: repeating-linear-gradient(-45deg, #f4f2eb, #f4f2eb 6px, #e3e0d4 6px, #e3e0d4 12px);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 12px;
+    color: #20221f;
+    font-family: var(--identity, monospace);
+    font-weight: 700;
+    letter-spacing: .12em;
+}
+.tv-nota-atras {
+    margin: 10px 20px 0;
+    font-size: 10px;
+    opacity: .7;
+}
+
+.tv-form .form-control {
+    font-variant-numeric: tabular-nums;
+}
+.tv-generar {
+    min-height: 44px;
+}
+.tv-pruebas summary {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--brand-dark, #b73511);
+}
+.tv-pruebas button {
+    min-height: 44px;
+    text-align: left;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tv-giro,
+    .tv-cara {
+        transition: none;
+    }
+}
