@@ -12,7 +12,8 @@ import java.util.Map;
 // responden sus errores con la misma forma, la que ya usa el resto de la API:
 //   {"error": "mensaje para la persona"}
 // y, si Medusa está despertando, además {"despertando": true} con Retry-After
-// para que la web y la app reintenten solas.
+// para que la web y la app reintenten solas. Algunos errores agregan datos
+// (p. ej. "carrito" cuando el carrito cambió antes de pagar).
 @RestControllerAdvice
 public class TiendaExceptionHandler {
 
@@ -20,6 +21,7 @@ public class TiendaExceptionHandler {
     public ResponseEntity<Map<String, Object>> manejar(TiendaException e) {
         Map<String, Object> cuerpo = new LinkedHashMap<>();
         cuerpo.put("error", e.getMessage());
+        cuerpo.putAll(e.getDatos());
         if (e.isDespertando()) {
             cuerpo.put("despertando", true);
             return ResponseEntity.status(e.getStatus()).header("Retry-After", "10").body(cuerpo);

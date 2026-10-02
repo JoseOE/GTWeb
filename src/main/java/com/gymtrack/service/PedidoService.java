@@ -18,7 +18,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -38,6 +40,11 @@ public class PedidoService {
     private static final Logger log = LoggerFactory.getLogger(PedidoService.class);
     private static final ZoneId ZONA_MX = ZoneId.of("America/Mexico_City");
     private static final Set<String> PAGOS_COBRADOS = Set.of("captured", "partially_refunded");
+    private static final Map<String, String> ESTADOS = Map.of(
+            Pedido.ESTADO_PENDIENTE_PAGO, "Pendiente de pago",
+            Pedido.ESTADO_PAGADO, "Pagado",
+            Pedido.ESTADO_CANCELADO, "Cancelado",
+            Pedido.ESTADO_REEMBOLSADO, "Reembolsado");
 
     private static final String CAMPOS = String.join(",",
             "id", "display_id", "status", "payment_status", "email", "metadata", "sales_channel_id",
@@ -198,6 +205,43 @@ public class PedidoService {
             if (e.getStatus() == HttpStatus.NOT_FOUND) return Optional.empty();
             throw e;
         }
+    }
+
+    // Forma en que la web y la app reciben un pedido (confirmación y "Mis pedidos").
+    public Map<String, Object> vista(Pedido p) {
+        Map<String, Object> v = new LinkedHashMap<>();
+        v.put("orderId", p.getOrderId());
+        v.put("folio", p.getFolio());
+        v.put("estado", p.getEstado());
+        v.put("estadoTexto", ESTADOS.getOrDefault(p.getEstado(), p.getEstado()));
+        v.put("metodo", MetodosPago.nombre(p.getProveedorPago()));
+        v.put("proveedorPago", p.getProveedorPago());
+        v.put("canal", p.getCanal());
+        v.put("total", p.getTotal());
+        v.put("subtotal", p.getSubtotal());
+        v.put("iva", p.getIva());
+        v.put("creadoEn", p.getCreadoEn());
+        v.put("pagadoEn", p.getPagadoEn());
+        v.put("canceladoEn", p.getCanceladoEn());
+        List<Map<String, Object>> partidas = new ArrayList<>();
+        for (Pedido.Partida x : p.getPartidas()) {
+            Map<String, Object> partida = new LinkedHashMap<>();
+            partida.put("titulo", x.getTitulo());
+            // "Plan" es el nombre interno de la única variante de un plan: no dice nada al comprador.
+            partida.put("variante", "Plan".equals(x.getVariante()) ? null : x.getVariante());
+            partida.put("tipo", x.getTipo());
+            partida.put("cantidad", x.getCantidad());
+            partida.put("precioUnitario", x.getPrecioUnitario());
+            partida.put("total", x.getTotal());
+            partidas.add(partida);
+        }
+        v.put("partidas", partidas);
+        Gym gym = p.getGymId() == null ? null : gymRepository.findById(p.getGymId()).orElse(null);
+        v.put("gym", gym == null ? null : Map.of(
+                "id", gym.getId(),
+                "nombre", gym.getNombre() == null ? "" : gym.getNombre(),
+                "direccion", gym.getDireccion() == null ? "" : gym.getDireccion()));
+        return v;
     }
 
     private void marcarAplicado(Pedido p) {
