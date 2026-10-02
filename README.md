@@ -231,6 +231,10 @@ Se envían por el SMTP de Gmail con plantillas HTML (Thymeleaf). Los códigos se
 | Tu contraseña cambió | Al restablecerla o cambiarla en Mi cuenta. |
 | Código para el correo nuevo · aviso al anterior | Al cambiar el correo en Mi cuenta. |
 | Solicitud aprobada · pago por vencer · membresía vencida | Avisos de la membresía para los miembros del gimnasio. |
+| Compra confirmada (con el recibo en PDF) | Al pagarse una compra de un miembro: tienda, app o mostrador. |
+| Ficha de pago Paynet (con la ficha en PDF) | Al elegir pagar en efectivo en tiendas. |
+| Recibimos tu pago (con el recibo en PDF y push) | Al pagarse una ficha Paynet. |
+| Recibo de membresía (con el recibo en PDF) | Al registrar un pago a mano en el panel. |
 
 > Las cuentas creadas desde la app móvil entran sin verificar el correo, porque la app todavía no tiene esa pantalla.
 
@@ -412,6 +416,42 @@ Los rechazos llegan al checkout como 402 con el mensaje para el comprador, y el 
 - **Entrega.** La venta se marca como entregada en el acto, así que bajan las existencias del almacén.
 - **Plan.** Si la venta lleva un plan y el cliente es miembro, su membresía se extiende igual que en la tienda.
 
+**Recibos y simulador de Paynet**
+
+| Método | Ruta | Uso |
+|---|---|---|
+| GET | `/api/recibos/pedidos/{orderId}.pdf` | Recibo tamaño carta; con `?formato=ticket`, ticket de 80 mm para el mostrador |
+| GET | `/api/recibos/paynet/{orderId}.pdf` · `/codigo.png` | Ficha Paynet en PDF · código de barras de la referencia (para la web y la app) |
+| GET | `/api/recibos/pagos/{paymentId}.pdf` | Recibo de una mensualidad registrada en el panel |
+| POST | `/api/recibos/pedidos/{orderId}/enviar` · `/api/recibos/pagos/{paymentId}/enviar` | Reenviar el recibo (o la ficha) por correo |
+| POST | `/api/simuladores/paynet/{orderId}/pagar` | "Simular pago en tienda" (solo el dueño; lo usa el dashboard de ventas) |
+| POST | `/api/simuladores/paynet/vencidas` | Cancelar ahora las fichas vencidas (también corre sola cada 15 minutos) |
+
+**Recibos.**
+
+- **Quién los ve.** Solo el comprador y el dueño del gimnasio. Se piden con `fetch` y `X-User-Id`, porque un enlace no puede mandar el encabezado.
+- **Contenido.** Todos los PDF llevan:
+  - logo y datos del gimnasio, folio, fecha y cliente;
+  - las partidas, con subtotal, IVA 16 % desglosado y total (los precios ya incluyen IVA);
+  - la forma de pago y el estado;
+  - un QR con el folio y la leyenda **"Comprobante simulado, sin validez fiscal"**.
+- **Pedidos sin recibo.** Un pedido pendiente o cancelado responde 409.
+
+**Paynet.**
+
+- **La ficha.** Al pagar, el proveedor genera una referencia de 18 dígitos (convenio `93` y dígito verificador de Luhn) con fecha límite de 72 horas. El pago queda autorizado sin capturar: el pedido está "Pendiente de pago" y no activa ningún plan.
+- **Dónde se ve.** `confirmacion.html` muestra el código de barras, la referencia copiable, las tiendas (marcadas como simulación) y las instrucciones. La ficha también llega por correo en PDF.
+- **El pago.** "Simular pago en tienda" captura el pago en Medusa y el pedido queda pagado: se activa el plan, llegan el recibo por correo y el push "Recibimos tu pago".
+- **Vencimiento.** Cada 15 minutos se cancelan las fichas vencidas y Medusa libera el inventario que tenían apartado.
+- **En la vista del pedido.** Viene `paynet: {referencia, vence}` para pintar la ficha en la web y en la app.
+
+**Correos de la tienda.**
+
+- Salen en segundo plano, con el PDF adjunto por la API de Brevo (base64).
+- Cada correo automático se registra en `correos_enviados` antes de salir, así que un pedido sincronizado varias veces no lo repite.
+- Solo se escribe a miembros: en una venta de mostrador al público no se manda nada.
+- Sin Brevo configurado, la plantilla se arma igual y el aviso se escribe en la consola.
+
 **Generales**
 
 | Método | Ruta | Uso |
@@ -491,7 +531,7 @@ Para crear o editar se manda `nombre`, `descripcion`, `categoria` (el handle), `
 | Proveedor en Medusa | Bloque | Comportamiento base |
 |---|---|---|
 | `pp_sim-stripe_default` | 3 · Eduardo | Hecho: cobra en el acto si el token es de una tarjeta aprobada (ids `pi_sim_...` y cargo `ch_sim_...`) y rechaza con su mensaje las demás |
-| `pp_sim-paynet_default` | 4 · Valeria | Queda **autorizado sin capturar**: pedido pendiente de pago |
+| `pp_sim-paynet_default` | 4 · Valeria | Hecho: referencia con dígito verificador y 72 h; queda **autorizado sin capturar** hasta "Simular pago en tienda" |
 | `pp_sim-paypal_default` | 5 · Edwin | Cobra en el acto. Ids `PAYID-SIM_...` |
 | `pp_system_default` | 3 · Eduardo | Hecho: efectivo en mostrador; Spring captura el pago al cobrar |
 
@@ -735,6 +775,7 @@ La comunicación entre el dispositivo IoT y los servicios backend utilizará pro
 | Spring Boot Mail (SMTP de Gmail) + Thymeleaf | Correos de la cuenta con plantillas HTML |
 | BCrypt (spring-security-crypto) | Cifrado de contraseñas |
 | Medusa v2 + PostgreSQL (Neon) | Motor de la tienda de cada gimnasio (segundo servicio en Render) |
+| iText Core 9 (kernel, layout, barcodes) | Recibos, tickets de 80 mm y fichas Paynet en PDF, con QR y código de barras (licencia AGPL) |
 
 **Aplicación móvil** (repositorio aparte)
 
