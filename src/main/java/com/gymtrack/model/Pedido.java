@@ -6,7 +6,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 // Copia local de un pedido de la tienda. El pedido de verdad vive en Medusa;
 // aquí queda lo que Spring necesita sin preguntarle a Medusa cada vez: de quién
@@ -44,6 +46,14 @@ public class Pedido {
     private String estado;
     // Proveedor de pago de Medusa (pp_sim-stripe_default, pp_system_default...).
     private String proveedorPago;
+    // Lo que cada simulador guardó del pago, sin nada sensible: marca y últimos 4
+    // de la tarjeta, lo recibido y el cambio en efectivo, la referencia Paynet...
+    // Es lo que muestran el ticket y el recibo.
+    private Map<String, Object> datosPago = new LinkedHashMap<>();
+    // Nombre del cliente en ventas de mostrador ("Público en general" si no es miembro).
+    private String cliente;
+    // Dueño que cobró en el mostrador.
+    private String vendedorId;
     private Double total;
     private Double subtotal;
     private Double iva;
@@ -127,6 +137,15 @@ public class Pedido {
 
     public String getProveedorPago() { return proveedorPago; }
     public void setProveedorPago(String proveedorPago) { this.proveedorPago = proveedorPago; }
+
+    public Map<String, Object> getDatosPago() { return datosPago; }
+    public void setDatosPago(Map<String, Object> datosPago) { this.datosPago = datosPago; }
+
+    public String getCliente() { return cliente; }
+    public void setCliente(String cliente) { this.cliente = cliente; }
+
+    public String getVendedorId() { return vendedorId; }
+    public void setVendedorId(String vendedorId) { this.vendedorId = vendedorId; }
 
     public Double getTotal() { return total; }
     public void setTotal(Double total) { this.total = total; }

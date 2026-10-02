@@ -74,7 +74,7 @@
                         : ''}
                     <section class="paso mt-4">
                         <div class="d-flex justify-content-between gap-3 small text-body-secondary mb-2">
-                            <span>${Tienda.escapar(Tienda.fecha(p.creadoEn))}</span><span>${Tienda.escapar(p.metodo)}</span>
+                            <span>${Tienda.escapar(Tienda.fecha(p.creadoEn))}</span><span>${Tienda.escapar(p.detallePago || p.metodo)}</span>
                         </div>
                         ${p.partidas.map(x => `
                             <div class="d-flex justify-content-between gap-3 py-1">

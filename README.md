@@ -39,7 +39,7 @@ GitHub Pages solo sirve archivos estáticos, así que ahí funcionan la página 
 | `verificar.html` | Verificar el correo con el código de 6 dígitos o con el botón del correo. |
 | `login.html` | Iniciar sesión; incluye "¿Olvidaste tu contraseña?". |
 | `recuperar.html` y `restablecer.html` | Pedir un enlace por correo y crear una contraseña nueva. |
-| `bienvenido.html` | Panel del gimnasio: datos del gimnasio, miembros, pagos, máquinas y rutinas. |
+| `bienvenido.html` | Panel del gimnasio: datos del gimnasio, miembros, pagos, máquinas, rutinas y la tienda (mostrador, productos y planes). |
 | `cuenta.html` | Mi cuenta: cambiar contraseña y correo. |
 | `tienda.html` | Tienda del gimnasio para sus miembros: planes, productos, categorías y búsqueda. |
 | `producto.html` | Detalle de un producto o plan: presentación, sabor, precio, stock y cantidad. |
@@ -375,6 +375,43 @@ Respuestas de `/checkout`:
 }
 ```
 
+**Simulador de Stripe y mostrador**
+
+| Método | Ruta | Uso |
+|---|---|---|
+| POST | `/api/simuladores/stripe/tokens` | Tokenizar una tarjeta de prueba `{numero, titular, mes, anio, cvc}` → `{token, marca, ultimos4, vencimiento}` |
+| GET · DELETE | `/api/gyms/{gymId}/mostrador/carrito` | Ver el ticket del mostrador · cancelar la venta |
+| POST | `/api/gyms/{gymId}/mostrador/carrito/items` | Agregar `{"varianteId", "cantidad"}` |
+| PATCH · DELETE | `/api/gyms/{gymId}/mostrador/carrito/items/{id}` | Cambiar la cantidad · quitar |
+| POST | `/api/gyms/{gymId}/mostrador/cobrar` | Cobrar `{clienteId, metodo, recibido, datos, totalVisto}` → `{pedido, cambio, cliente}` |
+
+**Simulador de Stripe.**
+
+- **Tokenización.** La tarjeta va a `/tokens`, que valida Luhn, vencimiento y CVC (4 dígitos en Amex) y devuelve un token `tok_sim_...`. Al pedido solo llega el token: el número completo y el CVC no se guardan ni se escriben en la consola.
+- **El token.** Es de un solo uso y de quien lo pidió, y vence en 30 minutos. Al pagar, Spring cambia los `datos` del navegador por los del token, así el resultado no se puede forzar desde la página.
+- **Tarjetas aceptadas.** Solo las de prueba; cualquier otro número responde "Usa una tarjeta de prueba".
+
+| Tarjeta | Resultado al cobrar |
+|---|---|
+| 4242 4242 4242 4242 | Visa aprobada |
+| 5555 5555 5555 4444 | Mastercard aprobada |
+| 3782 822463 10005 | American Express aprobada |
+| 4000 0000 0000 0002 | Rechazada |
+| 4000 0000 0000 9995 | Fondos insuficientes |
+| 4000 0000 0000 0069 | Vencida |
+| 4000 0000 0000 0127 | CVC incorrecto |
+
+Los rechazos llegan al checkout como 402 con el mensaje para el comprador, y el carrito queda intacto para intentar con otra tarjeta.
+
+**Mostrador.**
+
+- **El carrito.** Es del dueño (canal `mostrador`) y sobrevive a recargar la página.
+- **El cliente.** Se elige al cobrar: un miembro del gimnasio (en cualquier estado) o `null` para "Público en general".
+- **Efectivo.** `metodo: "efectivo"` exige `recibido` ≥ total, calcula el cambio y captura el pago al momento (proveedor manual de Medusa).
+- **Tarjeta.** `metodo: "tarjeta"` usa el token del simulador de Stripe como terminal.
+- **Entrega.** La venta se marca como entregada en el acto, así que bajan las existencias del almacén.
+- **Plan.** Si la venta lleva un plan y el cliente es miembro, su membresía se extiende igual que en la tienda.
+
 **Generales**
 
 | Método | Ruta | Uso |
@@ -443,6 +480,8 @@ Para crear o editar se manda `nombre`, `descripcion`, `categoria` (el handle), `
 - `orderId`, `folio`, `gymId`, `userId` (null en mostrador a público en general), `canal`;
 - `estado`: `pendiente_pago`, `pagado`, `cancelado` o `reembolsado`;
 - `proveedorPago`, `total`, `subtotal` (sin IVA), `iva` y `partidas`;
+- `datosPago`: lo que guardó el simulador, sin nada sensible (`marca` y `ultimos4`; `recibido` y `cambio` en efectivo). `PedidoService.detallePago(pedido)` lo convierte en texto ("Visa •••• 4242", "Efectivo · recibido $500.00, cambio $42.00"); Paynet y PayPal agregan ahí su forma;
+- `cliente` y `vendedorId` en ventas de mostrador. En una venta al público, el correo del pedido es el del dueño: solo se manda correo al comprador si `userId` no es nulo;
 - `creadoEn`, `pagadoEn`, `canceladoEn` y `planAplicado`.
 
 `AccesoService.exigirAccesoAPedido(pedido, userId)` deja verlo solo al comprador y al dueño del gimnasio.
@@ -451,10 +490,10 @@ Para crear o editar se manda `nombre`, `descripcion`, `categoria` (el handle), `
 
 | Proveedor en Medusa | Bloque | Comportamiento base |
 |---|---|---|
-| `pp_sim-stripe_default` | 3 · Eduardo | Cobra en el acto (`captured`). Ids `pi_sim_...` |
+| `pp_sim-stripe_default` | 3 · Eduardo | Hecho: cobra en el acto si el token es de una tarjeta aprobada (ids `pi_sim_...` y cargo `ch_sim_...`) y rechaza con su mensaje las demás |
 | `pp_sim-paynet_default` | 4 · Valeria | Queda **autorizado sin capturar**: pedido pendiente de pago |
 | `pp_sim-paypal_default` | 5 · Edwin | Cobra en el acto. Ids `PAYID-SIM_...` |
-| `pp_system_default` | 3 · Eduardo | Efectivo en mostrador (proveedor manual de Medusa) |
+| `pp_system_default` | 3 · Eduardo | Hecho: efectivo en mostrador; Spring captura el pago al cobrar |
 
 Cada simulador está en `medusa/src/modules/sim-*/service.ts` y extiende `SimuladorPago` (`medusa/src/lib/simulador-pago.ts`), que ya implementa toda la interfaz `AbstractPaymentProvider` de Medusa 2.21:
 

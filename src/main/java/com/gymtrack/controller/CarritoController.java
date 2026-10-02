@@ -5,6 +5,8 @@ import com.gymtrack.model.User;
 import com.gymtrack.service.AccesoService;
 import com.gymtrack.service.CarritoService;
 import com.gymtrack.service.PedidoService;
+import com.gymtrack.service.TiendaException;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -31,7 +33,8 @@ public class CarritoController {
     @GetMapping
     public Map<String, Object> ver(@RequestParam(required = false) String canal,
                                    @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
-        return carritos.ver(acceso.exigirComprador(userId), canal);
+        User user = acceso.exigirComprador(userId);
+        return carritos.ver(user, user.getGymId(), canal(canal));
     }
 
     // POST → abre el carrito en Medusa si todavía no existe (no es obligatorio:
@@ -39,14 +42,16 @@ public class CarritoController {
     @PostMapping
     public Map<String, Object> asegurar(@RequestParam(required = false) String canal,
                                         @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
-        return carritos.asegurar(acceso.exigirComprador(userId), canal);
+        User user = acceso.exigirComprador(userId);
+        return carritos.asegurar(user, user.getGymId(), canal(canal));
     }
 
     // DELETE → vacía el carrito.
     @DeleteMapping
     public Map<String, Object> vaciar(@RequestParam(required = false) String canal,
                                       @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
-        return carritos.vaciar(acceso.exigirComprador(userId), canal);
+        User user = acceso.exigirComprador(userId);
+        return carritos.vaciar(user, user.getGymId(), canal(canal));
     }
 
     // POST /items  {"varianteId": "variant_...", "cantidad": 2}
@@ -54,7 +59,8 @@ public class CarritoController {
     public Map<String, Object> agregar(@RequestParam(required = false) String canal,
                                        @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId,
                                        @RequestBody PartidaRequest request) {
-        return carritos.agregar(acceso.exigirComprador(userId), canal, request.getVarianteId(), request.getCantidad());
+        User user = acceso.exigirComprador(userId);
+        return carritos.agregar(user, user.getGymId(), canal(canal), request.getVarianteId(), request.getCantidad());
     }
 
     // PATCH /items/{id}  {"cantidad": 3}  (0 la quita)
@@ -63,14 +69,16 @@ public class CarritoController {
                                        @RequestParam(required = false) String canal,
                                        @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId,
                                        @RequestBody PartidaRequest request) {
-        return carritos.cambiarCantidad(acceso.exigirComprador(userId), canal, partidaId, request.getCantidad());
+        User user = acceso.exigirComprador(userId);
+        return carritos.cambiarCantidad(user, user.getGymId(), canal(canal), partidaId, request.getCantidad());
     }
 
     @DeleteMapping("/items/{partidaId}")
     public Map<String, Object> quitar(@PathVariable String partidaId,
                                       @RequestParam(required = false) String canal,
                                       @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
-        return carritos.quitar(acceso.exigirComprador(userId), canal, partidaId);
+        User user = acceso.exigirComprador(userId);
+        return carritos.quitar(user, user.getGymId(), canal(canal), partidaId);
     }
 
     // POST /checkout  {"metodo": "stripe" | "paynet" | "paypal", "datos": {...}, "totalVisto": 934.5}
@@ -82,8 +90,17 @@ public class CarritoController {
                                         @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId,
                                         @RequestBody CheckoutRequest request) {
         User user = acceso.exigirComprador(userId);
-        Pedido pedido = carritos.checkout(user, canal, request.getMetodo(), request.getDatos(), request.getTotalVisto());
+        Pedido pedido = carritos.checkout(user, user.getGymId(), canal(canal), request.getMetodo(), request.getDatos(), request.getTotalVisto());
         return pedidos.vista(pedido);
+    }
+
+    // El miembro compra por la web o la app; el mostrador es del dueño.
+    private static String canal(String canal) {
+        String elegido = canal == null || canal.isBlank() ? Pedido.CANAL_WEB : canal.trim().toLowerCase();
+        if (!CarritoService.CANALES.contains(elegido)) {
+            throw new TiendaException(HttpStatus.BAD_REQUEST, "Canal no válido (web o app).");
+        }
+        return elegido;
     }
 
     public static class PartidaRequest {

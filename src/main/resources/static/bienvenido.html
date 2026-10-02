@@ -50,6 +50,9 @@
                 <button type="button" class="dash-nav-link" role="tab" id="tab-membresias" aria-controls="panel-membresias" aria-selected="false" data-panel="membresias">
                     <i class='bx bx-credit-card'></i><span>Membresías y Pagos</span>
                 </button>
+                <button type="button" class="dash-nav-link" role="tab" id="tab-mostrador" aria-controls="panel-mostrador" aria-selected="false" data-panel="mostrador">
+                    <i class='bx bx-store'></i><span>Mostrador</span>
+                </button>
                 <button type="button" class="dash-nav-link" role="tab" id="tab-productos" aria-controls="panel-productos" aria-selected="false" data-panel="productos">
                     <i class='bx bx-package'></i><span>Productos</span>
                 </button>
@@ -483,6 +486,92 @@
                                 <button type="submit" class="btn btn-primary rounded-pill px-4" id="payment-save-btn"><i class='bx bx-check'></i> Registrar pago</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── MOSTRADOR (venta en recepción) ─── -->
+            <div class="dash-panel" id="panel-mostrador" data-panel="mostrador" role="tabpanel" aria-labelledby="tab-mostrador" tabindex="0">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+                    <div>
+                        <h3 class="fw-bold mb-1"><i class='bx bx-store text-primary me-1'></i> Mostrador</h3>
+                        <p class="text-body-secondary mb-0">Vende en recepción: toca los productos, elige al cliente y cobra en efectivo o con tarjeta.</p>
+                    </div>
+                </div>
+                <div class="alert alert-info d-none small py-2 tienda-despertando" role="status">
+                    <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span> Despertando la tienda… La primera vez puede tardar hasta un minuto.
+                </div>
+                <div class="row g-4">
+                    <div class="col-lg-7">
+                        <input type="search" id="mostrador-buscar" class="form-control mb-3" placeholder="Buscar producto o plan" aria-label="Buscar producto o plan">
+                        <div id="mostrador-catalogo" aria-live="polite"></div>
+                    </div>
+                    <div class="col-lg-5">
+                        <section class="dash-empty text-start mostrador-ticket" aria-labelledby="mostrador-titulo">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h4 class="fw-bold fs-5 mb-0" id="mostrador-titulo">Venta actual</h4>
+                                <button type="button" class="btn btn-link btn-sm text-danger px-0" id="mostrador-cancelar">Cancelar venta</button>
+                            </div>
+
+                            <label for="mostrador-cliente-buscar" class="form-label fw-semibold small">Cliente</label>
+                            <div id="mostrador-cliente-elegido" class="d-flex align-items-center justify-content-between gap-2 border rounded-3 px-3 py-2 mb-2">
+                                <span id="mostrador-cliente-nombre"><i class='bx bx-user'></i> Público en general</span>
+                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill d-none" id="mostrador-cliente-quitar">Quitar</button>
+                            </div>
+                            <input type="search" id="mostrador-cliente-buscar" class="form-control" placeholder="Buscar miembro por nombre o correo" autocomplete="off">
+                            <div id="mostrador-cliente-resultados" class="list-group mt-1"></div>
+
+                            <div id="mostrador-avisos" class="mt-3"></div>
+                            <div id="mostrador-partidas" class="mt-3"></div>
+
+                            <div class="mt-3" role="radiogroup" aria-label="Forma de cobro">
+                                <div class="btn-group w-100" role="group">
+                                    <input type="radio" class="btn-check" name="mostrador-metodo" id="mostrador-efectivo-radio" value="efectivo" checked>
+                                    <label class="btn btn-outline-primary" for="mostrador-efectivo-radio"><i class='bx bx-money'></i> Efectivo</label>
+                                    <input type="radio" class="btn-check" name="mostrador-metodo" id="mostrador-tarjeta-radio" value="tarjeta">
+                                    <label class="btn btn-outline-primary" for="mostrador-tarjeta-radio"><i class='bx bx-credit-card'></i> Tarjeta</label>
+                                </div>
+                            </div>
+                            <div id="mostrador-efectivo" class="mt-3">
+                                <label for="mostrador-recibido" class="form-label fw-semibold small">Recibí</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" step="0.01" min="0" id="mostrador-recibido" class="form-control" inputmode="decimal" placeholder="0.00">
+                                </div>
+                                <div class="d-flex flex-wrap gap-2 mt-2" id="mostrador-billetes"></div>
+                                <div class="d-flex justify-content-between align-items-baseline mt-3">
+                                    <span class="fw-semibold">Cambio</span>
+                                    <span class="fs-3 fw-bold" id="mostrador-cambio">$0.00</span>
+                                </div>
+                            </div>
+                            <div id="mostrador-tarjeta" class="mt-3 d-none">
+                                <p class="small text-body-secondary mb-2"><i class='bx bx-info-circle'></i> Terminal simulada: captura una tarjeta de prueba o genera una.</p>
+                                <div id="mostrador-tarjeta-form"></div>
+                            </div>
+
+                            <div id="mostrador-error" class="alert alert-danger d-none py-2 small mt-3 mb-0" role="alert"></div>
+                            <button type="button" class="btn btn-primary btn-lg w-100 mt-3" id="mostrador-cobrar" disabled>Cobrar</button>
+                        </section>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── MODAL: VENTA COBRADA ─── -->
+            <div class="modal fade" id="ventaModal" tabindex="-1" aria-labelledby="ventaModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-0 rounded-4 text-center">
+                        <div class="modal-body p-4">
+                            <i class='bx bx-check-circle text-success' style="font-size:64px" aria-hidden="true"></i>
+                            <h5 class="fw-bold mt-2" id="ventaModalLabel">Venta cobrada</h5>
+                            <div id="venta-detalle" class="text-body-secondary"></div>
+                            <div id="venta-cambio" class="my-3"></div>
+                            <div id="venta-membresia"></div>
+                            <div id="venta-ticket-error" class="alert alert-warning d-none small py-2 mt-3 mb-0" role="alert"></div>
+                            <div class="d-grid gap-2 mt-4">
+                                <button type="button" class="btn btn-outline-primary rounded-pill" id="venta-ticket"><i class='bx bx-printer'></i> Imprimir ticket (80 mm)</button>
+                                <button type="button" class="btn btn-primary rounded-pill" data-bs-dismiss="modal">Nueva venta</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -947,6 +1036,7 @@
             initBilling();
             initProductos();
             initPlanes();
+            initMostrador();
         });
 
         /* ═══════════════════════════════════════
@@ -1133,6 +1223,7 @@
             loadBilling(gymId);
             loadProductos(gymId);
             loadPlanes(gymId);
+            loadMostrador(gymId);
         }
 
         /* ═══════════════════════════════════════
@@ -1815,7 +1906,13 @@
                         return new Promise(r => setTimeout(r, 5000)).then(() => apiTienda(url, opciones, intentos - 1));
                     }
                     mostrarDespertando(false);
-                    if (!res.ok) throw new Error(body.error || 'No se pudo completar la operación.');
+                    if (!res.ok) {
+                        // .datos lleva el cuerpo completo (p. ej. el carrito ya corregido en un 409).
+                        const error = new Error(body.error || 'No se pudo completar la operación.');
+                        error.status = res.status;
+                        error.datos = body;
+                        throw error;
+                    }
                     return body;
                 }));
         }
@@ -2244,6 +2341,307 @@
                 .catch(() => { presets.innerHTML = '<span class="text-body-secondary small">No se pudieron cargar las sugerencias.</span>'; });
         }
 
+        /* ═══════════════════════════════════════
+           MOSTRADOR — /api/gyms/{id}/mostrador
+        ═══════════════════════════════════════ */
+        let mostradorCatalogo = [];
+        let mostradorCarrito = null;
+        let mostradorMiembros = [];
+        let mostradorCliente = null;
+        let mostradorOcupado = false;
+
+        function initMostrador() {
+            const buscar = document.getElementById('mostrador-buscar');
+            const catalogo = document.getElementById('mostrador-catalogo');
+            const partidas = document.getElementById('mostrador-partidas');
+            const recibido = document.getElementById('mostrador-recibido');
+            const clienteBuscar = document.getElementById('mostrador-cliente-buscar');
+            const clienteResultados = document.getElementById('mostrador-cliente-resultados');
+            const ventaModal = new bootstrap.Modal(document.getElementById('ventaModal'));
+            let ultimaVenta = null;
+
+            buscar.addEventListener('input', pintarCatalogoMostrador);
+
+            catalogo.addEventListener('click', (e) => {
+                const tile = e.target.closest('[data-mostrador-variante]');
+                if (!tile || mostradorOcupado) return;
+                operarMostrador('/carrito/items', { method: 'POST', body: JSON.stringify({ varianteId: tile.dataset.mostradorVariante, cantidad: 1 }) });
+            });
+
+            partidas.addEventListener('click', (e) => {
+                const mas = e.target.closest('[data-m-mas]');
+                const menos = e.target.closest('[data-m-menos]');
+                const quitar = e.target.closest('[data-m-quitar]');
+                if (mostradorOcupado || (!mas && !menos && !quitar)) return;
+                if (quitar) return operarMostrador('/carrito/items/' + encodeURIComponent(quitar.dataset.mQuitar), { method: 'DELETE' });
+                const id = (mas || menos).dataset.mMas || (mas || menos).dataset.mMenos;
+                const item = mostradorCarrito.items.find(i => i.id === id);
+                operarMostrador('/carrito/items/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify({ cantidad: item.cantidad + (mas ? 1 : -1) }) });
+            });
+
+            document.getElementById('mostrador-cancelar').addEventListener('click', () => {
+                if (!mostradorCarrito || !mostradorCarrito.items.length) return;
+                if (!confirm('¿Cancelar esta venta? Se vacía el ticket.')) return;
+                operarMostrador('/carrito', { method: 'DELETE' });
+            });
+
+            // ─── Cliente: un miembro del gimnasio o el público en general ───
+            clienteBuscar.addEventListener('input', () => {
+                const q = clienteBuscar.value.trim().toLowerCase();
+                if (!q) { clienteResultados.innerHTML = ''; return; }
+                const encontrados = mostradorMiembros
+                    .filter(m => (m.nombre || '').toLowerCase().includes(q) || (m.email || '').toLowerCase().includes(q))
+                    .slice(0, 6);
+                clienteResultados.innerHTML = encontrados.length
+                    ? encontrados.map(m => '<button type="button" class="list-group-item list-group-item-action py-2" data-cliente="' + escapeHtml(m.id) + '">'
+                        + '<span class="fw-semibold">' + escapeHtml(m.nombre) + '</span><br><small class="text-body-secondary">' + escapeHtml(m.email) + '</small></button>').join('')
+                    : '<div class="list-group-item small text-body-secondary">Ningún miembro coincide.</div>';
+            });
+            clienteResultados.addEventListener('click', (e) => {
+                const b = e.target.closest('[data-cliente]');
+                if (!b) return;
+                elegirCliente(mostradorMiembros.find(m => m.id === b.dataset.cliente));
+            });
+            document.getElementById('mostrador-cliente-quitar').addEventListener('click', () => elegirCliente(null));
+
+            function elegirCliente(m) {
+                mostradorCliente = m || null;
+                clienteBuscar.value = '';
+                clienteResultados.innerHTML = '';
+                document.getElementById('mostrador-cliente-nombre').innerHTML = m
+                    ? '<i class="bx bx-user-check"></i> ' + escapeHtml(m.nombre) + ' <small class="text-body-secondary">· ' + escapeHtml(m.email) + '</small>'
+                    : '<i class="bx bx-user"></i> Público en general';
+                document.getElementById('mostrador-cliente-quitar').classList.toggle('d-none', !m);
+                if (metodoMostrador() === 'tarjeta') montarTerminal();
+            }
+
+            // ─── Forma de cobro ───
+            document.querySelectorAll('input[name="mostrador-metodo"]').forEach(r => r.addEventListener('change', () => {
+                const tarjeta = metodoMostrador() === 'tarjeta';
+                document.getElementById('mostrador-efectivo').classList.toggle('d-none', tarjeta);
+                document.getElementById('mostrador-tarjeta').classList.toggle('d-none', !tarjeta);
+                if (tarjeta) montarTerminal();
+                actualizarCobro();
+            }));
+            recibido.addEventListener('input', actualizarCobro);
+            document.getElementById('mostrador-billetes').addEventListener('click', (e) => {
+                const b = e.target.closest('[data-billete]');
+                if (!b) return;
+                recibido.value = b.dataset.billete;
+                actualizarCobro();
+            });
+
+            // El simulador de Stripe hace de terminal: el mismo formulario de la tienda.
+            function montarTerminal() {
+                MetodosPago.cargar().then(() => {
+                    const stripe = MetodosPago.obtener('stripe');
+                    const destino = document.getElementById('mostrador-tarjeta-form');
+                    if (!stripe) { destino.innerHTML = '<p class="small text-danger mb-0">El simulador de tarjeta no está disponible.</p>'; return; }
+                    stripe.montar(destino, { total: mostradorCarrito ? mostradorCarrito.total : 0, titular: mostradorCliente ? mostradorCliente.nombre : '' });
+                });
+            }
+
+            document.getElementById('mostrador-cobrar').addEventListener('click', cobrarMostrador);
+
+            function cobrarMostrador() {
+                if (mostradorOcupado || !mostradorCarrito || !mostradorCarrito.items.length) return;
+                const gymId = localStorage.getItem('gymId');
+                const metodo = metodoMostrador();
+                const boton = document.getElementById('mostrador-cobrar');
+                errorMostrador('');
+                const cuerpo = { clienteId: mostradorCliente ? mostradorCliente.id : null, metodo, totalVisto: mostradorCarrito.total };
+                let preparar;
+                if (metodo === 'efectivo') {
+                    const monto = parseFloat(recibido.value);
+                    if (!(monto + 0.009 >= mostradorCarrito.total)) return errorMostrador('El efectivo recibido no alcanza para ' + dinero(mostradorCarrito.total) + '.');
+                    cuerpo.recibido = monto;
+                    preparar = Promise.resolve();
+                } else {
+                    preparar = MetodosPago.obtener('stripe').obtenerDatos().then(datos => { cuerpo.datos = datos; });
+                }
+                mostradorOcupado = true;
+                boton.disabled = true;
+                boton.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Cobrando…';
+                preparar
+                    .then(() => apiTienda('/api/gyms/' + gymId + '/mostrador/cobrar', { method: 'POST', body: JSON.stringify(cuerpo) }))
+                    .then(venta => {
+                        ultimaVenta = venta.pedido;
+                        const p = venta.pedido;
+                        document.getElementById('venta-detalle').innerHTML = 'Venta <strong>#' + escapeHtml(p.folio) + '</strong> · ' + dinero(p.total)
+                            + '<br>' + escapeHtml(p.cliente || 'Público en general') + ' · ' + escapeHtml(p.detallePago || p.metodo);
+                        document.getElementById('venta-cambio').innerHTML = venta.cambio != null
+                            ? '<div class="small text-body-secondary">Cambio</div><div class="display-5 fw-bold">' + dinero(venta.cambio) + '</div>' : '';
+                        const conPlan = p.partidas.some(x => x.tipo === 'membresia');
+                        document.getElementById('venta-membresia').innerHTML = conPlan && venta.cliente && venta.cliente.fechaProximoPago
+                            ? '<div class="alert alert-success small py-2 mb-0"><i class="bx bx-check-circle"></i> Membresía de ' + escapeHtml(venta.cliente.nombre)
+                                + ' activa hasta el ' + new Date(venta.cliente.fechaProximoPago + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }) + '.</div>'
+                            : '';
+                        document.getElementById('venta-ticket-error').classList.add('d-none');
+                        ventaModal.show();
+                        recibido.value = '';
+                        elegirCliente(null);
+                        loadMostrador(gymId);
+                        loadMembers(gymId);
+                        loadBilling(gymId);
+                    })
+                    .catch(err => {
+                        // 409: el carrito cambió (stock, precio). Se muestra corregido.
+                        if (err.datos && err.datos.carrito) pintarTicket(err.datos.carrito, err.datos.avisos);
+                        errorMostrador(err.message);
+                    })
+                    .finally(() => {
+                        mostradorOcupado = false;
+                        boton.innerHTML = 'Cobrar';
+                        actualizarCobro();
+                    });
+            }
+
+            // Ticket de 80 mm (lo genera el módulo de recibos). La ventana se abre
+            // antes del fetch para que el navegador no la bloquee como emergente.
+            document.getElementById('venta-ticket').addEventListener('click', () => {
+                if (!ultimaVenta) return;
+                const aviso = document.getElementById('venta-ticket-error');
+                const ventana = window.open('', '_blank');
+                fetch('/api/recibos/pedidos/' + encodeURIComponent(ultimaVenta.orderId) + '.pdf?formato=ticket',
+                    { headers: { 'X-User-Id': localStorage.getItem('userId') || '' } })
+                    .then(res => {
+                        if (res.status === 404) throw new Error('El ticket todavía no está disponible: llega con el módulo de recibos.');
+                        if (!res.ok) throw new Error('No se pudo generar el ticket.');
+                        return res.blob();
+                    })
+                    .then(blob => { if (ventana) ventana.location = URL.createObjectURL(blob); })
+                    .catch(err => {
+                        if (ventana) ventana.close();
+                        aviso.textContent = err.message;
+                        aviso.classList.remove('d-none');
+                    });
+            });
+
+            const gymId = localStorage.getItem('gymId');
+            loadMostrador(gymId);
+        }
+
+        function metodoMostrador() {
+            return document.querySelector('input[name="mostrador-metodo"]:checked').value;
+        }
+
+        function errorMostrador(mensaje) {
+            const caja = document.getElementById('mostrador-error');
+            caja.textContent = mensaje;
+            caja.classList.toggle('d-none', !mensaje);
+        }
+
+        function operarMostrador(ruta, opciones) {
+            const gymId = localStorage.getItem('gymId');
+            mostradorOcupado = true;
+            errorMostrador('');
+            return apiTienda('/api/gyms/' + gymId + '/mostrador' + ruta, opciones)
+                .then(c => pintarTicket(c))
+                .catch(err => {
+                    if (err.datos && err.datos.carrito) pintarTicket(err.datos.carrito);
+                    errorMostrador(err.message);
+                })
+                .finally(() => { mostradorOcupado = false; actualizarCobro(); });
+        }
+
+        function loadMostrador(gymId) {
+            const catalogo = document.getElementById('mostrador-catalogo');
+            if (!gymId) {
+                catalogo.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-store fs-1 d-block mb-2 opacity-50"></i>Configura primero "Mi Gimnasio" para vender en mostrador.</div>';
+                return;
+            }
+            estadoCargando(catalogo, 'Cargando productos…');
+            apiTienda('/api/tienda/' + gymId + '/productos')
+                .then(lista => { mostradorCatalogo = lista; pintarCatalogoMostrador(); })
+                .catch(err => estadoError(catalogo, err.message, () => loadMostrador(gymId)));
+            apiTienda('/api/gyms/' + gymId + '/mostrador/carrito').then(c => pintarTicket(c)).catch(() => {});
+            fetch('/api/gyms/' + gymId + '/members').then(r => r.json()).then(m => { mostradorMiembros = m; }).catch(() => {});
+        }
+
+        // Cada presentación es un botón: en recepción se vende tocando, sin abrir detalles.
+        function pintarCatalogoMostrador() {
+            const catalogo = document.getElementById('mostrador-catalogo');
+            const q = document.getElementById('mostrador-buscar').value.trim().toLowerCase()
+                .normalize('NFD').replace(/[̀-ͯ]/g, '');
+            const botones = [];
+            mostradorCatalogo.forEach(p => p.variantes.forEach(v => {
+                const texto = (p.nombre + ' ' + v.nombre).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+                if (q && !texto.includes(q)) return;
+                const detalle = p.tipo === 'membresia' ? (p.plan ? p.plan.duracionTexto : '') : (v.nombre === 'Única' ? '' : v.nombre);
+                const stock = v.disponible == null ? '' : v.agotado ? 'Agotado' : v.disponible + ' disp.';
+                botones.push(`
+                    <div class="col-6 col-md-4">
+                        <button type="button" class="mostrador-tile w-100 h-100" data-mostrador-variante="${escapeHtml(v.id)}" ${v.agotado ? 'disabled' : ''}>
+                            <span class="d-block fw-semibold">${escapeHtml(p.nombre)}</span>
+                            ${detalle ? '<small class="d-block text-body-secondary">' + escapeHtml(detalle) + '</small>' : ''}
+                            <span class="d-flex justify-content-between align-items-end mt-2">
+                                <strong>${dinero(v.precio)}</strong>
+                                <small class="${v.agotado ? 'text-danger' : 'text-body-secondary'}">${p.tipo === 'membresia' ? '<i class="bx bx-purchase-tag-alt"></i>' : stock}</small>
+                            </span>
+                        </button>
+                    </div>`);
+            }));
+            catalogo.innerHTML = botones.length
+                ? '<div class="row g-2">' + botones.join('') + '</div>'
+                : '<div class="dash-empty text-center text-body-secondary py-5">' + (mostradorCatalogo.length ? 'Nada coincide con la búsqueda.' : 'Aún no tienes productos publicados. Agrégalos en la pestaña Productos.') + '</div>';
+        }
+
+        function pintarTicket(c, avisos) {
+            mostradorCarrito = c;
+            const lista = (avisos || c.avisos || []);
+            document.getElementById('mostrador-avisos').innerHTML = lista.length
+                ? '<div class="alert alert-warning small py-2 mb-0">' + lista.map(escapeHtml).join('<br>') + '</div>' : '';
+            const partidas = document.getElementById('mostrador-partidas');
+            partidas.innerHTML = !c.items.length
+                ? '<p class="text-body-secondary small mb-0">Toca un producto para agregarlo al ticket.</p>'
+                : c.items.map(i => `
+                    <div class="d-flex align-items-center gap-2 py-2 border-bottom">
+                        <div class="flex-grow-1" style="min-width:0">
+                            <div class="fw-semibold text-truncate">${escapeHtml(i.titulo)}</div>
+                            <small class="text-body-secondary">${escapeHtml(i.variante || '')} · ${dinero(i.precioUnitario)}</small>
+                        </div>
+                        ${i.esPlan ? '' : `
+                            <div class="btn-group btn-group-sm" role="group" aria-label="Cantidad de ${escapeHtml(i.titulo)}">
+                                <button type="button" class="btn btn-outline-secondary" data-m-menos="${escapeHtml(i.id)}" aria-label="Una pieza menos" ${i.cantidad <= 1 ? 'disabled' : ''}><i class="bx bx-minus"></i></button>
+                                <span class="btn btn-outline-secondary disabled fw-semibold">${i.cantidad}</span>
+                                <button type="button" class="btn btn-outline-secondary" data-m-mas="${escapeHtml(i.id)}" aria-label="Una pieza más" ${i.cantidad >= i.maximo ? 'disabled' : ''}><i class="bx bx-plus"></i></button>
+                            </div>`}
+                        <strong class="text-nowrap">${dinero(i.total)}</strong>
+                        <button type="button" class="btn btn-sm btn-link text-danger px-1" data-m-quitar="${escapeHtml(i.id)}" aria-label="Quitar ${escapeHtml(i.titulo)}"><i class="bx bx-trash fs-5"></i></button>
+                    </div>`).join('') + `
+                    <div class="pt-2 small text-body-secondary d-flex justify-content-between"><span>Subtotal (sin IVA)</span><span>${dinero(c.subtotal)}</span></div>
+                    <div class="small text-body-secondary d-flex justify-content-between"><span>IVA 16 %</span><span>${dinero(c.iva)}</span></div>
+                    <div class="d-flex justify-content-between align-items-baseline mt-1"><span class="fw-bold">Total</span><span class="fs-4 fw-bold">${dinero(c.total)}</span></div>`;
+            pintarBilletes();
+            actualizarCobro();
+        }
+
+        // Atajos de efectivo: el total exacto y los billetes que lo cubren.
+        function pintarBilletes() {
+            const total = mostradorCarrito ? mostradorCarrito.total : 0;
+            const opciones = total > 0 ? [total, ...[50, 100, 200, 500, 1000].map(b => Math.ceil(total / b) * b)] : [];
+            const unicos = [...new Set(opciones.map(v => Math.round(v * 100) / 100))].slice(0, 5);
+            document.getElementById('mostrador-billetes').innerHTML = unicos.map((v, i) =>
+                '<button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" data-billete="' + v + '">' + (i === 0 ? 'Exacto' : dinero(v)) + '</button>').join('');
+        }
+
+        function actualizarCobro() {
+            const total = mostradorCarrito ? mostradorCarrito.total : 0;
+            const hayItems = !!(mostradorCarrito && mostradorCarrito.items.length);
+            const boton = document.getElementById('mostrador-cobrar');
+            const cambio = document.getElementById('mostrador-cambio');
+            const recibido = parseFloat(document.getElementById('mostrador-recibido').value);
+            if (metodoMostrador() === 'efectivo') {
+                const falta = !(recibido + 0.009 >= total);
+                cambio.textContent = isNaN(recibido) ? '$0.00' : falta ? 'Faltan ' + dinero(total - recibido) : dinero(recibido - total);
+                cambio.classList.toggle('text-danger', !isNaN(recibido) && falta);
+            }
+            if (!mostradorOcupado) {
+                boton.disabled = !hayItems;
+                boton.textContent = hayItems ? 'Cobrar ' + dinero(total) : 'Cobrar';
+            }
+        }
+
         function escapeHtml(str) {
             const div = document.createElement('div');
             div.textContent = str == null ? '' : String(str);
@@ -2251,5 +2649,6 @@
         }
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/pagos/metodos.js"></script>
 </body>
 </html>

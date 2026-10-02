@@ -1,6 +1,8 @@
 package com.gymtrack.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymtrack.model.Gym;
 import com.gymtrack.model.Pedido;
 import com.gymtrack.model.User;
@@ -51,21 +53,24 @@ public class PedidoService {
             "created_at", "canceled_at", "total", "subtotal", "tax_total",
             "items.id", "items.title", "items.variant_title", "items.product_id", "items.variant_id",
             "items.product_type", "items.quantity", "items.unit_price", "items.total", "items.metadata",
-            "payment_collections.payments.provider_id", "payment_collections.payments.captured_at");
+            "payment_collections.payments.provider_id", "payment_collections.payments.captured_at",
+            "payment_collections.payments.data");
 
     private final MedusaClient medusa;
     private final PedidoRepository pedidoRepository;
     private final GymRepository gymRepository;
     private final UserRepository userRepository;
     private final BillingService billingService;
+    private final ObjectMapper json;
 
     public PedidoService(MedusaClient medusa, PedidoRepository pedidoRepository, GymRepository gymRepository,
-                         UserRepository userRepository, BillingService billingService) {
+                         UserRepository userRepository, BillingService billingService, ObjectMapper json) {
         this.medusa = medusa;
         this.pedidoRepository = pedidoRepository;
         this.gymRepository = gymRepository;
         this.userRepository = userRepository;
         this.billingService = billingService;
+        this.json = json;
     }
 
     public Pedido sincronizar(String orderId) {
@@ -102,6 +107,9 @@ public class PedidoService {
 
         JsonNode pago = o.path("payment_collections").path(0).path("payments").path(0);
         p.setProveedorPago(texto(pago.path("provider_id")));
+        p.setCliente(texto(metadata.path("cliente")));
+        p.setVendedorId(texto(metadata.path("vendedorId")));
+        p.setDatosPago(datosPago(pago.path("data"), metadata.path("efectivo")));
 
         String estado = estado(o);
         p.setEstado(estado);
@@ -215,6 +223,8 @@ public class PedidoService {
         v.put("estado", p.getEstado());
         v.put("estadoTexto", ESTADOS.getOrDefault(p.getEstado(), p.getEstado()));
         v.put("metodo", MetodosPago.nombre(p.getProveedorPago()));
+        v.put("detallePago", detallePago(p));
+        v.put("cliente", p.getCliente());
         v.put("proveedorPago", p.getProveedorPago());
         v.put("canal", p.getCanal());
         v.put("total", p.getTotal());
@@ -242,6 +252,44 @@ public class PedidoService {
                 "nombre", gym.getNombre() == null ? "" : gym.getNombre(),
                 "direccion", gym.getDireccion() == null ? "" : gym.getDireccion()));
         return v;
+    }
+
+    // Datos del pago que se conservan para el ticket y el recibo. El token de la
+    // tarjeta no sirve para nada después de cobrar, así que no se copia.
+    private Map<String, Object> datosPago(JsonNode data, JsonNode efectivo) {
+        Map<String, Object> datos = new LinkedHashMap<>();
+        if (data.isObject()) {
+            datos.putAll(json.convertValue(data, new TypeReference<Map<String, Object>>() {}));
+            datos.remove("token");
+            datos.remove("session_id");
+        }
+        if (efectivo.isObject()) {
+            datos.put("recibido", efectivo.path("recibido").asDouble());
+            datos.put("cambio", efectivo.path("cambio").asDouble());
+        }
+        return datos;
+    }
+
+    // "Visa •••• 4242", "Efectivo · recibido $500.00, cambio $42.00"... Los
+    // demás simuladores agregan aquí su forma (referencia Paynet, cuenta PayPal).
+    public static String detallePago(Pedido p) {
+        Map<String, Object> d = p.getDatosPago() == null ? Map.of() : p.getDatosPago();
+        if (d.get("marca") != null && d.get("ultimos4") != null) {
+            return MARCAS.getOrDefault(String.valueOf(d.get("marca")), String.valueOf(d.get("marca")))
+                    + " •••• " + d.get("ultimos4");
+        }
+        if (d.get("recibido") != null) {
+            return "Efectivo · recibido " + dinero(d.get("recibido")) + ", cambio " + dinero(d.get("cambio"));
+        }
+        return MetodosPago.nombre(p.getProveedorPago());
+    }
+
+    private static final Map<String, String> MARCAS = Map.of(
+            "visa", "Visa", "mastercard", "Mastercard", "amex", "American Express");
+
+    private static String dinero(Object monto) {
+        double n = monto instanceof Number num ? num.doubleValue() : 0;
+        return String.format(java.util.Locale.forLanguageTag("es-MX"), "$%,.2f", n);
     }
 
     private void marcarAplicado(Pedido p) {
