@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#20221f">
+    <title>Mis pedidos | GymTrack</title>
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/2964/2964514.png">
+    <link rel="stylesheet" href="css/fonts.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/editorial.css">
+    <link rel="stylesheet" href="css/tienda.css">
+</head>
+<body class="gym-interior tienda">
+
+    <header id="tienda-barra"></header>
+
+    <main class="container-tienda pt-2 pb-5" id="contenido" style="max-width:760px">
+        <a href="tienda.html" class="d-inline-flex align-items-center gap-1 text-body-secondary text-decoration-none tocable fw-semibold">
+            <i class='bx bx-chevron-left fs-4' aria-hidden="true"></i> Tienda
+        </a>
+        <h1 class="titulo-display mt-2 mb-3">Mis pedidos</h1>
+        <div id="pedidos" class="d-flex flex-column gap-3" aria-live="polite"></div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/tienda.js"></script>
+    <script>
+        (function () {
+            Tienda.exigirSesion();
+            Tienda.montar();
+
+            const lista = document.getElementById('pedidos');
+            let pedidos = [];
+
+            function resumenPartidas(p) {
+                const nombres = p.partidas.map(x => (x.cantidad > 1 ? x.cantidad + ' × ' : '') + x.titulo);
+                return nombres.slice(0, 2).join(', ') + (nombres.length > 2 ? ' y ' + (nombres.length - 2) + ' más' : '');
+            }
+
+            function pintar() {
+                if (!pedidos.length) {
+                    lista.innerHTML = '<div class="estado-vacio"><i class="bx bx-receipt"></i>Aún no tienes pedidos.<div class="mt-3"><a class="btn btn-primary tocable px-4" href="tienda.html">Ver la tienda</a></div></div>';
+                    return;
+                }
+                lista.innerHTML = pedidos.map(p => `
+                    <article class="pedido-card">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <div>
+                                <h2 class="seccion-titulo mb-0">Pedido #${Tienda.escapar(p.folio)}</h2>
+                                <small class="text-body-secondary">${Tienda.escapar(Tienda.fecha(p.creadoEn))} · ${Tienda.escapar(p.metodo)}${p.gym ? ' · ' + Tienda.escapar(p.gym.nombre) : ''}</small>
+                            </div>
+                            <span class="estado-pedido ${Tienda.escapar(p.estado)}">${Tienda.escapar(p.estadoTexto)}</span>
+                        </div>
+                        <p class="mt-2 mb-2">${Tienda.escapar(resumenPartidas(p))}</p>
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                            <strong class="fs-5" style="font-family:var(--identity)">${Tienda.dinero(p.total)}</strong>
+                            <div class="d-flex gap-2">
+                                ${p.estado === 'pagado' || p.estado === 'reembolsado'
+                                    ? '<button type="button" class="btn btn-outline-primary tocable px-3" data-recibo="' + Tienda.escapar(p.orderId) + '" data-folio="' + Tienda.escapar(p.folio) + '"><i class="bx bx-download"></i> Recibo</button>'
+                                    : ''}
+                                <a class="btn btn-primary tocable px-3" href="confirmacion.html?pedido=${encodeURIComponent(p.orderId)}">Ver</a>
+                            </div>
+                        </div>
+                    </article>`).join('');
+            }
+
+            lista.addEventListener('click', (e) => {
+                const boton = e.target.closest('[data-recibo]');
+                if (boton) Tienda.descargarRecibo(boton.dataset.recibo, boton.dataset.folio, boton);
+            });
+
+            function cargar() {
+                lista.innerHTML = Array.from({ length: 3 }, () => '<div class="esqueleto" style="height:130px" aria-hidden="true"></div>').join('');
+                Tienda.api('/api/tienda/pedidos')
+                    .then(p => { pedidos = p; pintar(); })
+                    .catch(err => Tienda.pintarEstado(lista, 'error', err.message, cargar));
+            }
+
+            cargar();
+            if (Tienda.sesion.role !== 'owner') Tienda.cargarCarrito().catch(() => {});
+        })();
+    </script>
+</body>
+</html>

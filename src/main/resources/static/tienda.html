@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#20221f">
+    <title>Tienda | GymTrack</title>
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/2964/2964514.png">
+    <link rel="stylesheet" href="css/fonts.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/editorial.css">
+    <link rel="stylesheet" href="css/tienda.css">
+</head>
+<body class="gym-interior tienda">
+
+    <header id="tienda-barra"></header>
+
+    <main class="container-tienda pb-5" id="contenido">
+        <section class="tienda-encabezado" aria-labelledby="gym-nombre">
+            <div class="d-flex align-items-center gap-3">
+                <div id="gym-logo" class="logo-gym sin-logo" aria-hidden="true"><i class='bx bx-dumbbell'></i></div>
+                <div class="flex-grow-1" style="min-width:0">
+                    <div class="eyebrow">Tienda</div>
+                    <h1 class="titulo-display" id="gym-nombre">&nbsp;</h1>
+                </div>
+            </div>
+            <div id="estado-cuenta" class="mt-3"></div>
+        </section>
+
+        <div id="zona-tienda">
+            <div class="buscador">
+                <i class='bx bx-search' aria-hidden="true"></i>
+                <input type="search" id="buscar" class="form-control" placeholder="Buscar proteína, agua, barras…" aria-label="Buscar en la tienda" autocomplete="off" enterkeyhint="search">
+            </div>
+            <div class="chips" id="chips" role="toolbar" aria-label="Categorías"></div>
+
+            <section id="seccion-planes" class="mt-4 d-none" aria-labelledby="titulo-planes">
+                <div class="d-flex align-items-baseline justify-content-between gap-2 mb-2">
+                    <h2 class="seccion-titulo" id="titulo-planes">Planes</h2>
+                    <small class="text-body-secondary">Al pagarlo, tu acceso se extiende solo</small>
+                </div>
+                <div class="planes-fila" id="planes"></div>
+            </section>
+
+            <section id="seccion-productos" class="mt-4" aria-labelledby="titulo-productos" aria-live="polite">
+                <h2 class="seccion-titulo mb-2" id="titulo-productos">Productos</h2>
+                <div id="productos"></div>
+            </section>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/tienda.js"></script>
+    <script>
+        (function () {
+            Tienda.exigirSesion();
+            Tienda.montar();
+
+            const contenedorProductos = document.getElementById('productos');
+            const contenedorPlanes = document.getElementById('planes');
+            const seccionPlanes = document.getElementById('seccion-planes');
+            const seccionProductos = document.getElementById('seccion-productos');
+            const chips = document.getElementById('chips');
+            const buscar = document.getElementById('buscar');
+            let todo = [];
+            let categorias = [];
+            let categoria = '';
+            let comprador = false;
+
+            function normalizar(s) {
+                return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+            }
+
+            function esqueletos() {
+                contenedorProductos.innerHTML = '<div class="productos-rejilla" aria-hidden="true">'
+                    + Array.from({ length: 4 }, () => '<div class="esqueleto" style="aspect-ratio:3/4"></div>').join('') + '</div>';
+                seccionPlanes.classList.add('d-none');
+            }
+
+            function pintarEncabezado(cuenta) {
+                const gym = cuenta.gym || {};
+                document.getElementById('gym-nombre').textContent = gym.nombre || 'Tu gimnasio';
+                document.title = 'Tienda · ' + (gym.nombre || 'GymTrack');
+                const logo = document.getElementById('gym-logo');
+                if (gym.logo) {
+                    logo.outerHTML = '<img id="gym-logo" class="logo-gym" src="' + Tienda.escapar(gym.logo) + '" alt="">';
+                }
+                const estado = document.getElementById('estado-cuenta');
+                if (cuenta.role === 'owner') {
+                    estado.innerHTML = '<span class="estado-membresia"><i class="bx bx-show"></i> Vista previa: así ven tu tienda tus miembros</span>';
+                } else if (cuenta.membershipStatus === 'pending') {
+                    estado.innerHTML = '<span class="estado-membresia vencida"><i class="bx bx-time-five"></i> Tu solicitud está pendiente: podrás comprar cuando el gimnasio te acepte</span>';
+                } else if (cuenta.membershipStatus === 'active' && cuenta.fechaProximoPago) {
+                    estado.innerHTML = '<span class="estado-membresia activa"><i class="bx bx-check-circle"></i> '
+                        + Tienda.escapar(cuenta.planActual ? 'Plan ' + cuenta.planActual + ' · ' : 'Membresía activa · ')
+                        + 'vence el ' + Tienda.fecha(cuenta.fechaProximoPago + 'T12:00:00') + '</span>';
+                } else if (cuenta.membershipStatus === 'inactive') {
+                    estado.innerHTML = '<span class="estado-membresia vencida"><i class="bx bx-error-circle"></i> Tu membresía no está activa: renuévala con un plan</span>';
+                }
+            }
+
+            function pintarChips() {
+                const presentes = new Set(todo.map(p => p.categoria && p.categoria.handle).filter(Boolean));
+                const orden = ['membresias', ...categorias.map(c => c.handle).filter(h => h !== 'membresias')];
+                const nombres = Object.fromEntries(categorias.map(c => [c.handle, c.nombre]));
+                const lista = [{ handle: '', nombre: 'Todo' }].concat(
+                    orden.filter(h => presentes.has(h)).map(h => ({ handle: h, nombre: nombres[h] || h })));
+                chips.innerHTML = lista.map(c =>
+                    '<button type="button" class="chip" data-categoria="' + Tienda.escapar(c.handle) + '" aria-pressed="' + (c.handle === categoria) + '">'
+                    + Tienda.escapar(c.nombre) + '</button>').join('');
+            }
+
+            function pintar() {
+                const q = normalizar(buscar.value.trim());
+                const visibles = todo.filter(p =>
+                    (!categoria || (p.categoria && p.categoria.handle === categoria))
+                    && (!q || normalizar(p.nombre + ' ' + (p.descripcion || '') + ' ' + p.variantes.map(v => v.nombre).join(' ')).includes(q)));
+                const planes = visibles.filter(p => p.tipo === 'membresia');
+                const productos = visibles.filter(p => p.tipo !== 'membresia');
+
+                seccionPlanes.classList.toggle('d-none', !planes.length);
+                contenedorPlanes.innerHTML = planes.map(tarjetaPlan).join('');
+
+                seccionProductos.classList.toggle('d-none', !productos.length && planes.length > 0);
+                if (!todo.length) {
+                    Tienda.pintarEstado(contenedorProductos, 'vacio', 'Tu gimnasio todavía no publica productos. Vuelve pronto.');
+                } else if (!visibles.length) {
+                    Tienda.pintarEstado(contenedorProductos, 'info', 'No encontramos nada' + (buscar.value.trim() ? ' con «' + buscar.value.trim() + '»' : ' en esta categoría') + '.');
+                    seccionProductos.classList.remove('d-none');
+                } else {
+                    contenedorProductos.innerHTML = '<div class="productos-rejilla">' + productos.map(tarjetaProducto).join('') + '</div>';
+                }
+            }
+
+            function tarjetaPlan(p) {
+                const plan = p.plan || {};
+                const variante = p.variantes[0];
+                return `
+                    <article class="plan-card${plan.destacado ? ' destacado' : ''}">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <h3 class="plan-nombre"><a class="text-reset text-decoration-none stretched-link" href="producto.html?id=${encodeURIComponent(p.id)}">${Tienda.escapar(p.nombre)}</a></h3>
+                            ${plan.destacado ? '<span class="etiqueta-destacado">Recomendado</span>' : ''}
+                        </div>
+                        <div class="plan-precio">${Tienda.dinero(p.precioDesde)}</div>
+                        <div class="plan-duracion">${Tienda.escapar(plan.duracionTexto || '')}</div>
+                        <ul>${(plan.beneficios || []).slice(0, 4).map(b => '<li><i class="bx bx-check"></i><span>' + Tienda.escapar(b) + '</span></li>').join('')}</ul>
+                        <button type="button" class="btn ${plan.destacado ? 'btn-primary' : 'btn-outline-primary'} tocable w-100 mt-auto" data-agregar="${Tienda.escapar(variante.id)}" data-nombre="${Tienda.escapar(p.nombre)}" ${comprador ? '' : 'disabled'}>
+                            ${plan.pagoUnico ? 'Agregar' : 'Elegir este plan'}
+                        </button>
+                    </article>`;
+            }
+
+            function tarjetaProducto(p) {
+                const unica = p.variantes.length === 1 ? p.variantes[0] : null;
+                const varias = p.variantes.length > 1;
+                // Toda la tarjeta lleva al detalle (stretched-link); el botón "+" queda encima.
+                return `
+                    <article class="producto-card${p.agotado ? ' sin-stock' : ''}">
+                        <div class="foto">${p.imagen ? '<img src="' + Tienda.escapar(p.imagen) + '" alt="" loading="lazy">' : '<i class="bx bx-package"></i>'}</div>
+                        ${p.agotado ? '<span class="agotado">Agotado</span>' : ''}
+                        <div class="cuerpo">
+                            <a class="nombre stretched-link text-reset text-decoration-none" href="producto.html?id=${encodeURIComponent(p.id)}">${Tienda.escapar(p.nombre)}</a>
+                            <small class="text-body-secondary">${varias ? p.variantes.length + ' presentaciones' : Tienda.escapar(unica.nombre === 'Única' ? '' : unica.nombre)}</small>
+                            <span class="precio">${varias ? '<small class="fw-normal text-body-secondary">desde </small>' : ''}${Tienda.dinero(p.precioDesde)}</span>
+                        </div>
+                        ${comprador && unica && !unica.agotado
+                            ? '<button type="button" class="agregar-rapido" data-agregar="' + Tienda.escapar(unica.id) + '" data-nombre="' + Tienda.escapar(p.nombre) + '" aria-label="Agregar ' + Tienda.escapar(p.nombre) + ' al carrito"><i class="bx bx-plus"></i></button>'
+                            : ''}
+                    </article>`;
+            }
+
+            chips.addEventListener('click', (e) => {
+                const chip = e.target.closest('[data-categoria]');
+                if (!chip) return;
+                categoria = chip.dataset.categoria;
+                chips.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c === chip)));
+                pintar();
+            });
+
+            let espera;
+            buscar.addEventListener('input', () => { clearTimeout(espera); espera = setTimeout(pintar, 150); });
+
+            document.getElementById('zona-tienda').addEventListener('click', (e) => {
+                const boton = e.target.closest('[data-agregar]');
+                if (!boton) return;
+                e.preventDefault();
+                e.stopPropagation();
+                boton.disabled = true;
+                Tienda.agregar(boton.dataset.agregar, 1, boton.dataset.nombre)
+                    .catch(err => Tienda.avisar(err.message))
+                    .finally(() => { boton.disabled = false; });
+            });
+
+            function cargar(gymId) {
+                esqueletos();
+                Promise.all([
+                    Tienda.api('/api/tienda/' + encodeURIComponent(gymId) + '/productos'),
+                    fetch('/api/tienda/categorias').then(r => r.ok ? r.json() : []).catch(() => [])
+                ])
+                    .then(([productos, cats]) => {
+                        todo = productos;
+                        categorias = cats;
+                        pintarChips();
+                        pintar();
+                    })
+                    .catch(err => Tienda.pintarEstado(contenedorProductos, 'error', err.message, () => cargar(gymId)));
+            }
+
+            Tienda.cuenta()
+                .then(cuenta => {
+                    pintarEncabezado(cuenta);
+                    const gymId = cuenta.gymId || Tienda.sesion.gymId;
+                    if (!gymId) {
+                        document.getElementById('zona-tienda').innerHTML = '<div class="estado-vacio"><i class="bx bx-store-alt"></i>'
+                            + 'Todavía no perteneces a ningún gimnasio. Únete desde la app GymTrack con el código que te dan en recepción.</div>';
+                        return;
+                    }
+                    comprador = Tienda.puedeComprar(cuenta);
+                    if (comprador) Tienda.cargarCarrito().catch(() => {});
+                    cargar(gymId);
+                })
+                .catch(() => Tienda.pintarEstado(contenedorProductos, 'error', 'No pudimos cargar tu cuenta.', () => location.reload()));
+        })();
+    </script>
+</body>
+</html>
