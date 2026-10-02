@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#20221f">
+    <title>Pagar | GymTrack</title>
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/2964/2964514.png">
+    <link rel="stylesheet" href="css/fonts.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/editorial.css">
+    <link rel="stylesheet" href="css/tienda.css">
+</head>
+<body class="gym-interior tienda">
+
+    <header id="tienda-barra"></header>
+
+    <main class="container-tienda pt-2" id="contenido" style="max-width:760px">
+        <a href="tienda.html" class="d-inline-flex align-items-center gap-1 text-body-secondary text-decoration-none tocable fw-semibold">
+            <i class='bx bx-chevron-left fs-4' aria-hidden="true"></i> Seguir comprando
+        </a>
+        <h1 class="titulo-display mt-2 mb-3">Pagar</h1>
+
+        <div id="checkout">
+            <div class="esqueleto mb-3" style="height:180px" aria-hidden="true"></div>
+            <div class="esqueleto" style="height:120px" aria-hidden="true"></div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/tienda.js"></script>
+    <script src="js/pagos/metodos.js"></script>
+    <script>
+        (function () {
+            Tienda.exigirSesion();
+            Tienda.montar({ barraInferior: false });
+
+            const raiz = document.getElementById('checkout');
+            const params = new URLSearchParams(location.search);
+            const metodoInicial = params.get('metodo');
+            const continuar = params.get('continuar') === '1';
+            let cuenta = null;
+            let metodoActual = null;
+            let pagando = false;
+            let avisos = [];
+
+            function resumen() {
+                const c = Tienda.carrito;
+                return {
+                    total: c.total, subtotal: c.subtotal, iva: c.iva, articulos: c.articulos, items: c.items,
+                    gym: { nombre: cuenta.gym ? cuenta.gym.nombre : '', direccion: cuenta.gym ? cuenta.gym.direccion || '' : '' }
+                };
+            }
+
+            function pintarEsqueleto() {
+                const metodos = MetodosPago.lista();
+                const gym = cuenta.gym || {};
+                raiz.innerHTML = `
+                    <div id="avisos"></div>
+                    <section class="paso mb-3" aria-labelledby="paso-1">
+                        <h2 class="paso-titulo" id="paso-1"><span class="numero">1</span> Tu pedido</h2>
+                        <div id="resumen"></div>
+                    </section>
+                    <section class="paso mb-3" aria-labelledby="paso-2">
+                        <h2 class="paso-titulo" id="paso-2"><span class="numero">2</span> Entrega</h2>
+                        <div class="d-flex gap-3 align-items-start">
+                            <i class="bx bx-store-alt fs-3 text-primary" aria-hidden="true"></i>
+                            <div>
+                                <div class="fw-semibold">Recoger en el gimnasio · Gratis</div>
+                                <div class="text-body-secondary small">${Tienda.escapar(gym.nombre || '')}${gym.direccion ? ' · ' + Tienda.escapar(gym.direccion) : ''}</div>
+                                <div class="text-body-secondary small">Muestra tu número de pedido en recepción.</div>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="paso mb-3" aria-labelledby="paso-3">
+                        <h2 class="paso-titulo" id="paso-3"><span class="numero">3</span> Forma de pago</h2>
+                        <p class="small text-body-secondary mt-n2">Pagos simulados para pruebas: no se cobra dinero real.</p>
+                        ${metodos.length
+                            ? '<div role="radiogroup" aria-label="Forma de pago">' + metodos.map(m => `
+                                <label class="metodo-opcion">
+                                    <input type="radio" name="metodo" value="${Tienda.escapar(m.id)}">
+                                    <i class="bx ${Tienda.escapar(m.icono || 'bx-wallet')}" aria-hidden="true"></i>
+                                    <span><span class="fw-semibold d-block">${Tienda.escapar(m.nombre)}</span>
+                                    ${m.descripcion ? '<small class="text-body-secondary">' + Tienda.escapar(m.descripcion) + '</small>' : ''}</span>
+                                </label>`).join('') + '</div>'
+                            : '<div class="estado-vacio"><i class="bx bx-wallet"></i>Todavía no hay formas de pago disponibles. Vuelve pronto.</div>'}
+                        <div id="metodo-contenedor" class="metodo-contenedor mt-3"></div>
+                    </section>
+                    <div class="accion-fija">
+                        <div id="error-pago" class="alert alert-danger small py-2 d-none" role="alert"></div>
+                        <button type="button" class="btn btn-primary btn-grande w-100" id="pagar" disabled>Pagar</button>
+                    </div>`;
+
+                raiz.querySelectorAll('input[name="metodo"]').forEach(r => r.addEventListener('change', () => elegir(r.value)));
+                document.getElementById('pagar').addEventListener('click', pagar);
+                pintarResumen();
+            }
+
+            function pintarResumen() {
+                const c = Tienda.carrito;
+                const caja = document.getElementById('resumen');
+                if (!caja) return;
+                document.getElementById('avisos').innerHTML = avisos.length
+                    ? '<div class="alert alert-warning small" role="alert"><strong>Tu carrito cambió:</strong><br>' + avisos.map(Tienda.escapar).join('<br>') + '</div>'
+                    : '';
+                caja.innerHTML = c.items.map(i => `
+                    <div class="d-flex justify-content-between gap-3 py-1">
+                        <span style="min-width:0"><span class="fw-semibold">${i.cantidad} × ${Tienda.escapar(i.titulo)}</span>
+                        ${i.variante ? '<br><small class="text-body-secondary">' + Tienda.escapar(i.variante) + '</small>' : ''}</span>
+                        <span class="fw-semibold text-nowrap">${Tienda.dinero(i.total)}</span>
+                    </div>`).join('') + `
+                    <div class="totales mt-2">
+                        <div class="fila text-body-secondary"><span>Subtotal (sin IVA)</span><span>${Tienda.dinero(c.subtotal)}</span></div>
+                        <div class="fila text-body-secondary"><span>IVA 16 %</span><span>${Tienda.dinero(c.iva)}</span></div>
+                        <div class="fila total"><span>Total</span><span>${Tienda.dinero(c.total)}</span></div>
+                    </div>
+                    <button type="button" class="btn btn-link px-0 tocable" id="editar-carrito">Editar carrito</button>`;
+                document.getElementById('editar-carrito').addEventListener('click', Tienda.abrirCarrito);
+                actualizarBoton();
+            }
+
+            function actualizarBoton() {
+                const boton = document.getElementById('pagar');
+                if (!boton || pagando) return;
+                boton.disabled = !metodoActual || !Tienda.carrito.items.length;
+                boton.textContent = metodoActual ? 'Pagar ' + Tienda.dinero(Tienda.carrito.total) : 'Elige una forma de pago';
+            }
+
+            function elegir(id) {
+                if (metodoActual && metodoActual.id === id) return;
+                if (metodoActual && metodoActual.desmontar) metodoActual.desmontar();
+                metodoActual = MetodosPago.obtener(id);
+                const contenedor = document.getElementById('metodo-contenedor');
+                contenedor.innerHTML = '';
+                if (metodoActual) metodoActual.montar(contenedor, resumen());
+                ocultarError();
+                actualizarBoton();
+            }
+
+            function mostrarError(mensaje) {
+                const caja = document.getElementById('error-pago');
+                caja.textContent = mensaje;
+                caja.classList.remove('d-none');
+                caja.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+            }
+
+            function ocultarError() {
+                document.getElementById('error-pago')?.classList.add('d-none');
+            }
+
+            function pagar() {
+                if (!metodoActual || pagando) return;
+                const boton = document.getElementById('pagar');
+                ocultarError();
+                pagando = true;
+                boton.disabled = true;
+                boton.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Procesando…';
+                const metodo = metodoActual;
+
+                Promise.resolve()
+                    .then(() => metodo.obtenerDatos())
+                    .then(datos => Tienda.api('/api/tienda/carrito/checkout', {
+                        method: 'POST',
+                        body: JSON.stringify({ metodo: metodo.id, datos: datos || {}, totalVisto: Tienda.carrito.total })
+                    }))
+                    .then(pedido => Promise.resolve(metodo.despues ? metodo.despues(pedido) : null)
+                        .then(destino => { window.location.href = destino || 'confirmacion.html?pedido=' + encodeURIComponent(pedido.orderId); }))
+                    .catch(err => {
+                        pagando = false;
+                        if (err.status === 409 && err.datos && err.datos.carrito) {
+                            // El carrito cambió (precio, stock, producto oculto): se muestra
+                            // corregido y la persona decide si paga el total nuevo.
+                            avisos = err.datos.avisos || [];
+                            Tienda.cargarCarrito().then(() => {
+                                if (!Tienda.carrito.items.length) return pintarVacio();
+                                pintarResumen();
+                                mostrarError(err.message);
+                            });
+                            return;
+                        }
+                        actualizarBoton();
+                        mostrarError(err.message || 'No se pudo completar el pago.');
+                    });
+            }
+
+            function pintarVacio() {
+                raiz.innerHTML = '<div class="estado-vacio"><i class="bx bx-shopping-bag"></i>Tu carrito está vacío.<div class="mt-3"><a class="btn btn-primary tocable px-4" href="tienda.html">Ver la tienda</a></div></div>';
+            }
+
+            // Cualquier cambio desde el mini-carrito se refleja en el resumen.
+            document.addEventListener('carrito', () => {
+                if (!Tienda.carrito.items.length) return pintarVacio();
+                pintarResumen();
+            });
+
+            Tienda.cuenta()
+                .then(c => {
+                    cuenta = c;
+                    if (!Tienda.puedeComprar(c)) {
+                        Tienda.pintarEstado(raiz, 'info', c.role === 'owner'
+                            ? 'Los dueños venden desde la pestaña Mostrador del panel.'
+                            : 'Podrás comprar cuando el gimnasio apruebe tu solicitud.');
+                        return;
+                    }
+                    return Promise.all([Tienda.cargarCarrito(), MetodosPago.cargar()]).then(() => {
+                        if (!Tienda.carrito.items.length) return pintarVacio();
+                        avisos = Tienda.carrito.avisos || [];
+                        pintarEsqueleto();
+                        // Regreso de un método que salió de la página (PayPal): se
+                        // preselecciona y, si lo pide, se vuelve a pulsar "Pagar".
+                        if (metodoInicial && MetodosPago.obtener(metodoInicial)) {
+                            const radio = raiz.querySelector('input[value="' + CSS.escape(metodoInicial) + '"]');
+                            if (radio) { radio.checked = true; elegir(metodoInicial); }
+                            if (continuar) {
+                                // Se quita solo "continuar" (para que recargar no vuelva a cobrar);
+                                // lo demás de la URL lo lee obtenerDatos() del método.
+                                params.delete('continuar');
+                                history.replaceState(null, '', 'checkout.html' + (params.toString() ? '?' + params : ''));
+                                pagar();
+                            }
+                        }
+                    });
+                })
+                .catch(err => Tienda.pintarEstado(raiz, 'error', err.message || 'No pudimos cargar tu carrito.', () => location.reload()));
+        })();
+    </script>
+</body>
+</html>
