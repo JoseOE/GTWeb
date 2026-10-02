@@ -6,6 +6,7 @@ import com.gymtrack.model.TiendaGym;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.StreamSupport;
 
 import static com.gymtrack.service.MedusaClient.q;
@@ -83,6 +85,7 @@ public class CatalogoService {
 
         Map<String, Object> cuerpo = datosDelProducto(r.getNombre(), r.getDescripcion(), r.getImagen(),
                 r.getActivo(), categoriaDeProducto(r.getCategoria(), base), Map.of("gymId", gymId));
+        cuerpo.put("handle", handleUnico(r.getNombre()));
         cuerpo.put("type_id", base.tipoId(TIPO_PRODUCTO));
         cuerpo.put("sales_channels", List.of(Map.of("id", t.getSalesChannelId())));
         cuerpo.put("shipping_profile_id", base.perfilDeEnvioId());
@@ -163,6 +166,7 @@ public class CatalogoService {
 
         Map<String, Object> cuerpo = datosDelProducto(r.getNombre(), r.getDescripcion(), null, r.getActivo(),
                 base.categorias().get(CATEGORIA_MEMBRESIAS), metadataDelPlan(gymId, r));
+        cuerpo.put("handle", handleUnico(r.getNombre()));
         cuerpo.put("type_id", base.tipoId(TIPO_MEMBRESIA));
         cuerpo.put("sales_channels", List.of(Map.of("id", t.getSalesChannelId())));
         cuerpo.put("shipping_profile_id", base.perfilDeEnvioId());
@@ -360,6 +364,17 @@ public class CatalogoService {
         d.put("thumbnail", conImagen ? imagen : null);
         d.put("images", conImagen ? List.of(Map.of("url", imagen)) : List.of());
         return d;
+    }
+
+    // El handle es único en todo Medusa, no por canal: sin el sufijo, el segundo
+    // gimnasio que creara un plan "Mensual" chocaría con el del primero.
+    private static String handleUnico(String nombre) {
+        String base = Normalizer.normalize(nombre.trim().toLowerCase(), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("(^-|-$)", "");
+        if (base.length() > 60) base = base.substring(0, 60);
+        return (base.isEmpty() ? "producto" : base) + "-" + UUID.randomUUID().toString().substring(0, 8);
     }
 
     private Map<String, Object> datosDeVariante(VarianteLimpia v, String id) {
