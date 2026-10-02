@@ -27,7 +27,7 @@
                 <a href="cuenta.html" class="btn btn-outline-light btn-sm rounded-pill px-3 d-inline-flex align-items-center gap-1">
                     <i class='bx bx-user-circle'></i> <span class="d-none d-sm-inline">Mi cuenta</span>
                 </a>
-                <a href="login.html" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="localStorage.removeItem('userName'); localStorage.removeItem('userId'); localStorage.removeItem('gymId')">
+                <a href="login.html" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="localStorage.removeItem('userName'); localStorage.removeItem('userId'); localStorage.removeItem('gymId'); localStorage.removeItem('role')">
                     <i class='bx bx-log-out'></i> <span class="d-none d-sm-inline">Cerrar Sesión</span>
                 </a>
             </div>
@@ -49,6 +49,12 @@
                 </button>
                 <button type="button" class="dash-nav-link" role="tab" id="tab-membresias" aria-controls="panel-membresias" aria-selected="false" data-panel="membresias">
                     <i class='bx bx-credit-card'></i><span>Membresías y Pagos</span>
+                </button>
+                <button type="button" class="dash-nav-link" role="tab" id="tab-productos" aria-controls="panel-productos" aria-selected="false" data-panel="productos">
+                    <i class='bx bx-package'></i><span>Productos</span>
+                </button>
+                <button type="button" class="dash-nav-link" role="tab" id="tab-planes" aria-controls="panel-planes" aria-selected="false" data-panel="planes">
+                    <i class='bx bx-purchase-tag-alt'></i><span>Planes</span>
                 </button>
                 <button type="button" class="dash-nav-link" role="tab" id="tab-rutinas" aria-controls="panel-rutinas" aria-selected="false" data-panel="rutinas">
                     <i class='bx bx-dumbbell'></i><span>Rutinas</span>
@@ -440,6 +446,13 @@
                                 <input type="hidden" id="payment-user-id">
                                 <p class="text-body-secondary small mb-3" id="payment-user-label"></p>
                                 <div class="row g-3">
+                                    <div class="col-12">
+                                        <label for="payment-plan" class="form-label fw-semibold small">Plan</label>
+                                        <select id="payment-plan" class="form-select">
+                                            <option value="">Sin plan (cubre 1 mes)</option>
+                                        </select>
+                                        <small class="text-body-secondary d-block mt-1">Al elegir un plan se llena su precio y la membresía se extiende según su duración.</small>
+                                    </div>
                                     <div class="col-6">
                                         <label for="payment-monto" class="form-label fw-semibold small">Monto</label>
                                         <input type="number" step="0.01" min="0" id="payment-monto" class="form-control" placeholder="450.00">
@@ -468,6 +481,202 @@
                             <div class="modal-footer border-0 pt-0">
                                 <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
                                 <button type="submit" class="btn btn-primary rounded-pill px-4" id="payment-save-btn"><i class='bx bx-check'></i> Registrar pago</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── PRODUCTOS DE LA TIENDA ─── -->
+            <div class="dash-panel" id="panel-productos" data-panel="productos" role="tabpanel" aria-labelledby="tab-productos" tabindex="0">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+                    <div>
+                        <h3 class="fw-bold mb-1"><i class='bx bx-package text-primary me-1'></i> Productos</h3>
+                        <p class="text-body-secondary mb-0">Lo que vendes en tu tienda: suplementos, bebidas, snacks y accesorios, con sus presentaciones, precios y existencias.</p>
+                    </div>
+                    <button type="button" class="btn btn-primary rounded-pill px-4" id="producto-nuevo-btn" disabled>
+                        <i class='bx bx-plus'></i> Nuevo producto
+                    </button>
+                </div>
+                <div class="alert alert-info d-none small py-2 tienda-despertando" role="status">
+                    <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span> Despertando la tienda… La primera vez puede tardar hasta un minuto.
+                </div>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <input type="search" id="productos-buscar" class="form-control" style="max-width:280px" placeholder="Buscar producto" aria-label="Buscar producto">
+                    <select id="productos-categoria" class="form-select" style="max-width:200px" aria-label="Filtrar por categoría">
+                        <option value="">Todas las categorías</option>
+                    </select>
+                </div>
+                <div id="productos-container"></div>
+            </div>
+
+            <!-- ─── MODAL: PRODUCTO ─── -->
+            <div class="modal fade" id="productoModal" tabindex="-1" aria-labelledby="productoModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg modal-fullscreen-sm-down">
+                    <div class="modal-content border-0 rounded-4">
+                        <form id="producto-form" class="d-flex flex-column flex-grow-1" style="min-height:0" novalidate>
+                            <div class="modal-header border-0 pb-0">
+                                <h5 class="modal-title fw-bold" id="productoModalLabel">Nuevo producto</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="hidden" id="producto-id">
+                                <div class="row g-3">
+                                    <div class="col-md-8">
+                                        <label for="producto-nombre" class="form-label fw-semibold small">Nombre</label>
+                                        <input type="text" id="producto-nombre" class="form-control" placeholder="Ej. Proteína Whey Gold" maxlength="120" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="producto-categoria" class="form-label fw-semibold small">Categoría</label>
+                                        <select id="producto-categoria" class="form-select" required></select>
+                                    </div>
+                                    <div class="col-12">
+                                        <label for="producto-descripcion" class="form-label fw-semibold small">Descripción (opcional)</label>
+                                        <textarea id="producto-descripcion" class="form-control" rows="2" placeholder="Ej. 24 g de proteína por porción"></textarea>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label for="producto-imagen-input" class="form-label fw-semibold small">Foto</label>
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div id="producto-imagen-preview" class="rounded-3 border d-flex align-items-center justify-content-center bg-body-tertiary" style="width:84px;height:84px;overflow:hidden;flex:none">
+                                                <i class='bx bx-image-add fs-2 text-body-secondary'></i>
+                                            </div>
+                                            <div class="flex-grow-1">
+                                                <input type="file" id="producto-imagen-input" class="form-control form-control-sm" accept="image/png,image/jpeg,image/webp">
+                                                <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3 mt-2 d-none" id="producto-imagen-quitar">Quitar foto</button>
+                                                <small class="text-body-secondary d-block mt-1">Se reduce a 800 px antes de subirse.</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4 d-flex align-items-end">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" role="switch" id="producto-activo" checked>
+                                            <label class="form-check-label small fw-semibold" for="producto-activo">Visible en la tienda</label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <hr class="my-4">
+                                <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                                    <div>
+                                        <h6 class="fw-bold mb-0">Presentaciones y precios</h6>
+                                        <small class="text-body-secondary">Precio con IVA incluido. Quita "Inventario" en lo que nunca se agota (un scoop servido de un bote abierto).</small>
+                                    </div>
+                                    <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3 flex-shrink-0" id="variante-agregar-btn">
+                                        <i class='bx bx-plus'></i> Agregar
+                                    </button>
+                                </div>
+                                <datalist id="presentaciones-sugeridas">
+                                    <option value="Scoop"><option value="Bote 2 lb"><option value="Bote 5 lb"><option value="Sobre">
+                                    <option value="Botella 600 ml"><option value="Botella 1 L"><option value="Pieza"><option value="Paquete">
+                                </datalist>
+                                <div id="variantes-rows" class="d-flex flex-column gap-2"></div>
+
+                                <div id="producto-alert" class="alert alert-danger d-none py-2 small mt-3 mb-0" role="alert"></div>
+                            </div>
+                            <div class="modal-footer border-0 pt-0">
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-primary rounded-pill px-4" id="producto-guardar-btn"><i class='bx bx-save'></i> Guardar producto</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── PLANES DE MEMBRESÍA ─── -->
+            <div class="dash-panel" id="panel-planes" data-panel="planes" role="tabpanel" aria-labelledby="tab-planes" tabindex="0">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+                    <div>
+                        <h3 class="fw-bold mb-1"><i class='bx bx-purchase-tag-alt text-primary me-1'></i> Planes</h3>
+                        <p class="text-body-secondary mb-0">Las membresías que tus usuarios pueden comprar en la tienda o pagarte en recepción. Al pagarse, su acceso se extiende solo.</p>
+                    </div>
+                    <button type="button" class="btn btn-primary rounded-pill px-4" id="plan-nuevo-btn" disabled>
+                        <i class='bx bx-plus'></i> Nuevo plan
+                    </button>
+                </div>
+                <div class="alert alert-info d-none small py-2 tienda-despertando" role="status">
+                    <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span> Despertando la tienda… La primera vez puede tardar hasta un minuto.
+                </div>
+                <div class="dash-empty text-start mb-4">
+                    <h4 class="fw-bold fs-6 mb-1"><i class='bx bx-bolt-circle text-primary me-1'></i> Agregar rápido</h4>
+                    <p class="text-body-secondary small mb-3">Planes comunes con el precio calculado desde tu cuota mensual. Ajústalos antes de guardar.</p>
+                    <div class="d-flex flex-wrap gap-2" id="planes-presets">
+                        <span class="text-body-secondary small">Configura primero "Mi Gimnasio".</span>
+                    </div>
+                </div>
+                <div id="planes-container"></div>
+            </div>
+
+            <!-- ─── MODAL: PLAN ─── -->
+            <div class="modal fade" id="planModal" tabindex="-1" aria-labelledby="planModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+                    <div class="modal-content border-0 rounded-4">
+                        <form id="plan-form" class="d-flex flex-column flex-grow-1" style="min-height:0" novalidate>
+                            <div class="modal-header border-0 pb-0">
+                                <h5 class="modal-title fw-bold" id="planModalLabel">Nuevo plan</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="hidden" id="plan-id">
+                                <div class="row g-3">
+                                    <div class="col-7">
+                                        <label for="plan-nombre" class="form-label fw-semibold small">Nombre</label>
+                                        <input type="text" id="plan-nombre" class="form-control" placeholder="Ej. Trimestral" maxlength="60" required>
+                                    </div>
+                                    <div class="col-5">
+                                        <label for="plan-precio" class="form-label fw-semibold small">Precio</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">$</span>
+                                            <input type="number" step="0.01" min="0" id="plan-precio" class="form-control" placeholder="450.00" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="plan-tipo" id="plan-tipo-duracion" value="duracion" checked>
+                                            <label class="form-check-label small fw-semibold" for="plan-tipo-duracion">Extiende la membresía</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="plan-tipo" id="plan-tipo-unico" value="unico">
+                                            <label class="form-check-label small fw-semibold" for="plan-tipo-unico">Pago único (inscripción): no mueve la fecha de corte</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12" id="plan-duracion-campos">
+                                        <label for="plan-duracion-cantidad" class="form-label fw-semibold small">Duración</label>
+                                        <div class="input-group">
+                                            <input type="number" min="1" max="36" id="plan-duracion-cantidad" class="form-control" value="1" aria-label="Cantidad">
+                                            <select id="plan-duracion-unidad" class="form-select" aria-label="Unidad">
+                                                <option value="dia">días</option>
+                                                <option value="semana">semanas</option>
+                                                <option value="mes" selected>meses</option>
+                                            </select>
+                                        </div>
+                                        <small class="text-body-secondary d-block mt-1">Los planes por meses respetan el día de pago del usuario; los de días o semanas solo suman días.</small>
+                                    </div>
+                                    <div class="col-12">
+                                        <label for="plan-beneficios" class="form-label fw-semibold small">Beneficios (uno por línea)</label>
+                                        <textarea id="plan-beneficios" class="form-control" rows="3" placeholder="Acceso ilimitado&#10;Rutinas en la app"></textarea>
+                                    </div>
+                                    <div class="col-12">
+                                        <label for="plan-descripcion" class="form-label fw-semibold small">Descripción (opcional)</label>
+                                        <input type="text" id="plan-descripcion" class="form-control" placeholder="Ej. El favorito de nuestros usuarios">
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" role="switch" id="plan-destacado">
+                                            <label class="form-check-label small fw-semibold" for="plan-destacado">Destacado</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" role="switch" id="plan-activo" checked>
+                                            <label class="form-check-label small fw-semibold" for="plan-activo">Visible en la tienda</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="plan-alert" class="alert alert-danger d-none py-2 small mt-3 mb-0" role="alert"></div>
+                            </div>
+                            <div class="modal-footer border-0 pt-0">
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-primary rounded-pill px-4" id="plan-guardar-btn"><i class='bx bx-save'></i> Guardar plan</button>
                             </div>
                         </form>
                     </div>
@@ -696,6 +905,11 @@
                 window.location.href = 'login.html';
                 return;
             }
+            // El panel es del dueño: un miembro que llegue aquí va a la tienda de su gimnasio.
+            if (localStorage.getItem('role') === 'member') {
+                window.location.href = 'tienda.html';
+                return;
+            }
             document.getElementById('nav-user-name').innerHTML = `<i class='bx bx-user-circle'></i> ${userName}`;
             document.getElementById('dash-user-name').textContent = userName;
 
@@ -726,6 +940,8 @@
             initMembers();
             initMachines();
             initBilling();
+            initProductos();
+            initPlanes();
         });
 
         /* ═══════════════════════════════════════
@@ -904,12 +1120,14 @@
         }
 
         function unlockGymFeatures(gymId) {
-            ['routine-new-btn', 'member-new-btn', 'machine-new-btn', 'machine-import-btn']
+            ['routine-new-btn', 'member-new-btn', 'machine-new-btn', 'machine-import-btn', 'producto-nuevo-btn', 'plan-nuevo-btn']
                 .forEach(id => { document.getElementById(id).disabled = false; });
             loadRoutines(gymId);
             loadMembers(gymId);
             loadMachines(gymId);
             loadBilling(gymId);
+            loadProductos(gymId);
+            loadPlanes(gymId);
         }
 
         /* ═══════════════════════════════════════
@@ -1098,19 +1316,38 @@
             const saveBtn = document.getElementById('payment-save-btn');
             const fechaInput = document.getElementById('payment-fecha');
             const preview = document.getElementById('payment-preview');
+            const planSelect = document.getElementById('payment-plan');
 
             // Le enseña al dueño hasta cuándo quedará cubierto ANTES de guardar,
             // porque el corte respeta el día de pago original, no la fecha capturada.
             function actualizarPreview() {
                 if (!fechaInput.value) { preview.textContent = ''; return; }
-                const pago = new Date(fechaInput.value + 'T00:00:00');
-                const hasta = new Date(pago);
-                hasta.setMonth(hasta.getMonth() + 1);
+                const plan = planesCache.find(p => p.id === planSelect.value);
+                const unidad = plan ? plan.duracionUnidad : 'mes';
+                const cantidad = plan ? plan.duracionCantidad : 1;
+                const hasta = new Date(fechaInput.value + 'T00:00:00');
+                if (unidad === 'dia') hasta.setDate(hasta.getDate() + cantidad);
+                else if (unidad === 'semana') hasta.setDate(hasta.getDate() + 7 * cantidad);
+                else hasta.setMonth(hasta.getMonth() + cantidad);
                 preview.innerHTML = '<i class="bx bx-info-circle"></i> Con este pago la membresía quedará cubierta aproximadamente hasta el <strong>'
                     + hasta.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })
                     + '</strong>. Si el usuario ya tenía saldo, se le suma.';
             }
             fechaInput.addEventListener('change', actualizarPreview);
+            planSelect.addEventListener('change', () => {
+                const plan = planesCache.find(p => p.id === planSelect.value);
+                const cuota = document.getElementById('gym-cuota').value;
+                document.getElementById('payment-monto').value = plan ? plan.precio : (cuota || '');
+                actualizarPreview();
+            });
+
+            // Solo los planes que extienden la membresía; la inscripción se cobra en la tienda o el mostrador.
+            function llenarPlanes() {
+                planSelect.innerHTML = '<option value="">Sin plan (cubre 1 mes)</option>'
+                    + planesCache.filter(p => !p.pagoUnico).map(p =>
+                        '<option value="' + escapeHtml(p.id) + '">' + escapeHtml(p.nombre) + ' · ' + escapeHtml(p.duracionTexto)
+                        + ' · $' + Number(p.precio).toFixed(2) + (p.activo ? '' : ' (oculto)') + '</option>').join('');
+            }
 
             document.body.addEventListener('click', (e) => {
                 const btn = e.target.closest('[data-pay-user]');
@@ -1120,6 +1357,7 @@
                 document.getElementById('payment-user-id').value = btn.dataset.payUser;
                 document.getElementById('payment-user-label').textContent = 'Pago de ' + btn.dataset.payName;
                 fechaInput.value = new Date().toISOString().slice(0, 10);
+                llenarPlanes();
                 const cuota = document.getElementById('gym-cuota').value;
                 if (cuota) document.getElementById('payment-monto').value = cuota;
                 actualizarPreview();
@@ -1154,7 +1392,8 @@
                         monto: document.getElementById('payment-monto').value ? parseFloat(document.getElementById('payment-monto').value) : null,
                         metodo: document.getElementById('payment-metodo').value,
                         fechaPago: fechaInput.value,
-                        nota: document.getElementById('payment-nota').value.trim()
+                        nota: document.getElementById('payment-nota').value.trim(),
+                        planId: planSelect.value || null
                     })
                 })
                 .then(res => res.json().then(data => ({ status: res.status, body: data })))
@@ -1261,7 +1500,7 @@
                                     <td class="ps-4 fw-semibold">${escapeHtml(p.nombre)}</td>
                                     <td class="text-body-secondary">${escapeHtml(p.fechaPago || '')}</td>
                                     <td class="fw-semibold">${p.monto != null ? '$' + Number(p.monto).toFixed(2) : '—'}</td>
-                                    <td class="text-body-secondary">${escapeHtml(p.metodo || '—')}</td>
+                                    <td class="text-body-secondary">${escapeHtml(p.metodo || '—')}${p.plan ? '<div class="small">' + escapeHtml(p.plan) + '</div>' : ''}</td>
                                     <td class="pe-4 text-body-secondary">${escapeHtml(p.cubreHasta || '—')}</td>
                                 </tr>`).join('')
                             : '<tr><td colspan="5" class="text-center text-body-secondary py-4 px-4">Aún no registras pagos.</td></tr>';
@@ -1546,6 +1785,458 @@
                         </tr>`;
                     }).join('');
                 });
+        }
+
+        /* ═══════════════════════════════════════
+           TIENDA — /api/gyms/{id}/productos y /api/gyms/{id}/planes
+        ═══════════════════════════════════════ */
+        let productosCache = [];
+        let planesCache = [];
+        let presetsCache = [];
+
+        // Llamada a la tienda: manda el usuario en X-User-Id (el servidor comprueba
+        // que sea el dueño del gimnasio) y, si Medusa está despertando en Render,
+        // avisa y reintenta sola cada 5 segundos durante un minuto.
+        function apiTienda(url, opciones, intentos) {
+            opciones = opciones || {};
+            intentos = intentos == null ? 12 : intentos;
+            const headers = { 'X-User-Id': localStorage.getItem('userId') || '' };
+            if (opciones.body) headers['Content-Type'] = 'application/json';
+            return fetch(url, { ...opciones, headers })
+                .catch(() => { throw new Error('Error de conexión con el servidor.'); })
+                .then(res => res.json().catch(() => ({})).then(body => {
+                    if (res.status === 503 && body.despertando && intentos > 0) {
+                        mostrarDespertando(true);
+                        return new Promise(r => setTimeout(r, 5000)).then(() => apiTienda(url, opciones, intentos - 1));
+                    }
+                    mostrarDespertando(false);
+                    if (!res.ok) throw new Error(body.error || 'No se pudo completar la operación.');
+                    return body;
+                }));
+        }
+
+        function mostrarDespertando(visible) {
+            document.querySelectorAll('.tienda-despertando').forEach(el => el.classList.toggle('d-none', !visible));
+        }
+
+        function dinero(n) {
+            return n == null ? '—' : '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        // Reduce la foto en el navegador antes de subirla (como el logo). JPEG con
+        // fondo blanco: un PNG transparente no queda negro y pesa una fracción.
+        function reducirImagen(file, max) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const escala = Math.min(1, max / Math.max(img.width, img.height));
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.round(img.width * escala);
+                        canvas.height = Math.round(img.height * escala);
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#fff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        resolve(canvas.toDataURL('image/jpeg', 0.85));
+                    };
+                    img.onerror = () => reject(new Error('No pudimos leer esa imagen. Prueba con un PNG o JPG.'));
+                    img.src = reader.result;
+                };
+                reader.onerror = () => reject(new Error('No pudimos leer esa imagen.'));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function estadoCargando(container, texto) {
+            container.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>' + texto + '</div>';
+        }
+
+        function estadoError(container, mensaje, reintentar) {
+            container.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-error-circle fs-1 d-block mb-2 text-danger"></i>'
+                + escapeHtml(mensaje) + '<div class="mt-3"><button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3">Reintentar</button></div></div>';
+            container.querySelector('button').addEventListener('click', reintentar);
+        }
+
+        /* ─── Productos ─── */
+        function initProductos() {
+            const modal = new bootstrap.Modal(document.getElementById('productoModal'));
+            const form = document.getElementById('producto-form');
+            const alertBox = document.getElementById('producto-alert');
+            const saveBtn = document.getElementById('producto-guardar-btn');
+            const rows = document.getElementById('variantes-rows');
+            const imagenInput = document.getElementById('producto-imagen-input');
+            const imagenPreview = document.getElementById('producto-imagen-preview');
+            const imagenQuitar = document.getElementById('producto-imagen-quitar');
+            let imagenUrl = null;        // la que ya tiene el producto
+            let imagenPendiente = null;  // data URI elegida pero aún no subida
+            let filaN = 0;
+
+            function mostrarImagen(src) {
+                if (src) {
+                    imagenPreview.innerHTML = '<img src="' + escapeHtml(src) + '" alt="Foto del producto" style="width:100%;height:100%;object-fit:cover">';
+                    imagenQuitar.classList.remove('d-none');
+                } else {
+                    imagenPreview.innerHTML = '<i class="bx bx-image-add fs-2 text-body-secondary"></i>';
+                    imagenQuitar.classList.add('d-none');
+                }
+            }
+
+            imagenInput.addEventListener('change', () => {
+                const file = imagenInput.files && imagenInput.files[0];
+                if (!file) return;
+                reducirImagen(file, 800)
+                    .then(dataUrl => { imagenPendiente = dataUrl; mostrarImagen(dataUrl); })
+                    .catch(err => { alertBox.textContent = err.message; alertBox.classList.remove('d-none'); });
+            });
+            imagenQuitar.addEventListener('click', () => {
+                imagenUrl = null; imagenPendiente = null; imagenInput.value = ''; mostrarImagen(null);
+            });
+
+            // Una fila por presentación. El id viaja oculto para que al editar se
+            // actualice la misma variante (y su stock) en lugar de crear otra.
+            function agregarVariante(v) {
+                v = v || { controlarInventario: true };
+                const n = ++filaN;
+                const apartados = v.controlarInventario && v.existencias != null && v.disponible != null ? v.existencias - v.disponible : 0;
+                const row = document.createElement('div');
+                row.className = 'row g-2 align-items-end variante-row border rounded-3 p-2 mx-0';
+                row.innerHTML = `
+                    <input type="hidden" class="var-id" value="${escapeHtml(v.id || '')}">
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small mb-1" for="var-pres-${n}">Presentación</label>
+                        <input type="text" id="var-pres-${n}" class="form-control form-control-sm var-presentacion" list="presentaciones-sugeridas" placeholder="Ej. Scoop" value="${escapeHtml(v.presentacion || '')}">
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small mb-1" for="var-sabor-${n}">Sabor</label>
+                        <input type="text" id="var-sabor-${n}" class="form-control form-control-sm var-sabor" placeholder="Opcional" value="${escapeHtml(v.sabor || '')}">
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small mb-1" for="var-precio-${n}">Precio</label>
+                        <input type="number" step="0.01" min="0" id="var-precio-${n}" class="form-control form-control-sm var-precio" placeholder="0.00" value="${v.precio != null ? v.precio : ''}">
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label small mb-1" for="var-exist-${n}">Existencias</label>
+                        <input type="number" step="1" min="0" id="var-exist-${n}" class="form-control form-control-sm var-existencias" placeholder="0" value="${v.existencias != null ? v.existencias : ''}">
+                    </div>
+                    <div class="col-8 col-md-2 pb-1">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input var-controlar" type="checkbox" role="switch" id="var-ctrl-${n}" ${v.controlarInventario === false ? '' : 'checked'}>
+                            <label class="form-check-label small" for="var-ctrl-${n}">Inventario</label>
+                        </div>
+                    </div>
+                    <div class="col-4 col-md-1 text-end">
+                        <button type="button" class="btn btn-outline-danger btn-sm rounded-circle var-quitar" title="Quitar" aria-label="Quitar presentación"><i class='bx bx-x'></i></button>
+                    </div>
+                    ${apartados > 0 ? '<div class="col-12"><small class="text-body-secondary">' + apartados + ' apartado(s) en pedidos sin entregar.</small></div>' : ''}`;
+                const controlar = row.querySelector('.var-controlar');
+                const existencias = row.querySelector('.var-existencias');
+                const sincronizar = () => { existencias.disabled = !controlar.checked; if (!controlar.checked) existencias.value = ''; };
+                controlar.addEventListener('change', sincronizar);
+                sincronizar();
+                row.querySelector('.var-quitar').addEventListener('click', () => {
+                    if (rows.querySelectorAll('.variante-row').length > 1) row.remove();
+                });
+                rows.appendChild(row);
+            }
+
+            document.getElementById('variante-agregar-btn').addEventListener('click', () => agregarVariante());
+
+            function abrir(p) {
+                form.reset();
+                rows.innerHTML = '';
+                alertBox.classList.add('d-none');
+                imagenInput.value = '';
+                imagenPendiente = null;
+                imagenUrl = p ? p.imagen : null;
+                mostrarImagen(imagenUrl);
+                document.getElementById('producto-id').value = p ? p.id : '';
+                document.getElementById('productoModalLabel').textContent = p ? 'Editar producto' : 'Nuevo producto';
+                document.getElementById('producto-nombre').value = p ? p.nombre : '';
+                document.getElementById('producto-descripcion').value = p && p.descripcion ? p.descripcion : '';
+                document.getElementById('producto-activo').checked = p ? p.activo : true;
+                const cat = document.getElementById('producto-categoria');
+                if (p && p.categoria) cat.value = p.categoria.handle;
+                (p ? p.variantes : [null]).forEach(agregarVariante);
+                modal.show();
+            }
+
+            document.getElementById('producto-nuevo-btn').addEventListener('click', () => abrir(null));
+            document.getElementById('productos-buscar').addEventListener('input', renderProductos);
+            document.getElementById('productos-categoria').addEventListener('change', renderProductos);
+
+            document.getElementById('productos-container').addEventListener('click', (e) => {
+                const editar = e.target.closest('[data-editar-producto]');
+                const borrar = e.target.closest('[data-borrar-producto]');
+                if (editar) {
+                    abrir(productosCache.find(p => p.id === editar.dataset.editarProducto));
+                } else if (borrar) {
+                    const p = productosCache.find(x => x.id === borrar.dataset.borrarProducto);
+                    if (!confirm('¿Eliminar "' + p.nombre + '" de tu tienda? Los pedidos que ya lo incluyen no cambian.')) return;
+                    borrar.disabled = true;
+                    const gymId = localStorage.getItem('gymId');
+                    apiTienda('/api/gyms/' + gymId + '/productos/' + p.id, { method: 'DELETE' })
+                        .then(() => loadProductos(gymId))
+                        .catch(err => { borrar.disabled = false; alert(err.message); });
+                }
+            });
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                alertBox.classList.add('d-none');
+                const gymId = localStorage.getItem('gymId');
+                const id = document.getElementById('producto-id').value;
+                const variantes = [...rows.querySelectorAll('.variante-row')].map(r => ({
+                    id: r.querySelector('.var-id').value || null,
+                    presentacion: r.querySelector('.var-presentacion').value.trim(),
+                    sabor: r.querySelector('.var-sabor').value.trim(),
+                    precio: r.querySelector('.var-precio').value === '' ? null : parseFloat(r.querySelector('.var-precio').value),
+                    controlarInventario: r.querySelector('.var-controlar').checked,
+                    existencias: r.querySelector('.var-existencias').value === '' ? 0 : parseInt(r.querySelector('.var-existencias').value, 10)
+                }));
+                const fallar = (msg) => { alertBox.textContent = msg; alertBox.classList.remove('d-none'); };
+                if (!document.getElementById('producto-nombre').value.trim()) return fallar('Escribe el nombre del producto.');
+                if (variantes.some(v => !v.precio || v.precio <= 0)) return fallar('Cada presentación necesita un precio mayor a $0.');
+
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Guardando...';
+                const subirImagen = imagenPendiente
+                    ? apiTienda('/api/gyms/' + gymId + '/imagenes', { method: 'POST', body: JSON.stringify({ dataUrl: imagenPendiente }) }).then(r => r.url)
+                    : Promise.resolve(imagenUrl);
+                subirImagen
+                    .then(url => apiTienda(id ? '/api/gyms/' + gymId + '/productos/' + id : '/api/gyms/' + gymId + '/productos', {
+                        method: id ? 'PUT' : 'POST',
+                        body: JSON.stringify({
+                            nombre: document.getElementById('producto-nombre').value.trim(),
+                            descripcion: document.getElementById('producto-descripcion').value.trim(),
+                            categoria: document.getElementById('producto-categoria').value,
+                            imagen: url,
+                            activo: document.getElementById('producto-activo').checked,
+                            variantes
+                        })
+                    }))
+                    .then(() => { modal.hide(); loadProductos(gymId); })
+                    .catch(err => fallar(err.message))
+                    .finally(() => { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="bx bx-save"></i> Guardar producto'; });
+            });
+
+            // Las categorías son las mismas para todos los gimnasios; "Membresías" se maneja en Planes.
+            fetch('/api/tienda/categorias')
+                .then(res => res.ok ? res.json() : [])
+                .then(cats => {
+                    const deProducto = cats.filter(c => c.handle !== 'membresias');
+                    document.getElementById('producto-categoria').innerHTML = deProducto
+                        .map(c => '<option value="' + escapeHtml(c.handle) + '">' + escapeHtml(c.nombre) + '</option>').join('');
+                    document.getElementById('productos-categoria').innerHTML = '<option value="">Todas las categorías</option>'
+                        + deProducto.map(c => '<option value="' + escapeHtml(c.handle) + '">' + escapeHtml(c.nombre) + '</option>').join('');
+                })
+                .catch(() => {});
+
+            const gymId = localStorage.getItem('gymId');
+            if (gymId) document.getElementById('producto-nuevo-btn').disabled = false;
+            loadProductos(gymId);
+        }
+
+        function loadProductos(gymId) {
+            const container = document.getElementById('productos-container');
+            if (!gymId) {
+                container.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-package fs-1 d-block mb-2 opacity-50"></i>Configura primero "Mi Gimnasio" para abrir tu tienda.</div>';
+                return;
+            }
+            estadoCargando(container, 'Cargando productos…');
+            apiTienda('/api/gyms/' + gymId + '/productos')
+                .then(productos => { productosCache = productos; renderProductos(); })
+                .catch(err => estadoError(container, err.message, () => loadProductos(gymId)));
+        }
+
+        function renderProductos() {
+            const container = document.getElementById('productos-container');
+            if (!productosCache.length) {
+                container.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-package fs-1 d-block mb-2 opacity-50"></i>Tu tienda aún no tiene productos. Agrega el primero con "Nuevo producto".</div>';
+                return;
+            }
+            const q = document.getElementById('productos-buscar').value.trim().toLowerCase();
+            const cat = document.getElementById('productos-categoria').value;
+            const visibles = productosCache.filter(p =>
+                (!q || p.nombre.toLowerCase().includes(q)) && (!cat || (p.categoria && p.categoria.handle === cat)));
+            if (!visibles.length) {
+                container.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5">Ningún producto coincide con la búsqueda.</div>';
+                return;
+            }
+            container.innerHTML = '<div class="row g-3">' + visibles.map(p => {
+                const lineas = p.variantes.slice(0, 4).map(v => {
+                    let stock = '<span class="text-body-secondary">sin control</span>';
+                    if (v.controlarInventario) {
+                        stock = v.disponible <= 0 ? '<span class="text-danger fw-semibold">agotado</span>'
+                            : v.disponible <= 3 ? '<span class="text-warning fw-semibold">' + v.disponible + ' disp.</span>'
+                            : '<span class="text-body-secondary">' + v.disponible + ' disp.</span>';
+                    }
+                    return '<div class="d-flex justify-content-between gap-2 border-bottom py-1"><span class="text-truncate">' + escapeHtml(v.nombre)
+                        + '</span><span class="flex-shrink-0">' + dinero(v.precio) + ' · ' + stock + '</span></div>';
+                }).join('');
+                const mas = p.variantes.length > 4 ? '<div class="text-body-secondary pt-1">+' + (p.variantes.length - 4) + ' más</div>' : '';
+                return `
+                <div class="col-sm-6 col-xl-4">
+                    <div class="dash-empty text-start h-100 d-flex flex-column p-0 overflow-hidden">
+                        <div class="ratio ratio-16x9 bg-body-tertiary">
+                            ${p.imagen
+                                ? '<img src="' + escapeHtml(p.imagen) + '" alt="" style="object-fit:cover">'
+                                : '<div class="d-flex align-items-center justify-content-center"><i class="bx bx-package fs-1 text-body-secondary opacity-50"></i></div>'}
+                        </div>
+                        <div class="p-3 d-flex flex-column flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start gap-2">
+                                <h4 class="fw-bold fs-6 mb-1">${escapeHtml(p.nombre)}</h4>
+                                ${p.activo ? '' : '<span class="badge rounded-pill bg-secondary bg-opacity-10 text-body-secondary flex-shrink-0"><i class="bx bx-hide"></i> Oculto</span>'}
+                            </div>
+                            <small class="text-body-secondary mb-2">${escapeHtml(p.categoria ? p.categoria.nombre : 'Sin categoría')} · desde <strong>${dinero(p.precioDesde)}</strong></small>
+                            <div class="small mb-3">${lineas}${mas}</div>
+                            <div class="mt-auto d-flex gap-2">
+                                <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-editar-producto="${escapeHtml(p.id)}">Editar</button>
+                                <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" data-borrar-producto="${escapeHtml(p.id)}">Eliminar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('') + '</div>';
+        }
+
+        /* ─── Planes de membresía ─── */
+        function initPlanes() {
+            const modal = new bootstrap.Modal(document.getElementById('planModal'));
+            const form = document.getElementById('plan-form');
+            const alertBox = document.getElementById('plan-alert');
+            const saveBtn = document.getElementById('plan-guardar-btn');
+            const camposDuracion = document.getElementById('plan-duracion-campos');
+            const tipoUnico = document.getElementById('plan-tipo-unico');
+
+            const sincronizarTipo = () => camposDuracion.classList.toggle('d-none', tipoUnico.checked);
+            document.querySelectorAll('input[name="plan-tipo"]').forEach(r => r.addEventListener('change', sincronizarTipo));
+
+            function abrir(p, esNuevo) {
+                form.reset();
+                alertBox.classList.add('d-none');
+                document.getElementById('plan-id').value = !esNuevo && p ? p.id : '';
+                document.getElementById('planModalLabel').textContent = !esNuevo && p ? 'Editar plan' : 'Nuevo plan';
+                document.getElementById('plan-nombre').value = p ? p.nombre : '';
+                document.getElementById('plan-precio').value = p && p.precio != null ? p.precio : '';
+                document.getElementById('plan-duracion-cantidad').value = p && p.duracionCantidad ? p.duracionCantidad : 1;
+                document.getElementById('plan-duracion-unidad').value = p && p.duracionUnidad ? p.duracionUnidad : 'mes';
+                document.getElementById('plan-beneficios').value = p ? (p.beneficios || []).join('\n') : '';
+                document.getElementById('plan-descripcion').value = p && p.descripcion ? p.descripcion : '';
+                document.getElementById('plan-destacado').checked = !!(p && p.destacado);
+                document.getElementById('plan-activo').checked = p && p.activo != null ? p.activo : true;
+                tipoUnico.checked = !!(p && p.pagoUnico);
+                document.getElementById('plan-tipo-duracion').checked = !tipoUnico.checked;
+                sincronizarTipo();
+                modal.show();
+            }
+
+            document.getElementById('plan-nuevo-btn').addEventListener('click', () => abrir(null, true));
+            document.getElementById('planes-presets').addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-preset]');
+                if (btn) abrir(presetsCache[parseInt(btn.dataset.preset, 10)], true);
+            });
+
+            document.getElementById('planes-container').addEventListener('click', (e) => {
+                const editar = e.target.closest('[data-editar-plan]');
+                const borrar = e.target.closest('[data-borrar-plan]');
+                if (editar) {
+                    abrir(planesCache.find(p => p.id === editar.dataset.editarPlan), false);
+                } else if (borrar) {
+                    const p = planesCache.find(x => x.id === borrar.dataset.borrarPlan);
+                    if (!confirm('¿Eliminar el plan "' + p.nombre + '"? Quien ya lo pagó conserva su membresía.')) return;
+                    borrar.disabled = true;
+                    const gymId = localStorage.getItem('gymId');
+                    apiTienda('/api/gyms/' + gymId + '/planes/' + p.id, { method: 'DELETE' })
+                        .then(() => loadPlanes(gymId))
+                        .catch(err => { borrar.disabled = false; alert(err.message); });
+                }
+            });
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                alertBox.classList.add('d-none');
+                const gymId = localStorage.getItem('gymId');
+                const id = document.getElementById('plan-id').value;
+                const precio = parseFloat(document.getElementById('plan-precio').value);
+                const fallar = (msg) => { alertBox.textContent = msg; alertBox.classList.remove('d-none'); };
+                if (!document.getElementById('plan-nombre').value.trim()) return fallar('Escribe el nombre del plan.');
+                if (!(precio > 0)) return fallar('Ponle un precio mayor a $0.');
+
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Guardando...';
+                apiTienda(id ? '/api/gyms/' + gymId + '/planes/' + id : '/api/gyms/' + gymId + '/planes', {
+                    method: id ? 'PUT' : 'POST',
+                    body: JSON.stringify({
+                        nombre: document.getElementById('plan-nombre').value.trim(),
+                        descripcion: document.getElementById('plan-descripcion').value.trim(),
+                        precio,
+                        pagoUnico: tipoUnico.checked,
+                        duracionUnidad: document.getElementById('plan-duracion-unidad').value,
+                        duracionCantidad: parseInt(document.getElementById('plan-duracion-cantidad').value, 10) || null,
+                        beneficios: document.getElementById('plan-beneficios').value.split('\n').map(s => s.trim()).filter(Boolean),
+                        destacado: document.getElementById('plan-destacado').checked,
+                        activo: document.getElementById('plan-activo').checked
+                    })
+                })
+                    .then(() => { modal.hide(); loadPlanes(gymId); })
+                    .catch(err => fallar(err.message))
+                    .finally(() => { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="bx bx-save"></i> Guardar plan'; });
+            });
+
+            const gymId = localStorage.getItem('gymId');
+            if (gymId) document.getElementById('plan-nuevo-btn').disabled = false;
+            loadPlanes(gymId);
+        }
+
+        function loadPlanes(gymId) {
+            const container = document.getElementById('planes-container');
+            const presets = document.getElementById('planes-presets');
+            if (!gymId) {
+                container.innerHTML = '';
+                return;
+            }
+            estadoCargando(container, 'Cargando planes…');
+            apiTienda('/api/gyms/' + gymId + '/planes')
+                .then(planes => {
+                    planesCache = planes;
+                    if (!planes.length) {
+                        container.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-purchase-tag-alt fs-1 d-block mb-2 opacity-50"></i>Aún no tienes planes. Empieza con uno de "Agregar rápido".</div>';
+                        return;
+                    }
+                    container.innerHTML = '<div class="row g-3">' + planes.map(p => `
+                        <div class="col-sm-6 col-xl-4">
+                            <div class="dash-empty text-start h-100 d-flex flex-column${p.destacado ? ' border border-primary' : ''}">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                                    <h4 class="fw-bold fs-5 mb-0">${escapeHtml(p.nombre)}</h4>
+                                    <div class="d-flex flex-wrap gap-1 justify-content-end">
+                                        ${p.destacado ? '<span class="badge rounded-pill bg-primary bg-opacity-10 text-primary"><i class="bx bx-star"></i> Destacado</span>' : ''}
+                                        ${p.activo ? '' : '<span class="badge rounded-pill bg-secondary bg-opacity-10 text-body-secondary"><i class="bx bx-hide"></i> Oculto</span>'}
+                                    </div>
+                                </div>
+                                <div class="fs-3 fw-bold">${dinero(p.precio)}<small class="fs-6 text-body-secondary fw-normal"> · ${escapeHtml(p.duracionTexto)}</small></div>
+                                ${p.descripcion ? '<p class="text-body-secondary small mb-0">' + escapeHtml(p.descripcion) + '</p>' : ''}
+                                <ul class="list-unstyled small text-body-secondary my-3">
+                                    ${(p.beneficios || []).map(b => '<li class="d-flex gap-1"><i class="bx bx-check text-success"></i>' + escapeHtml(b) + '</li>').join('')}
+                                </ul>
+                                <div class="mt-auto d-flex gap-2">
+                                    <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-editar-plan="${escapeHtml(p.id)}">Editar</button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" data-borrar-plan="${escapeHtml(p.id)}">Eliminar</button>
+                                </div>
+                            </div>
+                        </div>`).join('') + '</div>';
+                })
+                .catch(err => estadoError(container, err.message, () => loadPlanes(gymId)));
+
+            apiTienda('/api/gyms/' + gymId + '/planes/presets')
+                .then(lista => {
+                    presetsCache = lista;
+                    presets.innerHTML = lista.map((p, i) =>
+                        '<button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-preset="' + i + '"><i class="bx bx-plus"></i> '
+                        + escapeHtml(p.nombre) + (p.precio != null ? ' · ' + dinero(p.precio) : '') + '</button>').join('');
+                })
+                .catch(() => { presets.innerHTML = '<span class="text-body-secondary small">No se pudieron cargar las sugerencias.</span>'; });
         }
 
         function escapeHtml(str) {
