@@ -743,3 +743,23 @@ footer.bg-dark::before {
 }
 .mostrador-tile-membresias .text-body-secondary { color: #c9cabf !important; }
 .mostrador-tile-membresias .text-primary { color: #ff8c66 !important; }
+
+/* ═══════════════════════════════════════
+   VENTAS (pestaña del panel)
+═══════════════════════════════════════ */
+.ventas-grafica { position: relative; height: 240px; }
+.ventas-dinero { font-size: clamp(1.15rem, 4.6vw, 1.5rem); overflow-wrap: anywhere; }
+.ventas-barra {
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(var(--brand-rgb), 0.14);
+    overflow: hidden;
+}
+.ventas-barra > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--brand);
+}
+.ventas-fila { cursor: pointer; }
+.ventas-fila:hover > td { background: rgba(var(--brand-rgb), 0.04); }
