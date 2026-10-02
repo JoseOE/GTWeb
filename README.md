@@ -39,12 +39,13 @@ GitHub Pages solo sirve archivos estáticos, así que ahí funcionan la página 
 | `verificar.html` | Verificar el correo con el código de 6 dígitos o con el botón del correo. |
 | `login.html` | Iniciar sesión; incluye "¿Olvidaste tu contraseña?". |
 | `recuperar.html` y `restablecer.html` | Pedir un enlace por correo y crear una contraseña nueva. |
-| `bienvenido.html` | Panel del gimnasio: datos del gimnasio, miembros, pagos, máquinas, rutinas y la tienda (mostrador, productos y planes). |
+| `bienvenido.html` | Panel del gimnasio: datos del gimnasio, miembros, pagos, máquinas, rutinas y la tienda (mostrador, ventas, productos y planes). |
 | `cuenta.html` | Mi cuenta: cambiar contraseña y correo. |
 | `tienda.html` | Tienda del gimnasio para sus miembros: planes, productos, categorías y búsqueda. |
 | `producto.html` | Detalle de un producto o plan: presentación, sabor, precio, stock y cantidad. |
 | `checkout.html` | Pagar: resumen, recoger en el gimnasio y forma de pago. |
 | `confirmacion.html` · `pedidos.html` | Confirmación del pedido y "Mis pedidos" con estado y recibo. |
+| `paypal-sim.html` | Simulador PayPal: el comprador aprueba o cancela un pago de prueba (también se abre desde la app). |
 
 ---
 
@@ -530,6 +531,52 @@ Los rechazos llegan al checkout como 402 con el mensaje para el comprador, y el 
 - Solo se escribe a miembros: en una venta de mostrador al público no se manda nada.
 - Sin Brevo configurado, la plantilla se arma igual y el aviso se escribe en la consola.
 
+**Simulador de PayPal**
+
+| Método | Ruta | Uso |
+|---|---|---|
+| POST | `/api/simuladores/paypal/ordenes?canal=web\|app` | Crea la orden por el total del carrito `{returnUrl, cancelUrl}` → `{id, monto, moneda, aprobarUrl}` |
+| GET | `/api/simuladores/paypal/ordenes/{id}` | Lo que muestra el simulador: comercio, monto, artículos, estado y cuentas de prueba |
+| POST | `/api/simuladores/paypal/ordenes/{id}/aprobar` | `{cuenta}` → `{redirect}`: `returnUrl` con `token` y `PayerID` |
+| POST | `/api/simuladores/paypal/ordenes/{id}/cancelar` | → `{redirect}`: `cancelUrl` con `token` |
+
+**PayPal.**
+
+- **El flujo.** Como en PayPal, el pago se aprueba fuera de la tienda:
+  1. Al pulsar "Pagar", Spring crea una orden `PAYID-SIM-...` por el total del carrito y la página va a `paypal-sim.html?token=...`.
+  2. Ahí se elige una cuenta de prueba (o se escribe un correo) y se aprueba o se cancela. No se pide contraseña y no lleva logotipos de PayPal: es una simulación.
+  3. Al aprobar, vuelve a `returnUrl` con `token` y `PayerID`, y el checkout paga con `{"metodo": "paypal", "datos": {"token", "payerId"}}`.
+- **Cancelar.** Vuelve a `cancelUrl` y no se crea ningún pedido; el carrito queda igual.
+- **Cuentas de prueba.** `ana.compradora@sim-paypal.test` y `luis.prueba@sim-paypal.test` aprueban; `sin-saldo@sim-paypal.test` aprueba, pero PayPal rechaza el cobro (402 con el mensaje). Cualquier otro correo también aprueba.
+- **Seguridad.**
+  - Crear la orden y pagar con ella exigen al comprador (`X-User-Id`).
+  - Ver, aprobar y cancelar no: el simulador se abre también desde el navegador de la app, que no tiene la sesión de la página. El id de la orden hace de llave, como el token de la URL de PayPal.
+  - Al pagar, Spring revisa que la orden sea del comprador, de su gimnasio y canal, que esté aprobada y que sea por el total de hoy (si el carrito cambió, responde 409 y hay que volver a aprobar). Se usa una sola vez y cambia por sus datos guardados, así que el resultado no se puede inventar desde el navegador.
+  - Las órdenes viven en `ordenes_paypal` y se borran a las 3 horas.
+- **Regreso.** `returnUrl` y `cancelUrl` pueden ser una página de esta web (relativa o con su dominio) o un enlace de la app (`gymtrack://...`, `exp://...`). Otro sitio web responde 400: el simulador no debe servir para mandar a nadie a una página ajena.
+- **En la app (GTApp).** Crea la orden con `?canal=app` y su enlace de regreso, abre `aprobarUrl` en el navegador (por ejemplo, `WebBrowser.openAuthSessionAsync`) y, al volver por el enlace con `token` y `PayerID`, paga con `POST /api/tienda/carrito/checkout?canal=app`.
+
+**Ventas (pestaña del panel)**
+
+| Método | Ruta | Uso |
+|---|---|---|
+| GET | `/api/gyms/{gymId}/ventas/resumen?desde=&hasta=` | KPIs de hoy y del mes, y gráficas del periodo (por defecto, los últimos 30 días; hasta un año) |
+| GET | `/api/gyms/{gymId}/ventas/pedidos` | Pedidos con filtros `metodo` (tarjeta, paynet, paypal, efectivo), `estado`, `canal` (web, app, mostrador), `desde`, `hasta`, `buscar` (folio, cliente o correo), `pagina` y `tamano` → `{pedidos, total, pagina, paginas, cobrado}` |
+| GET | `/api/gyms/{gymId}/ventas/pedidos/{orderId}` | Detalle con las `acciones` que admite: `recibo`, `ficha`, `reenviar`, `simularPaynet`, `reembolsar`, `cancelar` |
+| POST | `/api/gyms/{gymId}/ventas/pedidos/{orderId}/reembolsar` | Reembolso simulado de un pedido pagado → el detalle, más `membresia: {miembro, ajustada, vence}` si había extendido una |
+| POST | `/api/gyms/{gymId}/ventas/pedidos/{orderId}/cancelar` | Cancela un pedido pendiente de pago (una ficha Paynet) |
+
+**Ventas.**
+
+- **Solo el dueño** del gimnasio. Todo sale de la copia local de los pedidos (`pedidos`), así que abrir la pestaña no despierta a Medusa; solo las acciones pasan por ella.
+- **Qué cuenta como venta.** Un pedido pagado, en el día en que se pagó (hora de México). Los reembolsados y cancelados no suman.
+- **KPIs.** Ventas de hoy y del mes, ticket promedio del mes, fichas Paynet por cobrar y membresías vendidas en la tienda este mes. Las gráficas son por día y por forma de pago, con lo más vendido y los canales del periodo (Chart.js desde su CDN; sin él, se muestran como lista).
+- **Acciones del detalle.**
+  - Recibo y ficha Paynet en PDF, reenviar el correo y "Simular pago en tienda" usan las rutas de `/api/recibos` y `/api/simuladores/paynet`.
+  - **Reembolsar** devuelve todo lo cobrado (simulado: no se mueve dinero real). El pedido queda "Reembolsado" y conserva su total y su recibo. Lo vendido no regresa al inventario, porque ya se entregó.
+  - **Cancelar** es para lo que todavía no se paga; uno pagado se reembolsa.
+- **Reembolso de un plan.** El `Payment` queda marcado con `reembolsadoEn` (el panel lo muestra en "Últimos pagos"). Si fue el último pago que extendió la membresía, la fecha de corte vuelve a la que tenía antes (`Payment.corteAnterior`). Si después hubo otro pago, no se toca y el panel avisa para revisarla.
+
 **Generales**
 
 | Método | Ruta | Uso |
@@ -577,6 +624,7 @@ Para crear o editar se manda `nombre`, `descripcion`, `categoria` (el handle), `
   - los de días o semanas suman días.
 - Se guarda un `Payment` con `metodo`, `plan` y `orderId`. `orderId` tiene **índice único**, así que un aviso repetido nunca extiende dos veces. El usuario guarda `planActual`.
 - Un pedido Paynet pendiente **no** activa nada hasta que se captura.
+- Si el pedido se reembolsa desde Ventas, la membresía vuelve a su fecha de corte anterior (ver "Ventas").
 
 ### Contratos para los demás bloques
 
@@ -598,7 +646,7 @@ Para crear o editar se manda `nombre`, `descripcion`, `categoria` (el handle), `
 - `orderId`, `folio`, `gymId`, `userId` (null en mostrador a público en general), `canal`;
 - `estado`: `pendiente_pago`, `pagado`, `cancelado` o `reembolsado`;
 - `proveedorPago`, `total`, `subtotal` (sin IVA), `iva` y `partidas`;
-- `datosPago`: lo que guardó el simulador, sin nada sensible (`marca` y `ultimos4`; `recibido` y `cambio` en efectivo). `PedidoService.detallePago(pedido)` lo convierte en texto ("Visa •••• 4242", "Efectivo · recibido $500.00, cambio $42.00"); Paynet y PayPal agregan ahí su forma;
+- `datosPago`: lo que guardó el simulador, sin nada sensible (`marca` y `ultimos4`; `recibido` y `cambio` en efectivo). `PedidoService.detallePago(pedido)` lo convierte en texto ("Visa •••• 4242", "Efectivo · recibido $500.00, cambio $42.00", "Paynet · referencia 9301 2345 …", "PayPal · ana.compradora@sim-paypal.test");
 - `cliente` y `vendedorId` en ventas de mostrador. En una venta al público, el correo del pedido es el del dueño: solo se manda correo al comprador si `userId` no es nulo;
 - `creadoEn`, `pagadoEn`, `canceladoEn` y `planAplicado`.
 
@@ -610,7 +658,7 @@ Para crear o editar se manda `nombre`, `descripcion`, `categoria` (el handle), `
 |---|---|---|
 | `pp_sim-stripe_default` | 3 · Eduardo | Hecho: cobra en el acto si el token es de una tarjeta aprobada (ids `pi_sim_...` y cargo `ch_sim_...`) y rechaza con su mensaje las demás |
 | `pp_sim-paynet_default` | 4 · Valeria | Hecho: referencia con dígito verificador y 72 h; queda **autorizado sin capturar** hasta "Simular pago en tienda" |
-| `pp_sim-paypal_default` | 5 · Edwin | Cobra en el acto. Ids `PAYID-SIM_...` |
+| `pp_sim-paypal_default` | 5 · Edwin | Hecho: con la orden aprobada en `paypal-sim.html` cobra en el acto (captura `CAPTURE-SIM_...`); la cuenta sin saldo se rechaza con su mensaje |
 | `pp_system_default` | 3 · Eduardo | Hecho: efectivo en mostrador; Spring captura el pago al cobrar |
 
 Cada simulador está en `medusa/src/modules/sim-*/service.ts` y extiende `SimuladorPago` (`medusa/src/lib/simulador-pago.ts`), que ya implementa toda la interfaz `AbstractPaymentProvider` de Medusa 2.21:
@@ -636,7 +684,7 @@ Cada simulador está en `medusa/src/modules/sim-*/service.ts` y extiende `Simula
 
 Un método que sale de la página (PayPal) regresa a `checkout.html?metodo=<id>&continuar=1`. El checkout lo preselecciona y vuelve a pulsar "Pagar"; en esa segunda llamada, `obtenerDatos()` lee lo que trae la URL.
 
-El recibo se descarga de `GET /api/recibos/pedidos/{orderId}.pdf` (bloque 4) con `fetch` y el encabezado `X-User-Id`. Mientras no exista, la página avisa que todavía no está disponible.
+El recibo se descarga de `GET /api/recibos/pedidos/{orderId}.pdf` con `fetch` y el encabezado `X-User-Id`.
 
 ### Avisos de Medusa
 
