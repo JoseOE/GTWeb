@@ -4,6 +4,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.time.Instant;
 import java.time.LocalDate;
 
 // Un pago de membresía. Llega de dos formas: el dueño lo registra a mano
@@ -34,6 +35,11 @@ public class Payment {
     // aviso repetido de Medusa extienda la membresía dos veces.
     @Indexed(unique = true, sparse = true)
     private String orderId;
+    // Fecha de corte que tenía el miembro justo antes de este pago (null si no
+    // tenía). Si el pedido se reembolsa, la membresía vuelve a ella.
+    private LocalDate corteAnterior;
+    // Cuándo se reembolsó el pedido de la tienda que originó el pago.
+    private Instant reembolsadoEn;
 
     public Payment() {}
 
@@ -75,4 +81,10 @@ public class Payment {
 
     public String getOrderId() { return orderId; }
     public void setOrderId(String orderId) { this.orderId = orderId; }
+
+    public LocalDate getCorteAnterior() { return corteAnterior; }
+    public void setCorteAnterior(LocalDate corteAnterior) { this.corteAnterior = corteAnterior; }
+
+    public Instant getReembolsadoEn() { return reembolsadoEn; }
+    public void setReembolsadoEn(Instant reembolsadoEn) { this.reembolsadoEn = reembolsadoEn; }
 }

@@ -12,9 +12,11 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 // Cobranza de membresías.
 //
@@ -99,6 +101,7 @@ public class BillingService {
                 : pago;
         LocalDate cubreHasta = extender(base, duracion, member.getDiaDePago());
 
+        payment.setCorteAnterior(member.getFechaProximoPago());
         member.setFechaProximoPago(cubreHasta);
         member.setMembershipStatus(User.STATUS_ACTIVE);
         if (duracion.nombre() != null) member.setPlanActual(duracion.nombre());
@@ -124,6 +127,57 @@ public class BillingService {
         if (diaDePago == null) return siguiente;
         int dia = Math.min(diaDePago, siguiente.lengthOfMonth());
         return siguiente.withDayOfMonth(dia);
+    }
+
+    // Qué le pasó a la membresía al reembolsar el pedido que la había extendido.
+    public record Reversion(String miembro, boolean ajustada, LocalDate vence) {}
+
+    // Reembolso de una compra de la tienda que extendió la membresía: el pago
+    // queda marcado y, si fue el último que la extendió, la fecha de corte
+    // vuelve a la que tenía antes de pagarlo (o al día del pago si no tenía
+    // ninguna). Si después hubo otro pago, la fecha no se toca: el dueño la
+    // revisa en Membresías y Pagos. Se puede llamar más de una vez.
+    public Reversion revertirPagoDePedido(String orderId) {
+        Payment pago = paymentRepository.findByOrderId(orderId).orElse(null);
+        if (pago == null) return null;
+        User member = userRepository.findById(pago.getUserId()).orElse(null);
+        if (pago.getReembolsadoEn() != null || member == null) {
+            return member == null ? null : new Reversion(member.getNombre(), false, member.getFechaProximoPago());
+        }
+        pago.setReembolsadoEn(Instant.now());
+        paymentRepository.save(pago);
+        if (!Objects.equals(member.getFechaProximoPago(), pago.getCubreHasta())) {
+            log.info("Pedido {} reembolsado: {} tiene pagos posteriores y su membresía no se ajustó.", orderId, member.getEmail());
+            return new Reversion(member.getNombre(), false, member.getFechaProximoPago());
+        }
+        LocalDate vence = corteAntesDe(pago);
+        // Si ese corte lo había dado otro pago que también se reembolsó, se
+        // sigue hacia atrás hasta el último que sí se pagó. Se detiene en cuanto
+        // un pago vigente explica el corte.
+        List<Payment> suyos = paymentRepository.findByUserIdOrderByFechaPagoDesc(member.getId());
+        for (int i = 0; i < suyos.size(); i++) {
+            LocalDate corte = vence;
+            boolean loDaUnPagoVigente = suyos.stream()
+                    .anyMatch(x -> x.getReembolsadoEn() == null && !x.getId().equals(pago.getId()) && Objects.equals(x.getCubreHasta(), corte));
+            Payment previo = loDaUnPagoVigente ? null : suyos.stream()
+                    .filter(x -> x.getReembolsadoEn() != null && !x.getId().equals(pago.getId()) && Objects.equals(x.getCubreHasta(), corte))
+                    .findFirst().orElse(null);
+            if (previo == null) break;
+            vence = corteAntesDe(previo);
+        }
+        member.setFechaProximoPago(vence);
+        if (vence.isBefore(LocalDate.now()) && User.STATUS_ACTIVE.equals(member.getMembershipStatus())) {
+            member.setMembershipStatus(User.STATUS_INACTIVE);
+        }
+        userRepository.save(member);
+        log.info("Pedido {} reembolsado: la membresía de {} vuelve a vencer el {}.", orderId, member.getEmail(), vence);
+        return new Reversion(member.getNombre(), true, vence);
+    }
+
+    // El corte que tenía el miembro antes de ese pago; si no tenía ninguno, el
+    // día en que pagó (la membresía no queda abierta sin fecha).
+    private static LocalDate corteAntesDe(Payment pago) {
+        return pago.getCorteAnterior() != null ? pago.getCorteAnterior() : pago.getFechaPago();
     }
 
     // Corre todos los días a las 6:00 de la mañana: da de baja a los vencidos y
