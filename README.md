@@ -23,6 +23,7 @@ GitHub Pages solo sirve archivos estáticos, así que ahí funcionan la página 
 - [Estructura del proyecto](#-estructura-del-proyecto)
 - [API que usa la página](#-api-que-usa-la-página)
 - [Correos de la cuenta](#-correos-de-la-cuenta)
+- [Tienda](#-tienda)
 - [Contexto del proyecto](#problemática)
 - [Equipo y sprints](#-equipo-y-flujo-de-trabajo)
 
@@ -231,6 +232,232 @@ Se envían por el SMTP de Gmail con plantillas HTML (Thymeleaf). Los códigos se
 
 ---
 
+## 🛒 Tienda
+
+Cada gimnasio tiene su propia tienda: el dueño da de alta productos (scoops y botes de proteína, preentreno, aguas, chicles, barras…) y planes de membresía desde el panel. Los miembros compran desde la página (la app GTApp se conecta después) y el dueño vende en mostrador. Los pagos son **100 % simulados** (Stripe, Paynet y PayPal de prueba, más efectivo).
+
+```plaintext
+ Página web / App GTApp                  Spring Boot (gtweb)                       Medusa v2 (medusa/)
+ ───────────────────────   /api/...    ───────────────────────   Admin API    ─────────────────────────
+  panel, tienda, checkout ───────────▶  MedusaClient ─────────────────────────▶  productos, carritos,
+                                        (X-User-Id, reglas,      Store API      pedidos, inventario,
+                                         membresías, recibos) ◀────────────────  pagos simulados
+                                        Mongo: pedidos,           webhook HMAC        │
+                                        pagos, imágenes                              PostgreSQL (Neon)
+```
+
+- **Spring es la única puerta.** La web y la app nunca llaman a Medusa: llaman a `/api/...` y Spring decide qué pedirle a Medusa. La llave secreta de Medusa solo vive en las variables de entorno de Spring.
+- **Multi-gimnasio.** La primera vez que un gimnasio usa la tienda, Spring le crea en Medusa un canal de venta, un almacén, la opción de entrega "Recoger en el gimnasio" ($0) y una llave publicable ligada a ese canal. Los ids quedan en `Gym.tienda`.
+- **Precios en MXN con IVA incluido** (región México, IVA 16 %).
+- **Medusa dormida.** En el plan gratuito de Render, Medusa se duerme tras 15 minutos sin uso. Si no responde en 25 s, Spring contesta `503 {"error": "Despertando la tienda…", "despertando": true}` y la página reintenta sola.
+
+### Levantar la tienda en local
+
+Necesitas **Node.js 22.12 o superior** y una base de **PostgreSQL** (la de Neon del equipo o una local).
+
+1. Configura Medusa:
+
+   ```bash
+   cd medusa
+   ```
+
+   ```bash
+   cp .env.template .env
+   ```
+
+   Rellena `DATABASE_URL`, `JWT_SECRET`, `COOKIE_SECRET` y `MEDUSA_WEBHOOK_SECRET`.
+
+2. Instala, crea las tablas y carga la configuración base (región México, IVA, tipos, categorías y la llave secreta para Spring):
+
+   ```bash
+   npm install
+   ```
+
+   ```bash
+   npx medusa db:migrate
+   ```
+
+   ```bash
+   npm run seed
+   ```
+
+   El seed imprime una llave `sk_...` **una sola vez**. Si la pierdes, genera otra con `npm run seed -- nueva-llave`.
+
+3. Arranca Medusa (puerto 9000):
+
+   ```bash
+   npm run dev
+   ```
+
+4. En el `.env` de Spring (raíz del proyecto) agrega `MEDUSA_URL=http://localhost:9000`, `MEDUSA_ADMIN_TOKEN=<la sk_...>` y el mismo `MEDUSA_WEBHOOK_SECRET`, y levanta Spring como siempre con `mvn spring-boot:run`.
+
+### Variables de entorno de la tienda
+
+| Dónde | Variable | Para qué sirve |
+|---|---|---|
+| Spring | `MEDUSA_URL` | Dirección de Medusa (`http://localhost:9000` o la de Render). Sin ella la página funciona, pero la tienda responde 503. |
+| Spring | `MEDUSA_ADMIN_TOKEN` | Llave secreta `sk_...` que imprime `npm run seed`. |
+| Spring y Medusa | `MEDUSA_WEBHOOK_SECRET` | Clave con la que Medusa firma sus avisos (HMAC). Debe ser **idéntica** en los dos. |
+| Medusa | `DATABASE_URL` | PostgreSQL de Neon, terminada en `?sslmode=require`. |
+| Medusa | `JWT_SECRET` · `COOKIE_SECRET` | Secretos internos de Medusa (cadenas largas aleatorias). |
+| Medusa | `STORE_CORS` · `ADMIN_CORS` · `AUTH_CORS` | Orígenes permitidos (la dirección de Spring). |
+| Medusa | `SPRING_WEBHOOK_URL` | A dónde avisa Medusa: `https://gtweb.onrender.com/api/tienda/webhooks/medusa`. |
+
+### Medusa en Render (segundo servicio)
+
+| Campo | Valor |
+|---|---|
+| Tipo | Web Service, entorno **Node** |
+| Root Directory | `medusa` |
+| Build Command | `npm install && npm run build` |
+| Start Command | `cd .medusa/server && npm install && npm run predeploy && npm run start` |
+| Health Check Path | `/health` |
+| Variables | Las de la tabla anterior, más `NODE_ENV=production` |
+
+`predeploy` aplica las migraciones pendientes antes de arrancar. El seed se corre una sola vez (desde tu computadora con la `DATABASE_URL` de Neon). El dashboard de Medusa está apagado: todo se administra desde el panel de GTWeb.
+
+### API de la tienda
+
+Todas las rutas de la tienda identifican a quien llama con el encabezado **`X-User-Id`**: el `userId` que la página guarda al iniciar sesión. El servidor comprueba que ese usuario sea el dueño del gimnasio, o el comprador del pedido que pide. Los errores siempre llegan como `{"error": "..."}`, y si Medusa está despertando también traen `"despertando": true`.
+
+**Catálogo del dueño (panel)**
+
+| Método | Ruta | Uso |
+|---|---|---|
+| GET · POST | `/api/gyms/{gymId}/productos` | Listar · crear productos |
+| GET · PUT · DELETE | `/api/gyms/{gymId}/productos/{id}` | Ver · editar · eliminar un producto |
+| GET · POST | `/api/gyms/{gymId}/planes` | Listar · crear planes de membresía |
+| PUT · DELETE | `/api/gyms/{gymId}/planes/{id}` | Editar · eliminar un plan |
+| GET | `/api/gyms/{gymId}/planes/presets` | Planes sugeridos con el precio calculado desde la cuota mensual |
+| POST | `/api/gyms/{gymId}/imagenes` | Subir una foto `{"dataUrl": "data:image/jpeg;base64,..."}` → `{id, url}` |
+| GET | `/api/imagenes/{id}` | Ver la foto (pública, en caché un año) |
+| POST | `/api/gyms/{gymId}/members/{userId}/payments` | Registrar un pago a mano; acepta `planId` para usar la duración de un plan |
+
+**Generales**
+
+| Método | Ruta | Uso |
+|---|---|---|
+| GET | `/api/tienda/estado` | `{"lista": true}` o 503 mientras Medusa despierta. Ábrela al cargar la página para despertarla. |
+| GET | `/api/tienda/categorias` | `[{handle, nombre}]`: suplementos, bebidas, snacks, accesorios, membresias |
+| POST | `/api/tienda/webhooks/medusa` | Solo para Medusa (firmado). Ver "Avisos de Medusa". |
+
+**Producto** (lo que reciben y mandan el panel y la app):
+
+```json
+{
+  "id": "prod_...", "nombre": "Proteína Whey Gold", "descripcion": "24 g por porción",
+  "categoria": {"handle": "suplementos", "nombre": "Suplementos"},
+  "imagen": "https://gtweb.onrender.com/api/imagenes/...", "activo": true, "precioDesde": 35.0,
+  "variantes": [
+    {"id": "variant_...", "nombre": "Scoop · Vainilla", "presentacion": "Scoop", "sabor": "Vainilla",
+     "precio": 35.0, "controlarInventario": false, "existencias": null, "disponible": null},
+    {"id": "variant_...", "nombre": "Bote 2 lb · Vainilla", "presentacion": "Bote 2 lb", "sabor": "Vainilla",
+     "precio": 899.5, "controlarInventario": true, "existencias": 8, "disponible": 6}
+  ]
+}
+```
+
+Para crear o editar se manda `nombre`, `descripcion`, `categoria` (el handle), `imagen` (la `url` que devolvió `/imagenes`), `activo` y `variantes` con `id` (vacío si es nueva), `presentacion`, `sabor`, `precio`, `controlarInventario` y `existencias`. Las variantes que ya no vienen se borran. `disponible` = existencias menos lo apartado en pedidos sin entregar.
+
+**Plan:**
+
+```json
+{
+  "id": "prod_...", "varianteId": "variant_...", "nombre": "Trimestral", "descripcion": "",
+  "precio": 1215.0, "pagoUnico": false, "duracionUnidad": "mes", "duracionCantidad": 3,
+  "duracionTexto": "3 meses", "beneficios": ["3 meses de acceso"], "destacado": false, "activo": true
+}
+```
+
+`duracionUnidad` es `dia`, `semana` o `mes`. Con `pagoUnico: true` (la inscripción) no hay duración y no se mueve la fecha de corte.
+
+### Reglas de los planes
+
+- Máximo **1 plan por carrito**, cantidad 1 y sin inventario.
+- Lo pueden comprar los miembros vinculados al gimnasio con estado `active` o `inactive`; `pending` no.
+- Cuando el pedido queda **pagado** (`captured`), `BillingService` extiende la membresía:
+  - los planes por mes respetan el día de pago, como la mensualidad;
+  - los de días o semanas suman días.
+- Se guarda un `Payment` con `metodo`, `plan` y `orderId`. `orderId` tiene **índice único**, así que un aviso repetido nunca extiende dos veces. El usuario guarda `planActual`.
+- Un pedido Paynet pendiente **no** activa nada hasta que se captura.
+
+### Contratos para los demás bloques
+
+**Carrito (bloque 2).** Al crear el carrito en la Store API con la llave `Gym.tienda.publishableKey`:
+
+- usa `region_id` = `TiendaGymService.base().regionId()` y `email` = el correo del comprador;
+- manda `metadata: {"userId", "gymId", "canal": "web" | "app" | "mostrador"}`. Medusa lo copia al pedido, y así Spring sabe de quién es;
+- al agregar un plan, manda en la partida `metadata: {"duracionUnidad", "duracionCantidad"}`. Así el pedido conserva la duración aunque después se borre el plan;
+- la entrega es `Gym.tienda.shippingOptionId` ("Recoger en el gimnasio");
+- después de `POST /store/carts/{id}/complete`, llama a `PedidoService.sincronizar(orderId)`, que es idempotente. Así el pedido queda en Mongo aunque el aviso de Medusa tarde.
+
+**Pedidos (colección `pedidos`).** Copia local de cada pedido de Medusa:
+
+- `orderId`, `folio`, `gymId`, `userId` (null en mostrador a público en general), `canal`;
+- `estado`: `pendiente_pago`, `pagado`, `cancelado` o `reembolsado`;
+- `proveedorPago`, `total`, `subtotal` (sin IVA), `iva` y `partidas`;
+- `creadoEn`, `pagadoEn`, `canceladoEn` y `planAplicado`.
+
+`AccesoService.exigirAccesoAPedido(pedido, userId)` deja verlo solo al comprador y al dueño del gimnasio.
+
+**Métodos de pago (bloques 3 a 5).** Están registrados en `medusa/medusa-config.ts`. `MetodosPago` (Java) les da nombre en los recibos y el panel.
+
+| Proveedor en Medusa | Bloque | Comportamiento base |
+|---|---|---|
+| `pp_sim-stripe_default` | 3 · Eduardo | Cobra en el acto (`captured`). Ids `pi_sim_...` |
+| `pp_sim-paynet_default` | 4 · Valeria | Queda **autorizado sin capturar**: pedido pendiente de pago |
+| `pp_sim-paypal_default` | 5 · Edwin | Cobra en el acto. Ids `PAYID-SIM_...` |
+| `pp_system_default` | 3 · Eduardo | Efectivo en mostrador (proveedor manual de Medusa) |
+
+Cada simulador está en `medusa/src/modules/sim-*/service.ts` y extiende `SimuladorPago` (`medusa/src/lib/simulador-pago.ts`), que ya implementa toda la interfaz `AbstractPaymentProvider` de Medusa 2.21:
+
+- **Spring** crea la sesión con `POST /store/payment-collections/{id}/payment-sessions` y `{"provider_id", "data": {...}}`. Ese `data` (token de la tarjeta, cuenta PayPal…) llega a `initiatePayment` y se conserva hasta `autorizar`.
+- **Cada bloque** sobrescribe `autorizar(datos)`. Ahí valida y devuelve `{status: CAPTURED}` (cobro inmediato) o `{status: AUTHORIZED}` (pendiente), más los datos extra para el recibo (`marca`, `ultimos4`, `referencia`…). Para rechazar, lanza `new MedusaError(MedusaError.Types.NOT_ALLOWED, "mensaje para el comprador")`.
+- **Capturar después** (Paynet): `POST /admin/payments/{paymentId}/capture`. Medusa emite `payment.captured` y Spring recibe el aviso.
+- **Reembolsar:** `POST /admin/payments/{paymentId}/refund` con `{"amount"}`. **Cancelar:** `POST /admin/orders/{orderId}/cancel`.
+- Nunca guardes ni registres en logs el número completo de una tarjeta ni el CVC: al pedido solo llega el token.
+
+### Avisos de Medusa
+
+`medusa/src/subscribers/avisar-pedidos.ts` escucha tres eventos y avisa a Spring en `POST /api/tienda/webhooks/medusa`:
+
+| Evento | Cuándo |
+|---|---|
+| `order.placed` | Se completó un carrito |
+| `payment.captured` | Se capturó un pago que estaba pendiente |
+| `order.canceled` | Se canceló un pedido |
+
+- **Firma.** Cada aviso lleva `X-GymTrack-Firma: t=<segundos>,v1=<HMAC-SHA256 de "t.cuerpo">`. Spring rechaza (401) las firmas inválidas o de hace más de 5 minutos.
+- **Reintentos.** Si Spring no responde, Medusa reintenta a los 2, 10 y 45 segundos.
+- **Idempotencia.** Spring guarda cada evento procesado en `avisos_tienda` (evento + pedido o pago). Si llega repetido, responde 200 sin volver a aplicarlo.
+
+### Estructura de `medusa/`
+
+```plaintext
+medusa/
+├── medusa-config.ts             # Admin apagado, CORS y los tres simuladores registrados
+├── .env.template                # Variables de la tienda (copiar como .env)
+└── src/
+    ├── lib/
+    │   ├── simulador-pago.ts    # Base común de los simuladores de pago
+    │   └── avisar-spring.ts     # Aviso firmado (HMAC) con reintentos
+    ├── modules/sim-stripe · sim-paynet · sim-paypal
+    ├── subscribers/avisar-pedidos.ts
+    └── scripts/seed.ts          # Región México, IVA, tipos, categorías y llave para Spring
+```
+
+### Problemas comunes de la tienda
+
+| Síntoma | Solución |
+|---|---|
+| "La tienda no está configurada: faltan MEDUSA_URL o MEDUSA_ADMIN_TOKEN" | Agrega esas variables al `.env` de Spring y reinícialo. |
+| "La tienda todavía no tiene su configuración base" | Corre `npm run seed` en `medusa/`. |
+| "Llave de Medusa inválida" | La `sk_...` de `MEDUSA_ADMIN_TOKEN` se revocó o es de otra base. Genera otra con `npm run seed -- nueva-llave`. |
+| "Despertando la tienda…" que no termina | Revisa en Render que el servicio de Medusa esté desplegado y sano (`/health`). |
+| Se paga, pero la membresía no se extiende | Revisa que `MEDUSA_WEBHOOK_SECRET` sea idéntica en Spring y en Medusa, y que `SPRING_WEBHOOK_URL` apunte a Spring. La consola de Medusa avisa si un aviso no llegó. |
+
+---
+
 # Problemática
 
 Actualmente, muchos gimnasios medianos y locales presentan una desconexión entre sus procesos administrativos, el control de acceso y la gestión de los entrenamientos.
@@ -404,6 +631,7 @@ La comunicación entre el dispositivo IoT y los servicios backend utilizará pro
 | MongoDB Atlas + Spring Data MongoDB | Base de datos NoSQL en la nube |
 | Spring Boot Mail (SMTP de Gmail) + Thymeleaf | Correos de la cuenta con plantillas HTML |
 | BCrypt (spring-security-crypto) | Cifrado de contraseñas |
+| Medusa v2 + PostgreSQL (Neon) | Motor de la tienda de cada gimnasio (segundo servicio en Render) |
 
 **Aplicación móvil** (repositorio aparte)
 
