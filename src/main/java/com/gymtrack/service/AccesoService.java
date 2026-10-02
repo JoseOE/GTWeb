@@ -47,6 +47,36 @@ public class AccesoService {
         return gym;
     }
 
+    // La tienda de un gimnasio la ven sus miembros (aun con la solicitud
+    // pendiente, para que sepan qué venden) y su dueño, como vista previa.
+    public User exigirVerTienda(String gymId, String userId) {
+        User user = exigirUsuario(userId);
+        boolean esMiembro = "member".equals(user.getRole()) && gymId.equals(user.getGymId());
+        boolean esDueno = "owner".equals(user.getRole())
+                && gymRepository.findById(gymId).map(g -> user.getId().equals(g.getOwnerId())).orElse(false);
+        if (!esMiembro && !esDueno) {
+            throw new TiendaException(HttpStatus.FORBIDDEN, "Esta tienda es solo para los miembros de su gimnasio.");
+        }
+        return user;
+    }
+
+    // Compran en línea los miembros vinculados a un gimnasio con su membresía
+    // activa o vencida (justo para renovarla). Una solicitud pendiente todavía no:
+    // el gimnasio no ha dicho que esa persona sea su cliente.
+    public User exigirComprador(String userId) {
+        User user = exigirUsuario(userId);
+        if ("owner".equals(user.getRole())) {
+            throw new TiendaException(HttpStatus.FORBIDDEN, "Los dueños venden desde la pestaña Mostrador del panel.");
+        }
+        if (user.getGymId() == null || user.getGymId().isBlank()) {
+            throw new TiendaException(HttpStatus.FORBIDDEN, "Únete a un gimnasio con su código para comprar en su tienda.");
+        }
+        if (User.STATUS_PENDING.equals(user.getMembershipStatus())) {
+            throw new TiendaException(HttpStatus.FORBIDDEN, "Tu solicitud aún no se aprueba. Podrás comprar cuando el gimnasio te acepte.");
+        }
+        return user;
+    }
+
     // Un pedido lo ve quien lo compró y el dueño del gimnasio donde se compró.
     public User exigirAccesoAPedido(Pedido pedido, String userId) {
         User user = exigirUsuario(userId);
