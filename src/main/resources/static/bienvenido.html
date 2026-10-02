@@ -556,6 +556,26 @@
                 </div>
             </div>
 
+            <!-- ─── MODAL: OPCIONES DE UN PRODUCTO EN MOSTRADOR ─── -->
+            <div class="modal fade" id="opcionesModal" tabindex="-1" aria-labelledby="opcionesModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
+                    <div class="modal-content border-0 rounded-4">
+                        <div class="modal-header border-0 pb-0">
+                            <div>
+                                <h5 class="modal-title fw-bold" id="opcionesModalLabel"></h5>
+                                <small class="text-body-secondary">Toca una opción para agregarla al ticket.</small>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                        </div>
+                        <div class="modal-body" id="opciones-cuerpo"></div>
+                        <div class="modal-footer border-0 pt-0">
+                            <div id="opciones-error" class="alert alert-danger d-none small py-2 w-100 mb-2" role="alert"></div>
+                            <button type="button" class="btn btn-primary rounded-pill px-4" data-bs-dismiss="modal">Listo</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- ─── MODAL: VENTA COBRADA ─── -->
             <div class="modal fade" id="ventaModal" tabindex="-1" aria-labelledby="ventaModalLabel" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
@@ -2349,6 +2369,7 @@
         let mostradorMiembros = [];
         let mostradorCliente = null;
         let mostradorOcupado = false;
+        let grupoAbierto = null;
 
         function initMostrador() {
             const buscar = document.getElementById('mostrador-buscar');
@@ -2362,10 +2383,38 @@
 
             buscar.addEventListener('input', pintarCatalogoMostrador);
 
+            // Una tarjeta por producto: si solo tiene una presentación se agrega
+            // directo; si tiene varias (o son las membresías) se abre la lista.
+            const opcionesModal = new bootstrap.Modal(document.getElementById('opcionesModal'));
             catalogo.addEventListener('click', (e) => {
-                const tile = e.target.closest('[data-mostrador-variante]');
-                if (!tile || mostradorOcupado) return;
-                operarMostrador('/carrito/items', { method: 'POST', body: JSON.stringify({ varianteId: tile.dataset.mostradorVariante, cantidad: 1 }) });
+                const tarjeta = e.target.closest('[data-mostrador-grupo]');
+                if (!tarjeta || mostradorOcupado) return;
+                const grupo = gruposMostrador().find(g => g.clave === tarjeta.dataset.mostradorGrupo);
+                if (!grupo) return;
+                if (grupo.opciones.length === 1) {
+                    operarMostrador('/carrito/items', { method: 'POST', body: JSON.stringify({ varianteId: grupo.opciones[0].variante.id, cantidad: 1 }) });
+                    return;
+                }
+                grupoAbierto = grupo.clave;
+                pintarOpcionesMostrador();
+                opcionesModal.show();
+            });
+            document.getElementById('opciones-cuerpo').addEventListener('click', (e) => {
+                const opcion = e.target.closest('[data-mostrador-variante]');
+                if (!opcion || mostradorOcupado) return;
+                opcion.disabled = true;
+                operarMostrador('/carrito/items', { method: 'POST', body: JSON.stringify({ varianteId: opcion.dataset.mostradorVariante, cantidad: 1 }) })
+                    .then(() => {
+                        const error = document.getElementById('mostrador-error').textContent;
+                        const caja = document.getElementById('opciones-error');
+                        caja.textContent = error;
+                        caja.classList.toggle('d-none', !error);
+                        pintarOpcionesMostrador();
+                    });
+            });
+            document.getElementById('opcionesModal').addEventListener('hidden.bs.modal', () => {
+                grupoAbierto = null;
+                document.getElementById('opciones-error').classList.add('d-none');
             });
 
             partidas.addEventListener('click', (e) => {
@@ -2558,32 +2607,123 @@
             fetch('/api/gyms/' + gymId + '/members').then(r => r.json()).then(m => { mostradorMiembros = m; }).catch(() => {});
         }
 
-        // Cada presentación es un botón: en recepción se vende tocando, sin abrir detalles.
+        function sinAcentos(texto) {
+            return (texto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        }
+
+        // Grupos del Mostrador: una sola tarjeta "Membresías" con todos los planes
+        // (visita, semana, mensual, trimestral, anual...) y una por producto con
+        // todas sus presentaciones y sabores.
+        function gruposMostrador() {
+            const grupos = [];
+            // Del más corto al más largo (visita, semana, mensual... anual); la
+            // inscripción, que no tiene duración, al final.
+            const DIAS = { dia: 1, semana: 7, mes: 30 };
+            const duracion = p => p.plan && p.plan.duracionUnidad ? DIAS[p.plan.duracionUnidad] * p.plan.duracionCantidad : Infinity;
+            const planes = mostradorCatalogo.filter(p => p.tipo === 'membresia').sort((a, b) => duracion(a) - duracion(b));
+            if (planes.length) {
+                grupos.push({
+                    clave: 'membresias', titulo: 'Membresías', esMembresia: true,
+                    opciones: planes.map(p => ({
+                        variante: p.variantes[0], producto: p,
+                        seccion: '', texto: p.nombre, detalle: p.plan ? p.plan.duracionTexto : ''
+                    }))
+                });
+            }
+            mostradorCatalogo.filter(p => p.tipo !== 'membresia').forEach(p => {
+                const conSabor = p.variantes.some(v => v.sabor);
+                grupos.push({
+                    clave: p.id, titulo: p.nombre, esMembresia: false,
+                    // Con sabores, las opciones se ordenan por presentación y cada
+                    // botón es un sabor; sin sabores, cada botón es una presentación.
+                    opciones: p.variantes.map(v => ({
+                        variante: v, producto: p,
+                        seccion: conSabor ? v.presentacion : '',
+                        texto: conSabor ? (v.sabor || 'Natural') : (v.presentacion === 'Única' ? p.nombre : v.presentacion),
+                        detalle: ''
+                    }))
+                });
+            });
+            return grupos;
+        }
+
+        function piezasEnTicket(varianteIds) {
+            if (!mostradorCarrito) return 0;
+            return mostradorCarrito.items.filter(i => varianteIds.includes(i.varianteId)).reduce((n, i) => n + i.cantidad, 0);
+        }
+
         function pintarCatalogoMostrador() {
             const catalogo = document.getElementById('mostrador-catalogo');
-            const q = document.getElementById('mostrador-buscar').value.trim().toLowerCase()
-                .normalize('NFD').replace(/[̀-ͯ]/g, '');
-            const botones = [];
-            mostradorCatalogo.forEach(p => p.variantes.forEach(v => {
-                const texto = (p.nombre + ' ' + v.nombre).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-                if (q && !texto.includes(q)) return;
-                const detalle = p.tipo === 'membresia' ? (p.plan ? p.plan.duracionTexto : '') : (v.nombre === 'Única' ? '' : v.nombre);
-                const stock = v.disponible == null ? '' : v.agotado ? 'Agotado' : v.disponible + ' disp.';
-                botones.push(`
+            const q = sinAcentos(document.getElementById('mostrador-buscar').value.trim());
+            const tarjetas = gruposMostrador()
+                .filter(g => !q || sinAcentos(g.titulo + ' ' + g.opciones.map(o => o.texto + ' ' + o.seccion + ' ' + o.producto.nombre).join(' ')).includes(q))
+                .map(g => {
+                    const desde = Math.min(...g.opciones.map(o => o.variante.precio));
+                    const unica = g.opciones.length === 1 ? g.opciones[0].variante : null;
+                    const agotado = g.opciones.every(o => o.variante.agotado);
+                    const enTicket = piezasEnTicket(g.opciones.map(o => o.variante.id));
+                    let detalle;
+                    if (g.esMembresia) detalle = g.opciones.length + (g.opciones.length === 1 ? ' plan' : ' planes');
+                    else if (unica) detalle = unica.presentacion === 'Única' ? '' : unica.presentacion;
+                    else detalle = g.opciones.length + ' opciones';
+                    const existencias = unica && unica.disponible != null ? (unica.agotado ? 'Agotado' : unica.disponible + ' disp.') : '';
+                    return `
                     <div class="col-6 col-md-4">
-                        <button type="button" class="mostrador-tile w-100 h-100" data-mostrador-variante="${escapeHtml(v.id)}" ${v.agotado ? 'disabled' : ''}>
-                            <span class="d-block fw-semibold">${escapeHtml(p.nombre)}</span>
+                        <button type="button" class="mostrador-tile w-100 h-100 position-relative${g.esMembresia ? ' mostrador-tile-membresias' : ''}" data-mostrador-grupo="${escapeHtml(g.clave)}" ${agotado ? 'disabled' : ''}
+                                aria-label="${escapeHtml(g.titulo)}${unica ? ', agregar al ticket' : ', ver opciones'}">
+                            ${enTicket ? '<span class="badge rounded-pill bg-dark position-absolute top-0 end-0 m-2">' + enTicket + '</span>' : ''}
+                            <span class="d-flex align-items-center gap-1 fw-semibold pe-4">
+                                ${g.esMembresia ? '<i class="bx bx-purchase-tag-alt text-primary"></i>' : ''}${escapeHtml(g.titulo)}
+                            </span>
                             ${detalle ? '<small class="d-block text-body-secondary">' + escapeHtml(detalle) + '</small>' : ''}
                             <span class="d-flex justify-content-between align-items-end mt-2">
-                                <strong>${dinero(v.precio)}</strong>
-                                <small class="${v.agotado ? 'text-danger' : 'text-body-secondary'}">${p.tipo === 'membresia' ? '<i class="bx bx-purchase-tag-alt"></i>' : stock}</small>
+                                <strong>${unica ? '' : '<small class="fw-normal text-body-secondary">desde </small>'}${dinero(desde)}</strong>
+                                <small class="${agotado ? 'text-danger' : 'text-body-secondary'}">${unica ? existencias : '<i class="bx bx-chevron-right"></i>'}</small>
                             </span>
                         </button>
-                    </div>`);
-            }));
-            catalogo.innerHTML = botones.length
-                ? '<div class="row g-2">' + botones.join('') + '</div>'
+                    </div>`;
+                });
+            catalogo.innerHTML = tarjetas.length
+                ? '<div class="row g-2">' + tarjetas.join('') + '</div>'
                 : '<div class="dash-empty text-center text-body-secondary py-5">' + (mostradorCatalogo.length ? 'Nada coincide con la búsqueda.' : 'Aún no tienes productos publicados. Agrégalos en la pestaña Productos.') + '</div>';
+            pintarOpcionesMostrador();
+        }
+
+        // Opciones del grupo abierto, agrupadas por presentación. Cada botón
+        // dice cuántas piezas de esa opción ya van en el ticket.
+        function pintarOpcionesMostrador() {
+            if (!grupoAbierto) return;
+            const grupo = gruposMostrador().find(g => g.clave === grupoAbierto);
+            const cuerpo = document.getElementById('opciones-cuerpo');
+            if (!grupo) { cuerpo.innerHTML = '<p class="text-body-secondary mb-0">Este producto ya no está a la venta.</p>'; return; }
+            document.getElementById('opcionesModalLabel').textContent = grupo.titulo;
+            const secciones = [];
+            grupo.opciones.forEach(o => {
+                let seccion = secciones.find(x => x.nombre === o.seccion);
+                if (!seccion) secciones.push(seccion = { nombre: o.seccion, opciones: [] });
+                seccion.opciones.push(o);
+            });
+            cuerpo.innerHTML = secciones.map(sec => `
+                ${sec.nombre ? '<h6 class="text-uppercase fw-bold text-body-secondary small mt-2 mb-2" style="letter-spacing:0.06em">' + escapeHtml(sec.nombre) + '</h6>' : ''}
+                <div class="row g-2 mb-2">
+                    ${sec.opciones.map(o => {
+                        const v = o.variante;
+                        const enTicket = piezasEnTicket([v.id]);
+                        const existencias = v.disponible == null ? '' : v.agotado ? 'Agotado' : v.disponible + ' disp.';
+                        return `
+                        <div class="col-6">
+                            <button type="button" class="mostrador-tile w-100 h-100 position-relative" data-mostrador-variante="${escapeHtml(v.id)}" ${v.agotado ? 'disabled' : ''}>
+                                ${enTicket ? '<span class="badge rounded-pill bg-dark position-absolute top-0 end-0 m-2" aria-label="' + enTicket + ' en el ticket">' + enTicket + '</span>' : ''}
+                                <span class="d-block fw-semibold pe-4">${escapeHtml(o.texto)}</span>
+                                ${o.detalle ? '<small class="d-block text-body-secondary">' + escapeHtml(o.detalle) + '</small>' : ''}
+                                <span class="d-flex justify-content-between align-items-end mt-2">
+                                    <strong>${dinero(v.precio)}</strong>
+                                    <small class="${v.agotado ? 'text-danger' : 'text-body-secondary'}">${existencias}</small>
+                                </span>
+                            </button>
+                        </div>`;
+                    }).join('')}
+                </div>`).join('');
         }
 
         function pintarTicket(c, avisos) {
@@ -2614,6 +2754,7 @@
                     <div class="d-flex justify-content-between align-items-baseline mt-1"><span class="fw-bold">Total</span><span class="fs-4 fw-bold">${dinero(c.total)}</span></div>`;
             pintarBilletes();
             actualizarCobro();
+            pintarCatalogoMostrador();
         }
 
         // Atajos de efectivo: el total exacto y los billetes que lo cubren.

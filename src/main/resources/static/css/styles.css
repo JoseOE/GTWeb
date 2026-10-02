@@ -735,3 +735,11 @@ footer.bg-dark::before {
     .mostrador-tile { transition: none; }
     .mostrador-tile:active:not(:disabled) { transform: none; }
 }
+/* La tarjeta "Membresías" agrupa todos los planes: se distingue de los productos. */
+.mostrador-tile-membresias {
+    background: #20221f;
+    border-color: #20221f;
+    color: #f4f2eb;
+}
+.mostrador-tile-membresias .text-body-secondary { color: #c9cabf !important; }
+.mostrador-tile-membresias .text-primary { color: #ff8c66 !important; }
