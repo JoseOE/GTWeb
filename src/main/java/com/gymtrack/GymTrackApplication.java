@@ -6,14 +6,17 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.util.List;
 
 // @EnableScheduling activa el cobrador automático de membresías (BillingService),
 // que revisa vencimientos todos los días a las 6:00 sin que nadie abra el panel.
+// @EnableAsync deja que los correos con recibo se manden en segundo plano.
 @SpringBootApplication
 @EnableScheduling
+@EnableAsync
 public class GymTrackApplication {
 
 	public static void main(String[] args) {

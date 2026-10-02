@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{correos/base :: correo('Tu ficha de pago en efectivo', ~{::#cuerpo})}">
+<body>
+<div id="cuerpo">
+    <p style="margin:0 0 16px;" th:text="|${saludo}:|">Hola, Juan:</p>
+    <p style="margin:0 0 20px;" th:text="|Apartamos tu pedido #${pedido['folio']} en ${gimnasio}. Para completarlo, paga en efectivo en cualquier tienda de la red Paynet con esta referencia:|">Paga con esta referencia.</p>
+    <p style="margin:0 0 6px;font-size:24px;font-weight:800;letter-spacing:2px;" th:text="${referencia}">9301 2345 6789 0123 45</p>
+    <p style="margin:0 0 20px;" th:text="|Monto exacto: $${#numbers.formatDecimal(pedido['total'], 1, 'COMMA', 2, 'POINT')} · Paga antes del ${vence}.|">Monto exacto.</p>
+    <p style="margin:0 0 20px;">En la caja indica que pagarás un servicio Paynet y muestra el código de barras de la ficha adjunta (PDF) o dicta la referencia. Te avisaremos por correo cuando recibamos tu pago.</p>
+    <p style="margin:0 0 24px;">
+        <a th:href="${enlace}" href="#" style="display:inline-block;padding:14px 24px;background-color:#f45124;color:#191b18;border-radius:4px;font-weight:700;text-decoration:none;">Ver mi ficha</a>
+    </p>
+    <p style="margin:0;padding:12px;background-color:#f4f2eb;border-radius:4px;font-size:13px;"><strong>Simulación:</strong> esta ficha es de prueba y no se acepta en ninguna tienda real.</p>
+</div>
+</body>
+</html>
