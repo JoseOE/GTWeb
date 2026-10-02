@@ -294,6 +294,9 @@ public class PedidoService {
         if (d.get("referencia") != null) {
             return "Paynet · referencia " + referenciaLegible(String.valueOf(d.get("referencia")));
         }
+        if (MetodosPago.PAYPAL.equals(p.getProveedorPago()) && d.get("cuenta") != null) {
+            return "PayPal · " + d.get("cuenta");
+        }
         return MetodosPago.nombre(p.getProveedorPago());
     }
 
