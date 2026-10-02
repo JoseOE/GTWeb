@@ -1,0 +1,132 @@
+/* ═══════════════════════════════════════
+   Simulador de PayPal: la caja del checkout (js/pagos/paypal-sim.js) y la
+   página de aprobación (paypal-sim.html). Usa los colores de GymTrack, no
+   los de PayPal: es una simulación y no debe pasar por la página real.
+═══════════════════════════════════════ */
+.pp-caja,
+.pp-tarjeta {
+    background: #fff;
+    border: 1px solid var(--line, #d5d6cc);
+    border-radius: 12px;
+    padding: 18px 16px;
+}
+.pp-simulacion {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--brand-dark, #b73511);
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    padding: 2px 8px;
+}
+
+/* ─── paypal-sim.html ─── */
+.pp-pagina {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--paper, #f4f2eb);
+}
+.pp-barra {
+    background: var(--ink, #20221f);
+    color: #fff;
+}
+.pp-barra-contenido,
+.pp-principal,
+.pp-pie {
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    padding-left: 16px;
+    padding-right: 16px;
+}
+.pp-barra-contenido {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 60px;
+}
+.pp-marca {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--display, sans-serif);
+    font-weight: 700;
+    font-size: 24px;
+    letter-spacing: .01em;
+}
+.pp-marca .bx {
+    color: var(--brand, #f45124);
+}
+.pp-barra .pp-simulacion {
+    color: #ffb59e;
+}
+.pp-principal {
+    flex: 1;
+    padding-top: 20px;
+    padding-bottom: 28px;
+}
+.pp-monto {
+    font-family: var(--display, sans-serif);
+    font-weight: 700;
+    font-size: 44px;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+    margin-top: 6px;
+}
+.pp-moneda {
+    font-size: 18px;
+    color: var(--muted, #62645d);
+}
+.pp-orden {
+    font-family: var(--identity, monospace);
+    overflow-wrap: anywhere;
+}
+.pp-cuenta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 56px;
+    border: 1px solid var(--line, #d5d6cc);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color .15s, background-color .15s;
+}
+.pp-cuenta input {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    accent-color: var(--brand, #f45124);
+}
+.pp-cuenta small {
+    color: var(--muted, #62645d);
+    overflow-wrap: anywhere;
+}
+.pp-cuenta:has(input:checked) {
+    border-color: var(--brand, #f45124);
+    background: rgba(var(--brand-rgb, 244, 81, 36), .06);
+}
+.pp-cuenta:has(input:focus-visible) {
+    outline: 2px solid var(--brand, #f45124);
+    outline-offset: 2px;
+}
+.pp-estado {
+    text-align: center;
+    padding: 28px 16px;
+}
+.pp-estado .bx {
+    font-size: 56px;
+    color: var(--brand, #f45124);
+}
+.pp-pie {
+    font-size: 12px;
+    color: var(--muted, #62645d);
+    text-align: center;
+    padding-top: 12px;
+    padding-bottom: 20px;
+}
