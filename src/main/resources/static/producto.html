@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#20221f">
+    <title>Producto | GymTrack</title>
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/2964/2964514.png">
+    <link rel="stylesheet" href="css/fonts.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/editorial.css">
+    <link rel="stylesheet" href="css/tienda.css">
+</head>
+<body class="gym-interior tienda">
+
+    <header id="tienda-barra"></header>
+
+    <main class="container-tienda pt-2" id="contenido">
+        <a href="tienda.html" class="d-inline-flex align-items-center gap-1 text-body-secondary text-decoration-none tocable fw-semibold">
+            <i class='bx bx-chevron-left fs-4' aria-hidden="true"></i> Tienda
+        </a>
+        <div id="detalle" class="mt-2"></div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/tienda.js"></script>
+    <script>
+        (function () {
+            Tienda.exigirSesion();
+            // Aquí el botón fijo es "Agregar"; la barra con el total sobraría.
+            Tienda.montar({ barraInferior: false });
+
+            const detalle = document.getElementById('detalle');
+            const productoId = new URLSearchParams(location.search).get('id');
+            const MAX = 20;
+            let producto = null;
+            let comprador = false;
+            let presentacion = null;
+            let sabor = null;
+            let cantidad = 1;
+
+            if (!productoId) {
+                Tienda.pintarEstado(detalle, 'vacio', 'No encontramos ese producto.');
+                return;
+            }
+
+            function varianteElegida() {
+                return producto.variantes.find(v => v.presentacion === presentacion && (v.sabor || null) === (sabor || null))
+                    || producto.variantes.find(v => v.presentacion === presentacion);
+            }
+
+            function maximo(v) {
+                return v.disponible == null ? MAX : Math.min(MAX, v.disponible);
+            }
+
+            function pintar() {
+                const p = producto;
+                const plan = p.plan;
+                const v = varianteElegida();
+                const presentaciones = [...new Set(p.variantes.map(x => x.presentacion))];
+                const sabores = p.variantes.filter(x => x.presentacion === presentacion && x.sabor).map(x => x.sabor);
+                const mostrarPresentaciones = !plan && !(presentaciones.length === 1 && presentaciones[0] === 'Única');
+                cantidad = Math.max(1, Math.min(cantidad, maximo(v) || 1));
+
+                let existencias = '<span class="text-success"><i class="bx bx-check-circle"></i> Disponible</span>';
+                if (v.agotado) existencias = '<span class="text-danger fw-semibold"><i class="bx bx-x-circle"></i> Agotado</span>';
+                else if (v.disponible != null && v.disponible <= 5) existencias = '<span class="text-warning-emphasis fw-semibold"><i class="bx bx-error"></i> Quedan ' + v.disponible + '</span>';
+
+                let motivo = '';
+                if (!comprador) motivo = Tienda.sesion.role === 'owner' ? 'Vista previa: tus miembros compran desde aquí.' : 'Podrás comprar cuando el gimnasio apruebe tu solicitud.';
+                const deshabilitado = !comprador || v.agotado;
+
+                detalle.innerHTML = `
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <div class="detalle-foto">${p.imagen ? '<img src="' + Tienda.escapar(p.imagen) + '" alt="' + Tienda.escapar(p.nombre) + '">' : '<i class="bx ' + (plan ? 'bx-purchase-tag-alt' : 'bx-package') + '"></i>'}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="eyebrow">${Tienda.escapar(p.categoria ? p.categoria.nombre : '')}</div>
+                            <h1 class="titulo-display mt-1">${Tienda.escapar(p.nombre)}</h1>
+                            <div class="d-flex align-items-baseline flex-wrap gap-2 mt-3">
+                                <span class="detalle-precio" id="precio">${Tienda.dinero(v.precio)}</span>
+                                <small class="text-body-secondary">IVA incluido</small>
+                            </div>
+                            ${plan ? `
+                                <p class="mt-2 mb-0 fw-semibold"><i class="bx bx-calendar text-primary"></i> ${Tienda.escapar(plan.duracionTexto)}</p>
+                                <p class="small text-body-secondary mb-0">${plan.pagoUnico ? 'Pago único: no cambia la fecha en que vence tu membresía.' : 'Al pagarlo, tu acceso se extiende ' + Tienda.escapar(plan.duracionTexto) + ' a partir de tu fecha de corte.'}</p>
+                                ${(plan.beneficios || []).length ? '<ul class="list-unstyled mt-3 mb-0">' + plan.beneficios.map(b => '<li class="d-flex gap-2 py-1"><i class="bx bx-check text-primary fs-5"></i><span>' + Tienda.escapar(b) + '</span></li>').join('') + '</ul>' : ''}`
+                                : '<p class="mt-2 mb-0">' + existencias + '</p>'}
+                            ${p.descripcion ? '<p class="mt-3 mb-0" style="max-width:60ch">' + Tienda.escapar(p.descripcion) + '</p>' : ''}
+
+                            ${mostrarPresentaciones ? `
+                                <fieldset class="mt-4">
+                                    <legend class="eyebrow mb-2">Presentación</legend>
+                                    <div class="opciones">${presentaciones.map(x => {
+                                        const agotada = p.variantes.filter(y => y.presentacion === x).every(y => y.agotado);
+                                        return '<button type="button" class="chip" data-presentacion="' + Tienda.escapar(x) + '" aria-pressed="' + (x === presentacion) + '"' + (agotada ? ' aria-label="' + Tienda.escapar(x) + ', agotado"' : '') + '>' + Tienda.escapar(x) + '</button>';
+                                    }).join('')}</div>
+                                </fieldset>` : ''}
+                            ${sabores.length ? `
+                                <fieldset class="mt-3">
+                                    <legend class="eyebrow mb-2">Sabor</legend>
+                                    <div class="opciones">${sabores.map(s => {
+                                        const vs = p.variantes.find(y => y.presentacion === presentacion && y.sabor === s);
+                                        return '<button type="button" class="chip" data-sabor="' + Tienda.escapar(s) + '" aria-pressed="' + (s === sabor) + '"' + (vs.agotado ? ' aria-label="' + Tienda.escapar(s) + ', agotado"' : '') + '>' + Tienda.escapar(s) + (vs.agotado ? ' · agotado' : '') + '</button>';
+                                    }).join('')}</div>
+                                </fieldset>` : ''}
+
+                            <div class="accion-fija mt-4">
+                                ${motivo ? '<p class="small text-body-secondary mb-2">' + Tienda.escapar(motivo) + '</p>' : ''}
+                                <div class="d-flex align-items-center gap-2">
+                                    ${plan ? '' : `
+                                        <div class="cantidad" role="group" aria-label="Cantidad">
+                                            <button type="button" id="menos" aria-label="Una pieza menos" ${cantidad <= 1 || deshabilitado ? 'disabled' : ''}><i class="bx bx-minus"></i></button>
+                                            <output id="cantidad" aria-live="polite">${cantidad}</output>
+                                            <button type="button" id="mas" aria-label="Una pieza más" ${cantidad >= maximo(v) || deshabilitado ? 'disabled' : ''}><i class="bx bx-plus"></i></button>
+                                        </div>`}
+                                    <button type="button" class="btn btn-primary btn-grande flex-grow-1" id="agregar" ${deshabilitado ? 'disabled' : ''}>
+                                        ${v.agotado ? 'Agotado' : (plan ? 'Agregar plan' : 'Agregar · ' + Tienda.dinero(v.precio * cantidad))}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+
+            // pintar() reemplaza el HTML: se devuelve el foco al mismo control para
+            // que quien navega con teclado no regrese al inicio de la página.
+            function repintar(selector) {
+                pintar();
+                const el = selector && detalle.querySelector(selector);
+                if (el && !el.disabled) el.focus();
+            }
+
+            detalle.addEventListener('click', (e) => {
+                const pres = e.target.closest('[data-presentacion]');
+                const sab = e.target.closest('[data-sabor]');
+                if (pres) {
+                    presentacion = pres.dataset.presentacion;
+                    // Al cambiar de presentación se queda el mismo sabor si existe; si no, el primero con stock.
+                    const opciones = producto.variantes.filter(v => v.presentacion === presentacion);
+                    if (!opciones.some(v => (v.sabor || null) === (sabor || null))) {
+                        sabor = (opciones.find(v => !v.agotado) || opciones[0]).sabor || null;
+                    }
+                    repintar('[data-presentacion="' + CSS.escape(presentacion) + '"]');
+                } else if (sab) {
+                    sabor = sab.dataset.sabor;
+                    repintar('[data-sabor="' + CSS.escape(sabor) + '"]');
+                } else if (e.target.closest('#menos')) {
+                    cantidad--; repintar('#menos');
+                } else if (e.target.closest('#mas')) {
+                    cantidad++; repintar('#mas');
+                } else if (e.target.closest('#agregar')) {
+                    const boton = e.target.closest('#agregar');
+                    const v = varianteElegida();
+                    boton.disabled = true;
+                    boton.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Agregando…';
+                    Tienda.agregar(v.id, producto.plan ? 1 : cantidad, producto.nombre)
+                        .catch(err => Tienda.avisar(err.message))
+                        .finally(() => pintar());
+                }
+            });
+
+            function cargar(gymId) {
+                detalle.innerHTML = '<div class="row g-4" aria-hidden="true"><div class="col-md-6"><div class="esqueleto" style="aspect-ratio:1/1"></div></div>'
+                    + '<div class="col-md-6"><div class="esqueleto mb-3" style="height:56px"></div><div class="esqueleto" style="height:120px"></div></div></div>';
+                Tienda.api('/api/tienda/' + encodeURIComponent(gymId) + '/productos/' + encodeURIComponent(productoId))
+                    .then(p => {
+                        producto = p;
+                        document.title = p.nombre + ' | GymTrack';
+                        const inicial = p.variantes.find(v => !v.agotado) || p.variantes[0];
+                        presentacion = inicial.presentacion;
+                        sabor = inicial.sabor || null;
+                        pintar();
+                    })
+                    .catch(err => Tienda.pintarEstado(detalle, err.status === 404 ? 'vacio' : 'error', err.message,
+                        err.status === 404 ? null : () => cargar(gymId)));
+            }
+
+            Tienda.cuenta().then(cuenta => {
+                const gymId = cuenta.gymId || Tienda.sesion.gymId;
+                if (!gymId) {
+                    Tienda.pintarEstado(detalle, 'info', 'Todavía no perteneces a ningún gimnasio.');
+                    return;
+                }
+                comprador = Tienda.puedeComprar(cuenta);
+                if (comprador) Tienda.cargarCarrito().catch(() => {});
+                cargar(gymId);
+            });
+        })();
+    </script>
+</body>
+</html>
