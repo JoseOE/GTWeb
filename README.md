@@ -306,23 +306,101 @@ Necesitas **Node.js 22.12 o superior** y una base de **PostgreSQL** (la de Neon 
 | Spring | `MEDUSA_URL` | Dirección de Medusa (`http://localhost:9000` o la de Render). Sin ella la página funciona, pero la tienda responde 503. |
 | Spring | `MEDUSA_ADMIN_TOKEN` | Llave secreta `sk_...` que imprime `npm run seed`. |
 | Spring y Medusa | `MEDUSA_WEBHOOK_SECRET` | Clave con la que Medusa firma sus avisos (HMAC). Debe ser **idéntica** en los dos. |
-| Medusa | `DATABASE_URL` | PostgreSQL de Neon, terminada en `?sslmode=require`. |
+| Medusa | `DATABASE_URL` | PostgreSQL de Neon con conexión directa (sin pooling), terminada en `?sslmode=require`. |
 | Medusa | `JWT_SECRET` · `COOKIE_SECRET` | Secretos internos de Medusa (cadenas largas aleatorias). |
 | Medusa | `STORE_CORS` · `ADMIN_CORS` · `AUTH_CORS` | Orígenes permitidos (la dirección de Spring). |
 | Medusa | `SPRING_WEBHOOK_URL` | A dónde avisa Medusa: `https://gtweb.onrender.com/api/tienda/webhooks/medusa`. |
 
 ### Medusa en Render (segundo servicio)
 
+Medusa corre como un segundo Web Service de Render, con su base de datos en Neon. El servicio `gtweb` (Spring) no cambia: solo recibe cuatro variables nuevas. Estos pasos se probaron replicando Render con `main`: base vacía, mismos comandos y mismas variables.
+
+**1. Base de datos en Neon.** Crea un proyecto en https://console.neon.tech, en la región más cercana a la de Render. En **Connect**, apaga **Connection pooling** y copia la cadena:
+
+```plaintext
+postgresql://neondb_owner:<contraseña>@ep-<algo>.<región>.aws.neon.tech/neondb?sslmode=require
+```
+
+- Usa la conexión directa (el host **no** lleva `-pooler`): las migraciones de Medusa no van bien con el pooling.
+- Si la cadena trae `&channel_binding=require` al final, quítalo: debe terminar en `?sslmode=require`.
+
+**2. Claves secretas.** Genera tres, una para `JWT_SECRET`, otra para `COOKIE_SECRET` y otra para `MEDUSA_WEBHOOK_SECRET`:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+**3. El servicio.** En Render, **New + → Web Service** con el repositorio `JoseOE/GTWeb`:
+
 | Campo | Valor |
 |---|---|
-| Tipo | Web Service, entorno **Node** |
+| Language | Node |
+| Branch | `main` |
+| Region | La misma que `gtweb` |
 | Root Directory | `medusa` |
-| Build Command | `npm install && npm run build` |
-| Start Command | `cd .medusa/server && npm install && npm run predeploy && npm run start` |
+| Build Command | `npm install --include=dev && npm run build && cd .medusa/server && npm install && npm run predeploy` |
+| Start Command | `cd .medusa/server && NODE_OPTIONS=--max-old-space-size=320 npm run start` |
 | Health Check Path | `/health` |
-| Variables | Las de la tabla anterior, más `NODE_ENV=production` |
+| Instance Type | Free, con una sola instancia |
 
-`predeploy` aplica las migraciones pendientes antes de arrancar. El seed se corre una sola vez (desde tu computadora con la `DATABASE_URL` de Neon). El dashboard de Medusa está apagado: todo se administra desde el panel de GTWeb.
+Variables del servicio (se pueden pegar juntas con **Add from .env**):
+
+```env
+NODE_VERSION=24.19.0
+NODE_ENV=production
+DATABASE_URL=<cadena de Neon>
+JWT_SECRET=<clave 1>
+COOKIE_SECRET=<clave 2>
+MEDUSA_WEBHOOK_SECRET=<clave 3>
+STORE_CORS=https://gtweb.onrender.com
+ADMIN_CORS=https://gtweb.onrender.com
+AUTH_CORS=https://gtweb.onrender.com
+SPRING_WEBHOOK_URL=https://gtweb.onrender.com/api/tienda/webhooks/medusa
+```
+
+Por qué los comandos son así:
+
+- **`--include=dev`.** Con `NODE_ENV=production`, `npm install` se salta las dependencias de desarrollo (`ts-node`, `typescript`) y `medusa build` ya no puede leer `medusa-config.ts`.
+- **Instalación y migraciones en el build.** El plan gratis apaga el servicio tras 15 minutos sin uso; así, al despertar solo arranca Medusa en lugar de reinstalar todo. `predeploy` (`medusa db:migrate`) aplica en Neon las migraciones pendientes; si no hay, termina en segundos.
+- **`NODE_OPTIONS` solo en el Start Command.** Limita la memoria de Medusa para que quepa en los 512 MB del plan gratis. Como variable de entorno también aplicaría al build, y el compilador de TypeScript se quedaría sin memoria.
+- **`NODE_VERSION`.** Fija la versión de Node con la que se probó.
+- **Una sola instancia.** Sin Redis, los eventos y los workflows de Medusa viven en memoria.
+
+Al terminar el primer deploy, los **Logs** dicen `Server is ready on port: 10000` y `https://<servicio>.onrender.com/health` responde `OK`. La raíz del servicio responde "Cannot GET /": es normal, porque el dashboard de Medusa está apagado y todo se administra desde el panel de GTWeb.
+
+**4. Configuración base y llave para Spring (una sola vez).** Con el servicio ya desplegado (ese deploy crea las tablas), corre el seed desde tu computadora contra Neon:
+
+```bash
+cd medusa
+```
+
+```bash
+npm install
+```
+
+```bash
+DATABASE_URL="<cadena de Neon>" npm run seed
+```
+
+- **En PowerShell,** el último paso son dos comandos: `$env:DATABASE_URL = "<cadena de Neon>"` y luego `npm run seed`.
+- **La llave.** Copia la `sk_...` que imprime; solo se muestra una vez. Si la pierdes, genera otra con `npm run seed -- nueva-llave`.
+- **Tu `.env` local.** La cadena de la terminal tiene prioridad sobre tu `medusa/.env`. Cierra la terminal al terminar para no seguir apuntando a Neon.
+
+**5. Conectar Spring.** En **Environment** del servicio `gtweb` agrega:
+
+| Variable | Valor |
+|---|---|
+| `MEDUSA_URL` | La dirección del servicio de Medusa, sin `/` al final |
+| `MEDUSA_ADMIN_TOKEN` | La `sk_...` del paso 4 |
+| `MEDUSA_WEBHOOK_SECRET` | La misma clave que en Medusa |
+| `APP_URL` | `https://gtweb.onrender.com` (con ella se arman las direcciones de las imágenes de los productos y los enlaces de los correos) |
+
+Guarda con **Save, rebuild, and deploy**.
+
+**6. Comprobar.** `https://gtweb.onrender.com/api/tienda/estado` responde `{"lista":true}`. Si Medusa estaba dormida, primero responde `"despertando": true`; espera un minuto y vuelve a intentar.
+
+- **Memoria.** Medusa queda cerca del límite de 512 MB del plan gratis. Si en **Events** aparece *Ran out of memory*, revisa la sección de problemas comunes.
+- **Secretos.** La cadena de Neon, la `sk_...` y las tres claves solo van en Render, nunca en GitHub.
 
 ### API de la tienda
 
@@ -593,11 +671,15 @@ medusa/
 
 | Síntoma | Solución |
 |---|---|
-| "La tienda no está configurada: faltan MEDUSA_URL o MEDUSA_ADMIN_TOKEN" | Agrega esas variables al `.env` de Spring y reinícialo. |
+| "La tienda no está configurada: faltan MEDUSA_URL o MEDUSA_ADMIN_TOKEN" | Agrega esas variables al `.env` de Spring (en Render, en **Environment** del servicio `gtweb`) y reinícialo. |
 | "La tienda todavía no tiene su configuración base" | Corre `npm run seed` en `medusa/`. |
 | "Llave de Medusa inválida" | La `sk_...` de `MEDUSA_ADMIN_TOKEN` se revocó o es de otra base. Genera otra con `npm run seed -- nueva-llave`. |
 | "Despertando la tienda…" que no termina | Revisa en Render que el servicio de Medusa esté desplegado y sano (`/health`). |
 | Se paga, pero la membresía no se extiende | Revisa que `MEDUSA_WEBHOOK_SECRET` sea idéntica en Spring y en Medusa, y que `SPRING_WEBHOOK_URL` apunte a Spring. La consola de Medusa avisa si un aviso no llegó. |
+| El build de Medusa en Render falla con `Cannot find module '.../medusa-config'` | Falta `--include=dev` en el Build Command. |
+| `JavaScript heap out of memory` durante el build | `NODE_OPTIONS` está como variable de entorno: quítala de ahí y déjala solo en el Start Command. |
+| Render marca *Ran out of memory* en Medusa | Revisa que el Start Command lleve `NODE_OPTIONS=--max-old-space-size=320`. Si sigue pasando, Medusa necesita una instancia con más memoria. |
+| `npm run seed` contra Neon falla con *timeout* | La red bloquea el puerto de PostgreSQL (5432), algo común en redes escolares. Prueba desde otra red. |
 
 ---
 
