@@ -41,6 +41,10 @@ GitHub Pages solo sirve archivos estáticos, así que ahí funcionan la página 
 | `recuperar.html` y `restablecer.html` | Pedir un enlace por correo y crear una contraseña nueva. |
 | `bienvenido.html` | Panel del gimnasio: datos del gimnasio, miembros, pagos, máquinas y rutinas. |
 | `cuenta.html` | Mi cuenta: cambiar contraseña y correo. |
+| `tienda.html` | Tienda del gimnasio para sus miembros: planes, productos, categorías y búsqueda. |
+| `producto.html` | Detalle de un producto o plan: presentación, sabor, precio, stock y cantidad. |
+| `checkout.html` | Pagar: resumen, recoger en el gimnasio y forma de pago. |
+| `confirmacion.html` · `pedidos.html` | Confirmación del pedido y "Mis pedidos" con estado y recibo. |
 
 ---
 
@@ -333,6 +337,44 @@ Todas las rutas de la tienda identifican a quien llama con el encabezado **`X-Us
 | GET | `/api/imagenes/{id}` | Ver la foto (pública, en caché un año) |
 | POST | `/api/gyms/{gymId}/members/{userId}/payments` | Registrar un pago a mano; acepta `planId` para usar la duración de un plan |
 
+**Tienda del miembro (página y app)**
+
+| Método | Ruta | Uso |
+|---|---|---|
+| GET | `/api/tienda/{gymId}/productos?categoria=&q=` | Planes y productos publicados (los planes primero, los destacados arriba) |
+| GET | `/api/tienda/{gymId}/productos/{id}` | Detalle con variantes, precio vigente y `disponible` |
+| GET · POST · DELETE | `/api/tienda/carrito` | Ver el carrito ya revisado · abrirlo · vaciarlo |
+| POST | `/api/tienda/carrito/items` | Agregar `{"varianteId", "cantidad"}` |
+| PATCH · DELETE | `/api/tienda/carrito/items/{id}` | Cambiar la cantidad `{"cantidad"}` (0 la quita) · quitar |
+| POST | `/api/tienda/carrito/checkout` | Pagar `{"metodo", "datos", "totalVisto"}` y devolver el pedido |
+| GET | `/api/tienda/pedidos` · `/api/tienda/pedidos/{orderId}` | Mis pedidos · un pedido (si está pendiente, se vuelve a leer de Medusa) |
+
+Todas las rutas del carrito aceptan `?canal=web` (por defecto) o `?canal=app`, y cada canal tiene su carrito.
+
+- **Ver la tienda.** Pueden verla los miembros del gimnasio (aun con la solicitud pendiente) y su dueño, como vista previa.
+- **Comprar.** Solo pueden comprar los miembros con estado `active` o `inactive`.
+
+Respuestas de `/checkout`:
+
+- **200**: el pedido.
+- **409**: el carrito cambió desde que la persona lo vio (algo se agotó, se ocultó o cambió de precio). Trae `avisos` y `carrito` ya corregido, y no se cobra nada.
+- **402**: el simulador rechazó el pago, con su mensaje.
+
+**Carrito** (lo que reciben la página y la app):
+
+```json
+{
+  "id": "cart_...", "gymId": "...", "canal": "web", "articulos": 3,
+  "subtotal": 1550.86, "iva": 248.14, "total": 1799.0,
+  "avisos": ["El precio de «Proteína Whey Gold» cambió de $899.50 a $949.50."],
+  "items": [
+    {"id": "cali_...", "varianteId": "variant_...", "productoId": "prod_...", "titulo": "Proteína Whey Gold",
+     "variante": "Bote 2 lb · Vainilla", "imagen": "https://...", "esPlan": false,
+     "cantidad": 2, "maximo": 6, "precioUnitario": 899.5, "total": 1799.0}
+  ]
+}
+```
+
 **Generales**
 
 | Método | Ruta | Uso |
@@ -383,13 +425,18 @@ Para crear o editar se manda `nombre`, `descripcion`, `categoria` (el handle), `
 
 ### Contratos para los demás bloques
 
-**Carrito (bloque 2).** Al crear el carrito en la Store API con la llave `Gym.tienda.publishableKey`:
+**Carrito (`CarritoService`).**
 
-- usa `region_id` = `TiendaGymService.base().regionId()` y `email` = el correo del comprador;
-- manda `metadata: {"userId", "gymId", "canal": "web" | "app" | "mostrador"}`. Medusa lo copia al pedido, y así Spring sabe de quién es;
-- al agregar un plan, manda en la partida `metadata: {"duracionUnidad", "duracionCantidad"}`. Así el pedido conserva la duración aunque después se borre el plan;
-- la entrega es `Gym.tienda.shippingOptionId` ("Recoger en el gimnasio");
-- después de `POST /store/carts/{id}/complete`, llama a `PedidoService.sincronizar(orderId)`, que es idempotente. Así el pedido queda en Mongo aunque el aviso de Medusa tarde.
+- **Persistencia.** El carrito vive en Medusa. En Mongo (colección `carritos`) solo se guarda su `cartId` por usuario, gimnasio y canal. Por eso es el mismo en cualquier dispositivo donde la persona inicie sesión, y al pagar se abre uno nuevo. La página guarda en localStorage solo el contador, como caché.
+- **Al crearlo.** Usa la llave `Gym.tienda.publishableKey`, la región México y el correo del comprador, con `metadata: {"userId", "gymId", "canal"}`. Medusa lo copia al pedido.
+- **Planes.** Cada plan viaja con `metadata: {"duracionUnidad", "duracionCantidad"}` en su partida, para que el pedido conserve la duración aunque después se borre el plan. Hay máximo un plan con duración por carrito, de uno en uno; la inscripción sí puede ir junto.
+- **Revisión.** Antes de mostrar el carrito y antes de cobrar, se compara con lo que hoy está a la venta:
+  - lo que ya no se vende se quita;
+  - lo que no alcanza se ajusta al disponible;
+  - un precio que cambió se actualiza.
+
+  Cada cambio genera un aviso.
+- **Al cobrar.** Pone "Recoger en el gimnasio", crea la sesión de pago con los `datos` del módulo JS, completa el carrito y llama a `PedidoService.sincronizar(orderId)`. Así la membresía se activa sin esperar el aviso de Medusa.
 
 **Pedidos (colección `pedidos`).** Copia local de cada pedido de Medusa:
 
@@ -412,10 +459,27 @@ Para crear o editar se manda `nombre`, `descripcion`, `categoria` (el handle), `
 Cada simulador está en `medusa/src/modules/sim-*/service.ts` y extiende `SimuladorPago` (`medusa/src/lib/simulador-pago.ts`), que ya implementa toda la interfaz `AbstractPaymentProvider` de Medusa 2.21:
 
 - **Spring** crea la sesión con `POST /store/payment-collections/{id}/payment-sessions` y `{"provider_id", "data": {...}}`. Ese `data` (token de la tarjeta, cuenta PayPal…) llega a `initiatePayment` y se conserva hasta `autorizar`.
-- **Cada bloque** sobrescribe `autorizar(datos)`. Ahí valida y devuelve `{status: CAPTURED}` (cobro inmediato) o `{status: AUTHORIZED}` (pendiente), más los datos extra para el recibo (`marca`, `ultimos4`, `referencia`…). Para rechazar, lanza `new MedusaError(MedusaError.Types.NOT_ALLOWED, "mensaje para el comprador")`.
+- **Cada bloque** sobrescribe `autorizar(datos)`. Ahí valida y devuelve `{status: CAPTURED}` (cobro inmediato) o `{status: AUTHORIZED}` (pendiente), más los datos extra para el recibo (`marca`, `ultimos4`, `referencia`…). Para rechazar, lanza `new MedusaError(MedusaError.Types.PAYMENT_AUTHORIZATION_ERROR, "mensaje para el comprador")`: Medusa no crea el pedido y Spring responde 402 con ese mensaje.
 - **Capturar después** (Paynet): `POST /admin/payments/{paymentId}/capture`. Medusa emite `payment.captured` y Spring recibe el aviso.
 - **Reembolsar:** `POST /admin/payments/{paymentId}/refund` con `{"amount"}`. **Cancelar:** `POST /admin/orders/{orderId}/cancel`.
 - Nunca guardes ni registres en logs el número completo de una tarjeta ni el CVC: al pedido solo llega el token.
+
+### Formas de pago en el checkout (bloques 3 a 5)
+
+`checkout.html` no sabe cómo cobra cada método: carga `js/pagos/stripe-sim.js`, `paynet-sim.js` y `paypal-sim.js`, y cada uno se registra con `MetodosPago.registrar({...})`. La documentación completa está en `js/pagos/metodos.js`. Si un archivo todavía no existe, ese método no aparece.
+
+| Miembro | Para qué |
+|---|---|
+| `id` · `nombre` · `descripcion` · `icono` · `orden` | `id` es lo que Spring recibe en `metodo` (`stripe`, `paynet`, `paypal`); los demás son para el selector |
+| `montar(contenedor, resumen)` | Dibuja el formulario. `resumen` = `{total, subtotal, iva, articulos, items, gym}` |
+| `obtenerDatos(): Promise` | Valida y resuelve con los `datos` que van a Medusa. Para un error, rechaza con `new Error("mensaje")` |
+| `despues(pedido)` (opcional) | Ya creado el pedido. Puede devolver otra URL a la que ir en lugar de `confirmacion.html` |
+| `confirmacion(contenedor, pedido)` (opcional) | En `confirmacion.html`, lo propio del método (p. ej. la ficha de Paynet) |
+| `desmontar()` (opcional) | Al cambiar a otro método |
+
+Un método que sale de la página (PayPal) regresa a `checkout.html?metodo=<id>&continuar=1`. El checkout lo preselecciona y vuelve a pulsar "Pagar"; en esa segunda llamada, `obtenerDatos()` lee lo que trae la URL.
+
+El recibo se descarga de `GET /api/recibos/pedidos/{orderId}.pdf` (bloque 4) con `fetch` y el encabezado `X-User-Id`. Mientras no exista, la página avisa que todavía no está disponible.
 
 ### Avisos de Medusa
 
