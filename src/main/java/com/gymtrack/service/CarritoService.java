@@ -37,7 +37,8 @@ import static com.gymtrack.service.TiendaGymService.TIPO_MEMBRESIA;
 public class CarritoService {
 
     private static final Logger log = LoggerFactory.getLogger(CarritoService.class);
-    // Canales del miembro; el mostrador es solo del dueño (MostradorController).
+    // Canales del carrito del miembro. El mostrador no guarda carrito: su ticket
+    // vive en el navegador del panel y llega completo al cobrar.
     public static final Set<String> CANALES = Set.of(Pedido.CANAL_WEB, Pedido.CANAL_APP);
     private static final int MAX_POR_PARTIDA = 20;
 
@@ -66,6 +67,7 @@ public class CarritoService {
     }
 
     // Todo lo que una operación necesita saber del carrito de esa persona.
+    // registro es null en el mostrador, que no guarda carrito.
     private record Contexto(User user, String gymId, String canal, TiendaGym tienda, Carrito registro) {
         String llave() { return tienda.getPublishableKey(); }
     }
@@ -210,19 +212,39 @@ public class CarritoService {
         // La tarjeta llega como token: se cambia por los datos guardados del token
         // para que el resultado del cobro no se pueda inventar desde el navegador.
         if (MetodosPago.STRIPE.equals(proveedor)) datos = stripe.consumir(user.getId(), datos);
+        // metadata viaja al pedido: así Spring sabe de quién es y por dónde se vendió.
         Map<String, Object> metadata = Map.of("userId", user.getId(), "gymId", c.gymId(), "canal", c.canal());
-        return pedidos.sincronizar(cerrar(c, cart, proveedor, datos, user.getEmail(), metadata));
+        String cartId = cart.path("id").asText();
+        medusa.storePost(c.llave(), "/store/carts/" + cartId + q("fields", "id"), Map.of("email", user.getEmail(), "metadata", metadata));
+        String orderId = cerrar(c, cart, proveedor, datos);
+        // El carrito se cerró: el próximo producto abre uno nuevo.
+        c.registro().setCartId(null);
+        tocar(c);
+        return pedidos.sincronizar(orderId);
     }
+
+    // Una partida del ticket del mostrador, tal como la manda el panel.
+    public record PartidaTicket(String varianteId, Integer cantidad) {}
 
     // Venta en el mostrador del panel: la cobra el dueño, en efectivo o con la
     // tarjeta (el simulador de Stripe hace de terminal), a un miembro o al
     // público en general. Si es a un miembro y lleva un plan, su membresía se
     // extiende igual que en la tienda.
-    public VentaMostrador cobrarMostrador(User dueno, String gymId, User cliente, String metodo,
-                                          Double recibido, Map<String, Object> datos, Double totalVisto) {
-        Contexto c = contexto(dueno, gymId, Pedido.CANAL_MOSTRADOR);
-        JsonNode cart = revisarParaCobrar(c, totalVisto);
-        double total = cart.path("total").asDouble();
+    //
+    // El ticket se arma en el navegador sin esperar al servidor, así que aquí
+    // se revisa completo contra lo que hoy está a la venta y el carrito se crea
+    // en Medusa de una sola vez, con todas las partidas.
+    public VentaMostrador cobrarMostrador(User dueno, String gymId, User cliente, List<PartidaTicket> partidas,
+                                          String metodo, Double recibido, Map<String, Object> datos, Double totalVisto) {
+        if (!"efectivo".equals(metodo) && !"tarjeta".equals(metodo)) {
+            throw new TiendaException(HttpStatus.BAD_REQUEST, "Elige cobrar en efectivo o con tarjeta.");
+        }
+        Contexto c = new Contexto(dueno, gymId, Pedido.CANAL_MOSTRADOR, tiendas.asegurar(gymId), null);
+        Ticket ticket = revisarTicket(c, partidas, totalVisto);
+        double total = ticket.total();
+        if ("efectivo".equals(metodo) && (recibido == null || recibido + 0.009 < total)) {
+            throw new TiendaException(HttpStatus.BAD_REQUEST, "El efectivo recibido no alcanza para " + dinero(total) + ".");
+        }
 
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("gymId", c.gymId());
@@ -234,26 +256,40 @@ public class CarritoService {
         String proveedor;
         Double cambio = null;
         if ("efectivo".equals(metodo)) {
-            if (recibido == null || recibido + 0.009 < total) {
-                throw new TiendaException(HttpStatus.BAD_REQUEST, "El efectivo recibido no alcanza para " + dinero(total) + ".");
-            }
             proveedor = MetodosPago.EFECTIVO;
             cambio = Math.round((recibido - total) * 100) / 100.0;
             // El proveedor manual de Medusa no guarda datos del pago: lo recibido y
             // el cambio viajan en el pedido para el ticket.
             metadata.put("efectivo", Map.of("recibido", recibido, "cambio", cambio));
-            datos = Map.of();
-        } else if ("tarjeta".equals(metodo)) {
-            proveedor = MetodosPago.STRIPE;
-            datos = stripe.consumir(dueno.getId(), datos);
         } else {
-            throw new TiendaException(HttpStatus.BAD_REQUEST, "Elige cobrar en efectivo o con tarjeta.");
+            proveedor = MetodosPago.STRIPE;
         }
 
         // El correo del pedido es el del miembro; en una venta al público se usa
         // el del dueño (Medusa exige uno) y no se manda ningún aviso.
         String email = cliente == null ? dueno.getEmail() : cliente.getEmail();
-        String orderId = cerrar(c, cart, proveedor, datos, email, metadata);
+        JsonNode cart;
+        try {
+            cart = medusa.storePost(c.llave(), "/store/carts" + q("fields", CAMPOS), Map.of(
+                    "region_id", tiendas.base().regionId(),
+                    "email", email,
+                    "metadata", metadata,
+                    "items", ticket.items())).path("cart");
+        } catch (TiendaException e) {
+            // Medusa también cuida el inventario: si otra venta se llevó las
+            // últimas piezas entre la revisión y este momento, gana Medusa.
+            if (e.getStatus() == HttpStatus.BAD_REQUEST && e.getMessage() != null && e.getMessage().contains("inventory")) {
+                throw new TiendaException(HttpStatus.CONFLICT, "Ya no hay suficientes piezas de algo del ticket. Revísalo antes de cobrar.");
+            }
+            throw e;
+        }
+        if (Math.abs(cart.path("total").asDouble() - total) > 0.009) {
+            throw new TiendaException(HttpStatus.CONFLICT, "El total cambió a " + dinero(cart.path("total").asDouble())
+                    + ". Revisa el ticket antes de cobrar.");
+        }
+        // La tarjeta llega como token: se cambia por los datos guardados del token.
+        datos = MetodosPago.STRIPE.equals(proveedor) ? stripe.consumir(dueno.getId(), datos) : Map.of();
+        String orderId = cerrar(c, cart, proveedor, datos);
 
         // En el mostrador el efectivo ya está en la caja y el producto se entrega
         // en el acto: se captura el pago y se marca la entrega, que es lo que
@@ -273,6 +309,81 @@ public class CarritoService {
     }
 
     public record VentaMostrador(Pedido pedido, Double cambio) {}
+
+    // El ticket revisado: las partidas como las pide Medusa y su total.
+    private record Ticket(List<Map<String, Object>> items, double total) {}
+
+    // Revisa el ticket del mostrador contra lo que hoy está a la venta. Las
+    // mismas reglas que el carrito del miembro: solo lo publicado, nunca más
+    // piezas de las disponibles y un solo plan que extienda la membresía. Si
+    // algo cambió desde que el dueño lo agregó (se agotó, se ocultó, cambió de
+    // precio), se avisa y no se cobra.
+    private Ticket revisarTicket(Contexto c, List<PartidaTicket> partidas, Double totalVisto) {
+        if (partidas == null || partidas.isEmpty()) {
+            throw new TiendaException(HttpStatus.BAD_REQUEST, "El ticket está vacío.");
+        }
+        // Una sola partida por presentación, en el orden en que se agregaron.
+        Map<String, Integer> cantidades = new LinkedHashMap<>();
+        for (PartidaTicket p : partidas) {
+            if (p == null || p.varianteId() == null || p.varianteId().isBlank()) {
+                throw new TiendaException(HttpStatus.BAD_REQUEST, "Hay una partida sin presentación en el ticket.");
+            }
+            cantidades.merge(p.varianteId(), p.cantidad() == null ? 1 : p.cantidad(), Integer::sum);
+        }
+
+        List<JsonNode> listado = escaparate.listado(c.gymId());
+        List<Map<String, Object>> items = new ArrayList<>();
+        List<String> avisos = new ArrayList<>();
+        String plan = null;
+        double total = 0;
+        for (Map.Entry<String, Integer> e : cantidades.entrySet()) {
+            String varianteId = e.getKey();
+            int cantidad = e.getValue();
+            JsonNode producto = escaparate.productoDeVariante(listado, varianteId).orElse(null);
+            if (producto == null) {
+                avisos.add("Un producto del ticket ya no está a la venta.");
+                continue;
+            }
+            String titulo = producto.path("title").asText();
+            if (cantidad < 1 || cantidad > MAX_POR_PARTIDA) {
+                throw new TiendaException(HttpStatus.BAD_REQUEST, "De «" + titulo + "» se venden de 1 a " + MAX_POR_PARTIDA + " piezas.");
+            }
+            Map<String, Object> item = new HashMap<>();
+            item.put("variant_id", varianteId);
+            item.put("quantity", cantidad);
+            if (TIPO_MEMBRESIA.equals(escaparate.tipo(producto))) {
+                if (cantidad > 1) {
+                    throw new TiendaException(HttpStatus.BAD_REQUEST, "Los planes se venden de uno en uno.");
+                }
+                Optional<PlanPagado> duracion = CatalogoService.leerPlan(producto);
+                if (duracion.isPresent()) {
+                    if (plan != null) {
+                        throw new TiendaException(HttpStatus.BAD_REQUEST, "Solo puede ir un plan por venta: «" + plan + "» y «" + titulo + "».");
+                    }
+                    plan = titulo;
+                    // La duración viaja con la partida: PedidoService la usa al activar
+                    // la membresía aunque el plan se borre o cambie después.
+                    item.put("metadata", Map.of("duracionUnidad", duracion.get().unidad(), "duracionCantidad", duracion.get().cantidad()));
+                }
+            }
+            JsonNode variante = EscaparateService.variante(producto, varianteId);
+            Integer disponible = EscaparateService.disponible(variante);
+            if (disponible != null && cantidad > disponible) {
+                avisos.add(disponible <= 0 ? "«" + titulo + "» se agotó." : "Solo quedan " + disponible + " de «" + titulo + "».");
+                continue;
+            }
+            total += EscaparateService.precio(variante) * cantidad;
+            items.add(item);
+        }
+        if (!avisos.isEmpty()) {
+            throw new TiendaException(HttpStatus.CONFLICT, "El ticket cambió. Revísalo antes de cobrar.", Map.of("avisos", avisos));
+        }
+        total = Math.round(total * 100) / 100.0;
+        if (totalVisto == null || Math.abs(total - totalVisto) > 0.009) {
+            throw new TiendaException(HttpStatus.CONFLICT, "El total cambió a " + dinero(total) + ". Revisa el ticket antes de cobrar.");
+        }
+        return new Ticket(items, total);
+    }
 
     // Revisión final antes de cobrar: lo que cambió se avisa y no se cobra.
     private JsonNode revisarParaCobrar(Contexto c, Double totalVisto) {
@@ -298,13 +409,11 @@ public class CarritoService {
         return cart;
     }
 
-    // Cierra el carrito en Medusa con el proveedor de pago y devuelve el id del pedido.
-    private String cerrar(Contexto c, JsonNode cart, String proveedor, Map<String, Object> datos,
-                          String email, Map<String, Object> metadata) {
-        // 1. Comprador y entrega ("Recoger en el gimnasio"). metadata viaja al
-        //    pedido: así Spring sabe de quién es y por dónde se vendió.
+    // Cierra el carrito en Medusa con el proveedor de pago y devuelve el id del
+    // pedido. El correo y la metadata del comprador ya deben estar puestos.
+    private String cerrar(Contexto c, JsonNode cart, String proveedor, Map<String, Object> datos) {
+        // 1. Entrega: "Recoger en el gimnasio".
         String cartId = cart.path("id").asText();
-        medusa.storePost(c.llave(), "/store/carts/" + cartId + q("fields", "id"), Map.of("email", email, "metadata", metadata));
         boolean conEntrega = false;
         for (JsonNode m : cart.path("shipping_methods")) {
             if (c.tienda().getShippingOptionId().equals(m.path("shipping_option_id").asText())) conEntrega = true;
@@ -335,10 +444,7 @@ public class CarritoService {
             throw new TiendaException(HttpStatus.PAYMENT_REQUIRED, mensaje);
         }
 
-        // 3. El carrito se cerró: el próximo producto abre uno nuevo.
         String orderId = resultado.path("order").path("id").asText();
-        c.registro().setCartId(null);
-        tocar(c);
         log.info("Pedido {} creado desde el carrito {} ({}, {}).", orderId, cartId, MetodosPago.nombre(proveedor), c.canal());
         return orderId;
     }
@@ -421,12 +527,11 @@ public class CarritoService {
 
     // ═══════════════════════════ CARRITO EN MEDUSA ═══════════════════════════
 
-    // Quién puede usar cada canal lo deciden los controladores: CarritoController
-    // pasa el gimnasio actual del miembro (si se cambió de gimnasio, el carrito
-    // anterior simplemente deja de aparecer) y MostradorController el del dueño.
+    // CarritoController pasa el gimnasio actual del miembro: si se cambió de
+    // gimnasio, el carrito anterior simplemente deja de aparecer.
     private Contexto contexto(User user, String gymId, String canal) {
         String elegido = canal == null || canal.isBlank() ? Pedido.CANAL_WEB : canal.trim().toLowerCase();
-        if (!CANALES.contains(elegido) && !Pedido.CANAL_MOSTRADOR.equals(elegido)) {
+        if (!CANALES.contains(elegido)) {
             throw new TiendaException(HttpStatus.BAD_REQUEST, "Canal no válido (web o app).");
         }
         TiendaGym tienda = tiendas.asegurar(gymId);
@@ -463,11 +568,7 @@ public class CarritoService {
 
     private JsonNode crear(Contexto c) {
         // metadata viaja al pedido: así Spring sabe de quién es y por dónde compró.
-        // En el mostrador quien abre el carrito es el dueño, no el cliente: el
-        // cliente se pone al cobrar.
-        Map<String, Object> metadata = Pedido.CANAL_MOSTRADOR.equals(c.canal())
-                ? Map.of("vendedorId", c.user().getId(), "gymId", c.gymId(), "canal", c.canal())
-                : Map.of("userId", c.user().getId(), "gymId", c.gymId(), "canal", c.canal());
+        Map<String, Object> metadata = Map.of("userId", c.user().getId(), "gymId", c.gymId(), "canal", c.canal());
         JsonNode cart = medusa.storePost(c.llave(), "/store/carts" + q("fields", "id"), Map.of(
                 "region_id", tiendas.base().regionId(),
                 "email", c.user().getEmail(),

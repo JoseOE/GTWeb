@@ -462,10 +462,7 @@ Respuestas de `/checkout`:
 | Método | Ruta | Uso |
 |---|---|---|
 | POST | `/api/simuladores/stripe/tokens` | Tokenizar una tarjeta de prueba `{numero, titular, mes, anio, cvc}` → `{token, marca, ultimos4, vencimiento}` |
-| GET · DELETE | `/api/gyms/{gymId}/mostrador/carrito` | Ver el ticket del mostrador · cancelar la venta |
-| POST | `/api/gyms/{gymId}/mostrador/carrito/items` | Agregar `{"varianteId", "cantidad"}` |
-| PATCH · DELETE | `/api/gyms/{gymId}/mostrador/carrito/items/{id}` | Cambiar la cantidad · quitar |
-| POST | `/api/gyms/{gymId}/mostrador/cobrar` | Cobrar `{clienteId, metodo, recibido, datos, totalVisto}` → `{pedido, cambio, cliente}` |
+| POST | `/api/gyms/{gymId}/mostrador/cobrar` | Cobrar el ticket `{partidas: [{varianteId, cantidad}], clienteId, metodo, recibido, datos, totalVisto}` → `{pedido, cambio, cliente}` |
 
 **Simulador de Stripe.**
 
@@ -487,7 +484,8 @@ Los rechazos llegan al checkout como 402 con el mensaje para el comprador, y el 
 
 **Mostrador.**
 
-- **El carrito.** Es del dueño (canal `mostrador`) y sobrevive a recargar la página.
+- **El ticket.** Vive en el navegador del panel (y en `localStorage`, así que sobrevive a recargar la página): agregar, cambiar y quitar productos es instantáneo, sin esperar a Medusa, que en el plan gratis de Render tarda segundos en cada viaje.
+- **Al cobrar.** El ticket llega completo. Spring lo revisa contra lo que hoy está a la venta (existencias, precios, un solo plan) y crea el carrito en Medusa de una sola vez. Si algo cambió responde 409 con `avisos`; la página recarga el catálogo y muestra el ticket corregido.
 - **El cliente.** Se elige al cobrar: un miembro del gimnasio (en cualquier estado) o `null` para "Público en general".
 - **Efectivo.** `metodo: "efectivo"` exige `recibido` ≥ total, calcula el cambio y captura el pago al momento (proveedor manual de Medusa).
 - **Tarjeta.** `metodo: "tarjeta"` usa el token del simulador de Stripe como terminal.

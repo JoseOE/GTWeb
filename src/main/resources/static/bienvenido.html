@@ -2390,9 +2390,14 @@
 
         /* ═══════════════════════════════════════
            MOSTRADOR — /api/gyms/{id}/mostrador
+           El ticket vive en el navegador (y en localStorage, para que no se
+           pierda al recargar): agregar, cambiar y quitar no esperan al
+           servidor. Al cobrar se manda completo y Spring lo revisa otra vez.
         ═══════════════════════════════════════ */
+        const MAX_PIEZAS_MOSTRADOR = 20;
         let mostradorCatalogo = [];
-        let mostradorCarrito = null;
+        let mostradorTicket = [];      // [{varianteId, cantidad, precio, nombre}] en el orden en que se agregaron
+        let mostradorCarrito = null;   // el ticket listo para pintar: partidas con nombre y totales
         let mostradorMiembros = [];
         let mostradorCliente = null;
         let mostradorOcupado = false;
@@ -2419,7 +2424,7 @@
                 const grupo = gruposMostrador().find(g => g.clave === tarjeta.dataset.mostradorGrupo);
                 if (!grupo) return;
                 if (grupo.opciones.length === 1) {
-                    operarMostrador('/carrito/items', { method: 'POST', body: JSON.stringify({ varianteId: grupo.opciones[0].variante.id, cantidad: 1 }) });
+                    agregarAlTicket(grupo.opciones[0].variante.id);
                     return;
                 }
                 grupoAbierto = grupo.clave;
@@ -2429,15 +2434,11 @@
             document.getElementById('opciones-cuerpo').addEventListener('click', (e) => {
                 const opcion = e.target.closest('[data-mostrador-variante]');
                 if (!opcion || mostradorOcupado) return;
-                opcion.disabled = true;
-                operarMostrador('/carrito/items', { method: 'POST', body: JSON.stringify({ varianteId: opcion.dataset.mostradorVariante, cantidad: 1 }) })
-                    .then(() => {
-                        const error = document.getElementById('mostrador-error').textContent;
-                        const caja = document.getElementById('opciones-error');
-                        caja.textContent = error;
-                        caja.classList.toggle('d-none', !error);
-                        pintarOpcionesMostrador();
-                    });
+                agregarAlTicket(opcion.dataset.mostradorVariante);
+                const error = document.getElementById('mostrador-error').textContent;
+                const caja = document.getElementById('opciones-error');
+                caja.textContent = error;
+                caja.classList.toggle('d-none', !error);
             });
             document.getElementById('opcionesModal').addEventListener('hidden.bs.modal', () => {
                 grupoAbierto = null;
@@ -2449,16 +2450,18 @@
                 const menos = e.target.closest('[data-m-menos]');
                 const quitar = e.target.closest('[data-m-quitar]');
                 if (mostradorOcupado || (!mas && !menos && !quitar)) return;
-                if (quitar) return operarMostrador('/carrito/items/' + encodeURIComponent(quitar.dataset.mQuitar), { method: 'DELETE' });
-                const id = (mas || menos).dataset.mMas || (mas || menos).dataset.mMenos;
-                const item = mostradorCarrito.items.find(i => i.id === id);
-                operarMostrador('/carrito/items/' + encodeURIComponent(id), { method: 'PATCH', body: JSON.stringify({ cantidad: item.cantidad + (mas ? 1 : -1) }) });
+                if (quitar) return quitarDelTicket(quitar.dataset.mQuitar);
+                if (mas) cambiarEnTicket(mas.dataset.mMas, 1);
+                else cambiarEnTicket(menos.dataset.mMenos, -1);
             });
 
             document.getElementById('mostrador-cancelar').addEventListener('click', () => {
-                if (!mostradorCarrito || !mostradorCarrito.items.length) return;
+                if (mostradorOcupado || !mostradorTicket.length) return;
                 if (!confirm('¿Cancelar esta venta? Se vacía el ticket.')) return;
-                operarMostrador('/carrito', { method: 'DELETE' });
+                mostradorTicket = [];
+                guardarTicket();
+                errorMostrador('');
+                pintarTicket();
             });
 
             // ─── Cliente: un miembro del gimnasio o el público en general ───
@@ -2525,7 +2528,10 @@
                 const metodo = metodoMostrador();
                 const boton = document.getElementById('mostrador-cobrar');
                 errorMostrador('');
-                const cuerpo = { clienteId: mostradorCliente ? mostradorCliente.id : null, metodo, totalVisto: mostradorCarrito.total };
+                const cuerpo = {
+                    partidas: mostradorTicket.map(p => ({ varianteId: p.varianteId, cantidad: p.cantidad })),
+                    clienteId: mostradorCliente ? mostradorCliente.id : null, metodo, totalVisto: mostradorCarrito.total
+                };
                 let preparar;
                 if (metodo === 'efectivo') {
                     const monto = parseFloat(recibido.value);
@@ -2556,13 +2562,17 @@
                         ventaModal.show();
                         recibido.value = '';
                         elegirCliente(null);
-                        loadMostrador(gymId);
+                        mostradorTicket = [];
+                        guardarTicket();
+                        pintarTicket();
+                        loadMostrador(gymId);   // existencias nuevas
                         loadMembers(gymId);
                         loadBilling(gymId);
                     })
                     .catch(err => {
-                        // 409: el carrito cambió (stock, precio). Se muestra corregido.
-                        if (err.datos && err.datos.carrito) pintarTicket(err.datos.carrito, err.datos.avisos);
+                        // 409: algo del ticket cambió (existencias, precio). Se recarga
+                        // el catálogo y el ticket se muestra corregido, con los avisos.
+                        if (err.status === 409) loadMostrador(gymId, err.datos && err.datos.avisos);
                         errorMostrador(err.message);
                     })
                     .finally(() => {
@@ -2607,30 +2617,170 @@
             caja.classList.toggle('d-none', !mensaje);
         }
 
-        function operarMostrador(ruta, opciones) {
-            const gymId = localStorage.getItem('gymId');
-            mostradorOcupado = true;
-            errorMostrador('');
-            return apiTienda('/api/gyms/' + gymId + '/mostrador' + ruta, opciones)
-                .then(c => pintarTicket(c))
-                .catch(err => {
-                    if (err.datos && err.datos.carrito) pintarTicket(err.datos.carrito);
-                    errorMostrador(err.message);
-                })
-                .finally(() => { mostradorOcupado = false; actualizarCobro(); });
+        // ─── El ticket ───
+        function claveTicket() {
+            return 'mostradorTicket:' + (localStorage.getItem('gymId') || '');
         }
 
-        function loadMostrador(gymId) {
+        function guardarTicket() {
+            try { localStorage.setItem(claveTicket(), JSON.stringify(mostradorTicket)); } catch (e) { /* sin almacenamiento: el ticket solo vive en la página */ }
+        }
+
+        function leerTicketGuardado() {
+            try {
+                const guardado = JSON.parse(localStorage.getItem(claveTicket()) || '[]');
+                return Array.isArray(guardado) ? guardado.filter(p => p && p.varianteId && p.cantidad > 0) : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function enCatalogo(varianteId) {
+            for (const producto of mostradorCatalogo) {
+                const variante = producto.variantes.find(v => v.id === varianteId);
+                if (variante) return { producto, variante };
+            }
+            return null;
+        }
+
+        // Cuántas piezas caben de una opción: los planes de uno en uno; los
+        // productos hasta sus existencias (si las controla) y nunca más de 20.
+        function maximoEnTicket(producto, variante) {
+            if (producto.tipo === 'membresia') return 1;
+            return variante.disponible == null ? MAX_PIEZAS_MOSTRADOR : Math.min(variante.disponible, MAX_PIEZAS_MOSTRADOR);
+        }
+
+        // El plan del ticket que extiende la membresía (la inscripción de pago único no cuenta).
+        function planEnTicket() {
+            for (const p of mostradorTicket) {
+                const e = enCatalogo(p.varianteId);
+                if (e && e.producto.tipo === 'membresia' && e.producto.plan && e.producto.plan.duracionUnidad) return e.producto;
+            }
+            return null;
+        }
+
+        function agregarAlTicket(varianteId) {
+            errorMostrador('');
+            const e = enCatalogo(varianteId);
+            if (!e) return errorMostrador('Ese producto ya no está a la venta.');
+            const { producto, variante } = e;
+            const partida = mostradorTicket.find(p => p.varianteId === varianteId);
+            if (producto.tipo === 'membresia') {
+                if (partida) return errorMostrador('«' + producto.nombre + '» ya está en el ticket.');
+                const otro = planEnTicket();
+                if (otro && producto.plan && producto.plan.duracionUnidad) {
+                    return errorMostrador('Solo puede ir un plan por venta. Quita «' + otro.nombre + '» para elegir otro.');
+                }
+            }
+            const cantidad = (partida ? partida.cantidad : 0) + 1;
+            if (cantidad > maximoEnTicket(producto, variante)) return errorMostrador(textoDeTope(producto, variante));
+            if (partida) partida.cantidad = cantidad;
+            else mostradorTicket.push({ varianteId, cantidad, precio: variante.precio, nombre: producto.nombre });
+            guardarTicket();
+            pintarTicket();
+        }
+
+        function cambiarEnTicket(varianteId, cambio) {
+            errorMostrador('');
+            const partida = mostradorTicket.find(p => p.varianteId === varianteId);
+            const e = enCatalogo(varianteId);
+            if (!partida || !e) return;
+            const cantidad = partida.cantidad + cambio;
+            if (cantidad < 1) return;
+            if (cantidad > maximoEnTicket(e.producto, e.variante)) return errorMostrador(textoDeTope(e.producto, e.variante));
+            partida.cantidad = cantidad;
+            guardarTicket();
+            pintarTicket();
+        }
+
+        function quitarDelTicket(varianteId) {
+            errorMostrador('');
+            mostradorTicket = mostradorTicket.filter(p => p.varianteId !== varianteId);
+            guardarTicket();
+            pintarTicket();
+        }
+
+        function textoDeTope(producto, variante) {
+            if (variante.disponible != null && variante.disponible <= MAX_PIEZAS_MOSTRADOR) {
+                return variante.disponible <= 0 ? '«' + producto.nombre + '» se agotó.' : 'Solo hay ' + variante.disponible + ' de «' + producto.nombre + '».';
+            }
+            return 'Puedes vender hasta ' + MAX_PIEZAS_MOSTRADOR + ' piezas de «' + producto.nombre + '» por venta.';
+        }
+
+        // Repasa el ticket contra el catálogo recién cargado: quita lo que ya no
+        // se vende o se agotó, ajusta lo que ya no alcanza y toma los precios
+        // vigentes. Devuelve un aviso por cada cambio.
+        function reconciliarTicket() {
+            const avisos = [];
+            mostradorTicket = mostradorTicket.filter(p => {
+                const e = enCatalogo(p.varianteId);
+                if (!e) {
+                    avisos.push('Quitamos «' + (p.nombre || 'un producto') + '» porque ya no está a la venta.');
+                    return false;
+                }
+                const maximo = maximoEnTicket(e.producto, e.variante);
+                if (maximo <= 0) {
+                    avisos.push('«' + e.producto.nombre + '» se agotó y lo quitamos del ticket.');
+                    return false;
+                }
+                if (p.cantidad > maximo) {
+                    p.cantidad = maximo;
+                    avisos.push('Solo quedan ' + maximo + ' de «' + e.producto.nombre + '»: ajustamos la cantidad.');
+                }
+                if (Math.abs(e.variante.precio - p.precio) > 0.009) {
+                    avisos.push('El precio de «' + e.producto.nombre + '» cambió de ' + dinero(p.precio) + ' a ' + dinero(e.variante.precio) + '.');
+                    p.precio = e.variante.precio;
+                }
+                p.nombre = e.producto.nombre;
+                return true;
+            });
+            guardarTicket();
+            return avisos;
+        }
+
+        // El ticket listo para pintar. Los precios ya incluyen IVA: el total es
+        // la suma de las partidas y el IVA se desglosa de ahí.
+        function armarCarrito() {
+            const centavos = n => Math.round(n * 100) / 100;
+            const items = [];
+            mostradorTicket.forEach(p => {
+                const e = enCatalogo(p.varianteId);
+                if (!e) return;
+                const esPlan = e.producto.tipo === 'membresia';
+                items.push({
+                    id: p.varianteId,
+                    varianteId: p.varianteId,
+                    titulo: e.producto.nombre,
+                    variante: esPlan ? (e.producto.plan ? e.producto.plan.duracionTexto : '') : (e.variante.nombre === 'Única' ? '' : e.variante.nombre),
+                    esPlan,
+                    cantidad: p.cantidad,
+                    maximo: maximoEnTicket(e.producto, e.variante),
+                    precioUnitario: p.precio,
+                    total: centavos(p.precio * p.cantidad)
+                });
+            });
+            const total = centavos(items.reduce((suma, i) => suma + i.total, 0));
+            const iva = centavos(total - total / 1.16);
+            mostradorCarrito = { items, total, iva, subtotal: centavos(total - iva) };
+        }
+
+        // avisosDelServidor: los del 409 al cobrar, si el catálogo recargado no
+        // explica por sí solo qué cambió.
+        function loadMostrador(gymId, avisosDelServidor) {
             const catalogo = document.getElementById('mostrador-catalogo');
             if (!gymId) {
                 catalogo.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-store fs-1 d-block mb-2 opacity-50"></i>Configura primero "Mi Gimnasio" para vender en mostrador.</div>';
                 return;
             }
+            mostradorTicket = leerTicketGuardado();
             estadoCargando(catalogo, 'Cargando productos…');
             apiTienda('/api/tienda/' + gymId + '/productos')
-                .then(lista => { mostradorCatalogo = lista; pintarCatalogoMostrador(); })
+                .then(lista => {
+                    mostradorCatalogo = lista;
+                    const avisos = reconciliarTicket();
+                    pintarTicket(avisos.length ? avisos : avisosDelServidor);
+                })
                 .catch(err => estadoError(catalogo, err.message, () => loadMostrador(gymId)));
-            apiTienda('/api/gyms/' + gymId + '/mostrador/carrito').then(c => pintarTicket(c)).catch(() => {});
             fetch('/api/gyms/' + gymId + '/members').then(r => r.json()).then(m => { mostradorMiembros = m; }).catch(() => {});
         }
 
@@ -2753,9 +2903,10 @@
                 </div>`).join('');
         }
 
-        function pintarTicket(c, avisos) {
-            mostradorCarrito = c;
-            const lista = (avisos || c.avisos || []);
+        function pintarTicket(avisos) {
+            armarCarrito();
+            const c = mostradorCarrito;
+            const lista = avisos || [];
             document.getElementById('mostrador-avisos').innerHTML = lista.length
                 ? '<div class="alert alert-warning small py-2 mb-0">' + lista.map(escapeHtml).join('<br>') + '</div>' : '';
             const partidas = document.getElementById('mostrador-partidas');
