@@ -130,7 +130,7 @@ public class EscaparateService {
         Double desde = null;
         boolean todoAgotado = true;
         List<JsonNode> ordenadas = StreamSupport.stream(p.path("variants").spliterator(), false)
-                .sorted(Comparator.comparing(x -> x.path("created_at").asText("")))
+                .sorted(CatalogoService.EN_ORDEN)
                 .toList();
         for (JsonNode var : ordenadas) {
             double precio = precio(var);

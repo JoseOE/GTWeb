@@ -32,7 +32,7 @@ import static com.gymtrack.service.TiendaGymService.TIPO_PRODUCTO;
 // Cómo se guarda en Medusa:
 //  - Producto de tipo "producto" o "membresia", en el canal de venta del gimnasio.
 //  - Una sola opción, "Variante", cuyo valor es la etiqueta de cada variante
-//    ("Bote 2 lb · Vainilla"). La presentación y el sabor van por separado en
+//    ("Bote 1 kg · Vainilla"). La presentación y el sabor van por separado en
 //    el metadata de la variante para que la tienda pueda armar sus selectores.
 //  - Precio en MXN con IVA incluido (la región México es tax-inclusive).
 //  - Stock en el almacén del gimnasio. "No controlar inventario" (scoops,
@@ -51,7 +51,7 @@ public class CatalogoService {
             "sales_channels.id",
             "options.id", "options.title", "options.values.id", "options.values.value",
             "variants.id", "variants.title", "variants.manage_inventory", "variants.metadata",
-            "variants.created_at", "variants.prices.amount", "variants.prices.currency_code",
+            "variants.created_at", "variants.variant_rank", "variants.prices.amount", "variants.prices.currency_code",
             "variants.inventory_items.inventory_item_id",
             "variants.inventory_items.inventory.location_levels.location_id",
             "variants.inventory_items.inventory.location_levels.stocked_quantity",
@@ -90,7 +90,7 @@ public class CatalogoService {
         cuerpo.put("sales_channels", List.of(Map.of("id", t.getSalesChannelId())));
         cuerpo.put("shipping_profile_id", base.perfilDeEnvioId());
         cuerpo.put("options", List.of(Map.of("title", OPCION, "values", variantes.stream().map(VarianteLimpia::etiqueta).toList())));
-        cuerpo.put("variants", variantes.stream().map(v -> datosDeVariante(v, null)).toList());
+        cuerpo.put("variants", variantes.stream().map(v -> datosDeVariante(v, null, variantes.indexOf(v))).toList());
 
         JsonNode creado = medusa.adminPost("/admin/products" + q("fields", "id"), cuerpo).path("product");
         String id = creado.path("id").asText();
@@ -127,10 +127,10 @@ public class CatalogoService {
         Set<String> conservadas = new HashSet<>();
         for (VarianteLimpia v : variantes) {
             if (v.id() != null && idsExistentes.contains(v.id())) {
-                actualizar.add(datosDeVariante(v, v.id()));
+                actualizar.add(datosDeVariante(v, v.id(), variantes.indexOf(v)));
                 conservadas.add(v.id());
             } else {
-                crear.add(datosDeVariante(v, null));
+                crear.add(datosDeVariante(v, null, variantes.indexOf(v)));
             }
         }
         List<String> borrar = idsExistentes.stream().filter(id -> !conservadas.contains(id)).toList();
@@ -377,10 +377,14 @@ public class CatalogoService {
         return (base.isEmpty() ? "producto" : base) + "-" + UUID.randomUUID().toString().substring(0, 8);
     }
 
-    private Map<String, Object> datosDeVariante(VarianteLimpia v, String id) {
+    // rango = posición en la que el dueño capturó la presentación: así la tienda
+    // y el mostrador las muestran en ese orden (500 ml, 1 L, 2 L) y no en el
+    // orden en que se fueron creando.
+    private Map<String, Object> datosDeVariante(VarianteLimpia v, String id, int rango) {
         Map<String, Object> d = new HashMap<>();
         if (id != null) d.put("id", id);
         d.put("title", v.etiqueta());
+        d.put("variant_rank", rango);
         d.put("manage_inventory", v.controlar());
         d.put("options", Map.of(OPCION, v.etiqueta()));
         d.put("prices", List.of(Map.of("currency_code", MONEDA, "amount", v.precio())));
@@ -454,9 +458,15 @@ public class CatalogoService {
 
     private static List<JsonNode> ordenadas(JsonNode variantes) {
         return StreamSupport.stream(variantes.spliterator(), false)
-                .sorted(Comparator.comparing(v -> v.path("created_at").asText("")))
+                .sorted(EN_ORDEN)
                 .toList();
     }
+
+    // Orden en que el dueño capturó las presentaciones; las de antes de guardar
+    // ese orden (todas con rango 0) quedan por fecha de creación.
+    static final Comparator<JsonNode> EN_ORDEN = Comparator
+            .comparingInt((JsonNode v) -> v.path("variant_rank").asInt(0))
+            .thenComparing(v -> v.path("created_at").asText(""));
 
     private static String texto(JsonNode n) {
         return n.isMissingNode() || n.isNull() || n.asText().isBlank() ? null : n.asText();
