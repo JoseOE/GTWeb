@@ -4,6 +4,7 @@ import com.gymtrack.model.Gym;
 import com.gymtrack.model.User;
 import com.gymtrack.repository.GymRepository;
 import com.gymtrack.repository.UserRepository;
+import com.gymtrack.service.AccesoService;
 import com.gymtrack.util.JoinCodeUtil;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,17 +29,26 @@ public class GymController {
     }
 
     // POST /api/gyms → Crea el gimnasio y lo vincula al usuario que lo administra
+    // El dueño es quien tiene la sesión: el ownerUserId del cuerpo se acepta solo
+    // si es el mismo (la página lo sigue mandando).
     @PostMapping
-    public ResponseEntity<?> crearGimnasio(@RequestBody GymRequest request) {
-        if (request.getOwnerUserId() == null || request.getOwnerUserId().isBlank()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Falta el usuario dueño del gimnasio."));
+    public ResponseEntity<?> crearGimnasio(@RequestBody GymRequest request,
+                                           @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String sesion) {
+        if (sesion == null || sesion.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Inicia sesión para continuar."));
         }
-        Optional<User> ownerOpt = userRepository.findById(request.getOwnerUserId());
+        if (request.getOwnerUserId() != null && !request.getOwnerUserId().isBlank() && !request.getOwnerUserId().equals(sesion)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Solo puedes configurar tu propio gimnasio."));
+        }
+        Optional<User> ownerOpt = userRepository.findById(sesion);
         if (ownerOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Usuario no encontrado."));
         }
 
         User owner = ownerOpt.get();
+        if (!"owner".equals(owner.getRole())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Solo una cuenta de dueño puede registrar un gimnasio."));
+        }
         Gym gym;
         if (owner.getGymId() != null && gymRepository.existsById(owner.getGymId())) {
             // El usuario ya tiene un gimnasio: se actualiza en lugar de duplicarlo
@@ -101,11 +111,30 @@ public class GymController {
     }
 
     // GET /api/gyms/{id} → Obtener un gimnasio por ID
+    // El dueño recibe todo (código de acceso incluido); cualquier otro, solo lo
+    // que el gimnasio muestra al público: ni el código, ni quién es el dueño, ni
+    // los datos internos de su tienda.
     @GetMapping("/{id}")
-    public ResponseEntity<?> obtenerGimnasio(@PathVariable String id) {
+    public ResponseEntity<?> obtenerGimnasio(@PathVariable String id,
+                                             @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
         return gymRepository.findById(id)
-                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .<ResponseEntity<?>>map(gym -> ResponseEntity.ok(userId != null && userId.equals(gym.getOwnerId()) ? gym : vistaPublica(gym)))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Gimnasio no encontrado.")));
+    }
+
+    private static Map<String, Object> vistaPublica(Gym gym) {
+        Map<String, Object> v = new LinkedHashMap<>();
+        v.put("id", gym.getId());
+        v.put("nombre", gym.getNombre());
+        v.put("telefono", gym.getTelefono());
+        v.put("direccion", gym.getDireccion());
+        v.put("horario", gym.getHorario());
+        v.put("equipamiento", gym.getEquipamiento());
+        v.put("maquinas", gym.getMaquinas());
+        v.put("logo", gym.getLogo());
+        v.put("colorPrimario", gym.getColorPrimario());
+        v.put("cuotaMensual", gym.getCuotaMensual());
+        return v;
     }
 
     // POST /api/gyms/{id}/codigo → genera un código nuevo e invalida el anterior

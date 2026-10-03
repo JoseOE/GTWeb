@@ -8,20 +8,26 @@ La **página web** es la herramienta principal para los dueños de los gimnasios
 
 El sistema busca centralizar los principales procesos del gimnasio en un único ecosistema tecnológico, conectando la administración web, el control de acceso IoT y la experiencia deportiva móvil del usuario.
 
-> **Este repositorio contiene solo la página web:** el backend en Java Spring Boot, que expone la API REST y a la vez sirve la página (HTML, CSS y JavaScript). La aplicación móvil consume esta misma API y se trabaja en un repositorio aparte.
+> **Este repositorio contiene solo la página web:** el backend en Java Spring Boot, que expone la API REST y a la vez sirve la página (HTML, CSS y JavaScript). La aplicación móvil consume esta misma API y se trabaja en un repositorio aparte ([GTApp](https://github.com/JoseOE/GTApp)).
 
-🌐 **Página publicada:** **https://joseoe.github.io/GTWeb/**
+🌐 **Página y API publicadas (Render):** **https://gtweb.onrender.com**
 
-GitHub Pages solo sirve archivos estáticos, así que ahí funcionan la página principal, el formulario de contacto, el mapa y los enlaces de WhatsApp. El catálogo de soluciones, el registro, el inicio de sesión y el panel necesitan el backend, que por ahora se ejecuta en local (ver [Ejecución local paso a paso](#-ejecución-local-paso-a-paso)).
+Ahí funciona todo: la página principal, el catálogo, el registro, el inicio de sesión, el panel y la API que usa la app móvil (ver [Despliegue](#-despliegue)).
+
+📄 **Versión estática (GitHub Pages):** https://joseoe.github.io/GTWeb/
+
+GitHub Pages solo sirve archivos estáticos, así que ahí funcionan la página principal, el formulario de contacto, el mapa y los enlaces de WhatsApp. El catálogo de soluciones, el registro, el inicio de sesión y el panel necesitan el backend: úsalos desde Render o en local (ver [Ejecución local paso a paso](#-ejecución-local-paso-a-paso)).
 
 ## Contenido
 
 - [La página web](#-la-página-web)
 - [Ejecución local paso a paso](#-ejecución-local-paso-a-paso)
 - [Variables de entorno](#-variables-de-entorno)
+- [Despliegue](#-despliegue)
 - [Problemas comunes](#-problemas-comunes)
 - [Estructura del proyecto](#-estructura-del-proyecto)
-- [API que usa la página](#-api-que-usa-la-página)
+- [API](#-api)
+- [Seguridad y sesiones](#-seguridad-y-sesiones)
 - [Correos de la cuenta](#-correos-de-la-cuenta)
 - [Tienda](#-tienda)
 - [Contexto del proyecto](#problemática)
@@ -94,11 +100,11 @@ Después abre `.env` y rellena los valores (ver [Variables de entorno](#-variabl
 
 ```properties
 MONGODB_URI=mongodb+srv://<usuario>:<contraseña>@<cluster>.mongodb.net/gymtrackdb?retryWrites=true&w=majority
+BREVO_API_KEY=<api key de Brevo>
 MAIL_USERNAME=<correo>@gmail.com
-MAIL_PASSWORD=<contraseña de aplicación>
 ```
 
-> `.env` está en `.gitignore`: nunca se sube a GitHub. Pide los datos de MongoDB Atlas y del Gmail de GymTrack al equipo.
+> `.env` está en `.gitignore`: nunca se sube a GitHub. Pide al equipo los datos de MongoDB Atlas y de la cuenta de Brevo de GymTrack.
 
 ### 4. Levantar la página
 
@@ -153,11 +159,34 @@ Y abre http://localhost:5500. **Ojo:** así no funcionan el catálogo, el regist
 | Variable | ¿Obligatoria? | Para qué sirve |
 |---|---|---|
 | `MONGODB_URI` | **Sí** | Conexión a MongoDB Atlas (usuario, contraseña y cluster). |
-| `MAIL_USERNAME` | No* | Gmail de GymTrack que envía los correos de la cuenta. |
-| `MAIL_PASSWORD` | No* | **Contraseña de aplicación** de ese Gmail (16 letras, no la contraseña normal). Se crea en https://myaccount.google.com/apppasswords con la verificación en dos pasos activada. Puede pegarse con o sin espacios. |
-| `APP_URL` | No | Dirección con la que se arman los enlaces de los correos. Por defecto `http://localhost:8080`; cámbiala al publicar la página. |
+| `BREVO_API_KEY` | No* | Llave de la API de Brevo, que envía los correos de la cuenta. Se genera en Brevo → **SMTP & API → API Keys**. |
+| `MAIL_USERNAME` | No* | Correo remitente. Debe estar verificado en Brevo → **Senders, Domains & Dedicated IPs**. |
+| `APP_URL` | No | Dirección con la que se arman los enlaces de los correos. Por defecto `http://localhost:8080`; en Render debe ser `https://gtweb.onrender.com`. |
+| `PORT` | No | Puerto del servidor. Por defecto `8080`; Render lo asigna solo. |
+| `EXIGIR_TOKEN` | No | `true` para que toda la API exija el token de sesión. Por defecto `false` mientras la app móvil se actualiza (ver [Seguridad y sesiones](#-seguridad-y-sesiones)). |
 
-\* Sin `MAIL_USERNAME` la página funciona igual: los códigos de verificación y los enlaces de recuperación se escriben en la consola en lugar de enviarse.
+\* Sin `BREVO_API_KEY` y `MAIL_USERNAME` la página funciona igual: los códigos de verificación y los enlaces de recuperación se escriben en la consola en lugar de enviarse.
+
+> Los correos salen por la API HTTP de Brevo y no por SMTP porque Render bloquea los puertos SMTP salientes en todos sus planes.
+
+---
+
+## 🚢 Despliegue
+
+| Qué | Dónde | Cómo se publica |
+|---|---|---|
+| Página completa + API | [Render](https://gtweb.onrender.com) | Imagen de Docker construida con el `Dockerfile` del repositorio (Maven compila el jar y la imagen final solo lleva el JRE 17). Las variables de entorno se definen en el panel de Render. |
+| Página estática | [GitHub Pages](https://joseoe.github.io/GTWeb/) | El workflow `.github/workflows/deploy-pages.yml` publica `src/main/resources/static` cada vez que llegan cambios a esa carpeta en `main`. |
+
+Para probar la imagen de Docker en local:
+
+```bash
+docker build -t gtweb .
+```
+
+```bash
+docker run --env-file .env -p 8080:8080 gtweb
+```
 
 ---
 
@@ -169,7 +198,7 @@ Y abre http://localhost:5500. **Ojo:** así no funcionan el catálogo, el regist
 | El catálogo dice "no está disponible" o la consola muestra *timeout* con MongoDB | Revisa tu conexión y que tu IP esté permitida en MongoDB Atlas → **Network Access**. |
 | `Port 8080 was already in use` | Cierra el otro programa que usa el puerto o [cambia el puerto](#opcional-cambiar-el-puerto). |
 | `mvn` no se reconoce como comando | Maven no está instalado o su carpeta `bin` no está en el `PATH`. |
-| No llega el código de verificación | Revisa spam. Confirma que `MAIL_PASSWORD` sea una contraseña de aplicación. La consola indica si el correo no se pudo enviar. |
+| No llega el código de verificación | Revisa spam. Confirma que `BREVO_API_KEY` sea válida y que `MAIL_USERNAME` esté verificado como remitente en Brevo. La consola indica si el correo no se pudo enviar. |
 | El botón del correo abre `localhost` y no carga | Es normal en local: los enlaces apuntan a la computadora donde corre la página. En otro equipo usa el código de 6 dígitos. |
 | Cambié HTML/CSS/JS y no se ve el cambio | Detén el servidor (Ctrl + C), vuelve a ejecutarlo y recarga con Ctrl + F5. |
 
@@ -181,10 +210,12 @@ Y abre http://localhost:5500. **Ojo:** así no funcionan el catálogo, el regist
 GTWeb/
 ├── pom.xml                       # Dependencias y build (Maven)
 ├── .env.example                  # Plantilla de variables (copiar como .env)
+├── Dockerfile                    # Imagen para desplegar en Render
+├── .github/workflows/            # Publicación de la parte estática en GitHub Pages
 └── src/main/
     ├── java/com/gymtrack/
     │   ├── GymTrackApplication.java   # Arranque y datos iniciales del catálogo
-    │   ├── config/                    # CORS para la app y cliente de correo
+    │   ├── config/                    # CORS para la app móvil
     │   ├── controller/                # Endpoints REST (/api/...)
     │   ├── model/                     # Documentos de MongoDB
     │   ├── repository/                # Acceso a MongoDB (Spring Data)
@@ -202,27 +233,91 @@ GTWeb/
 
 ---
 
-## 🔌 API que usa la página
+## 🔌 API
+
+### Cuenta (página y app)
 
 | Método | Ruta | Uso |
 |---|---|---|
-| GET | `/api/servicios` | Catálogo de soluciones |
-| POST | `/api/users/register` | Crear cuenta |
-| POST | `/api/users/login` | Iniciar sesión |
-| GET | `/api/users/{id}/me` | Datos de la cuenta |
+| GET | `/api/servicios` · `/api/servicios/{id}` | Catálogo de soluciones |
+| POST | `/api/users/register` | Crear cuenta (dueño desde la página; miembro desde la app con `role: "member"`) |
+| POST | `/api/users/login` | Iniciar sesión → la cuenta y su `token` de sesión |
+| POST | `/api/users/logout` | Cerrar la sesión del token que llega (`Authorization: Bearer`) |
+| GET | `/api/users/{id}/me` | Estado vigente de la cuenta y su gimnasio |
 | POST | `/api/cuenta/verificar` · `/api/cuenta/verificar/reenviar` | Verificar el correo · pedir otro código |
 | POST | `/api/cuenta/recuperar` · `/api/cuenta/restablecer` | Enlace de recuperación · guardar contraseña nueva |
 | POST | `/api/cuenta/contrasena` | Cambiar contraseña (Mi cuenta) |
 | POST | `/api/cuenta/correo` · `/api/cuenta/correo/confirmar` | Cambiar correo con código |
-| GET/POST | `/api/gyms`, `/api/gyms/{gymId}/members`, `/api/gyms/{gymId}/machines`, `/api/gyms/{gymId}/routines` | Panel del gimnasio |
-| GET/POST | `/api/gyms/{gymId}/members/{userId}/payments` | Pagos de cada miembro |
-| POST | `/api/billing/run` | Revisar vencimientos ahora (también corre sola todos los días a las 6:00) |
+
+### Panel del gimnasio (página)
+
+| Método | Ruta | Uso |
+|---|---|---|
+| POST · GET | `/api/gyms` · `/api/gyms/{id}` | Registrar y consultar el gimnasio |
+| POST | `/api/gyms/{id}/codigo` | Generar un código de invitación nuevo (invalida el anterior) |
+| GET · POST | `/api/gyms/{gymId}/members` | Miembros y solicitudes; alta directa desde recepción |
+| PATCH · DELETE | `/api/gyms/{gymId}/members/{userId}` | Aprobar, dar de baja o reactivar · desvincular |
+| GET · POST | `/api/gyms/{gymId}/members/{userId}/payments` | Pagos de cada miembro |
+| GET · POST | `/api/gyms/{gymId}/machines` · PUT · DELETE `/api/machines/{id}` | Máquinas del gimnasio |
+| GET · POST | `/api/gyms/{gymId}/routines` · PUT · DELETE `/api/routines/{id}` | Rutinas del gimnasio |
+
+### App móvil
+
+| Método | Ruta | Uso |
+|---|---|---|
+| GET | `/api/gyms/directory` | Gimnasios que aceptaron aparecer en la app |
+| GET | `/api/gyms/lookup?codigo=...` | Vista previa del gimnasio antes de unirse |
+| POST | `/api/users/{userId}/membership/join` · `/leave` | Solicitar unirse con el código · salirse del gimnasio |
+| PUT | `/api/users/{id}/push-token` | Registrar el token de Expo para las notificaciones push |
+| GET | `/api/users/{userId}/routines` · `/api/users/{userId}/machines` | Rutinas y máquinas de su gimnasio |
+| GET · POST · DELETE | `/api/users/{userId}/workouts` · `/{workoutId}` | Historial y registro de entrenamientos |
+| GET | `/api/users/{userId}/workouts/stats` | Estadísticas de la pestaña Progreso |
+
+Las notificaciones push (solicitud aprobada, pago por vencer, membresía vencida) se envían por el servicio de push de Expo.
+
+---
+
+## 🔐 Seguridad y sesiones
+
+- **La sesión.**
+  - `POST /api/users/login` y `POST /api/cuenta/verificar` devuelven un `token` al azar, que vale 30 días.
+  - La página lo guarda (`js/sesion.js`) y lo manda en cada llamada a `/api/` como `Authorization: Bearer <token>`.
+  - En la base solo queda su huella SHA-256 (colección `sesiones`). Quien lea la base no puede usar las sesiones.
+- **La identidad sale del token, no del cliente.** Con token, el servidor llena él mismo el `X-User-Id` que usan las rutas. Si la página manda otro, responde 403.
+- **Quién puede qué.** `SesionFilter` revisa, además de la sesión:
+  - que el gimnasio de la ruta sea del dueño que llama (miembros, pagos, código, rutinas, máquinas, productos, planes, mostrador y ventas);
+  - que cada cuenta (`/api/users/{id}/...`) sea de quien llama.
+
+  La tienda, los recibos y los simuladores lo revisan en `AccesoService`.
+- **Al cerrar o cambiar la contraseña.**
+  - "Cerrar sesión" invalida el token en el servidor.
+  - Restablecer la contraseña cierra todas las sesiones de la cuenta.
+  - Cambiarla desde "Mi cuenta" cierra las demás y deja abierta la actual.
+- **Al verificar el correo** se entra directo al panel: verificar demuestra que el correo es suyo.
+- **Al registrarse** solo se aceptan nombre, correo, contraseña y `role`. Lo demás (fecha de corte, plan, gimnasio) nunca viene del cliente.
+- **El detalle de un gimnasio.** `GET /api/gyms/{id}` le da todo a su dueño. A cualquier otro le da solo lo público, sin el código de acceso ni los datos internos de la tienda.
+
+**Transición de la app móvil.**
+
+- Mientras la app no mande el token, `EXIGIR_TOKEN=false` deja que las rutas que comparte con la página sigan aceptando el `X-User-Id` de siempre.
+- Las rutas que solo usa el panel exigen token desde ya:
+  - gimnasio y su código;
+  - miembros y alta de pagos;
+  - rutinas y máquinas (crear, editar, borrar);
+  - productos, planes y mostrador;
+  - ventas y "Simular pago en tienda".
+- Para terminar la transición, la app debe:
+  1. guardar el `token` que devuelven `/api/users/login` y `/api/users/register` (los miembros entran directo);
+  2. mandarlo en cada llamada (`Authorization: Bearer <token>`) y llamar a `/api/users/logout` al salir;
+  3. con eso publicado, poner `EXIGIR_TOKEN=true` en Render.
+
+  Hasta entonces, las rutas de la app siguen tan abiertas como antes.
 
 ---
 
 ## 📧 Correos de la cuenta
 
-Se envían por el SMTP de Gmail con plantillas HTML (Thymeleaf). Los códigos se guardan cifrados en MongoDB Atlas y se borran solos al vencer.
+Se envían por la API HTTP de Brevo con plantillas HTML (Thymeleaf). Los códigos se guardan cifrados en MongoDB Atlas y se borran solos al vencer.
 
 | Correo | Cuándo llega |
 |---|---|
@@ -900,10 +995,13 @@ La comunicación entre el dispositivo IoT y los servicios backend utilizará pro
 |---|---|
 | Java 17 + Spring Boot 3.2 | API REST y servidor de la página |
 | MongoDB Atlas + Spring Data MongoDB | Base de datos NoSQL en la nube |
-| Spring Boot Mail (SMTP de Gmail) + Thymeleaf | Correos de la cuenta con plantillas HTML |
+| API de Brevo + Thymeleaf | Correos de la cuenta con plantillas HTML |
 | BCrypt (spring-security-crypto) | Cifrado de contraseñas |
 | Medusa v2 + PostgreSQL (Neon) | Motor de la tienda de cada gimnasio (segundo servicio en Render) |
 | iText Core 9 (kernel, layout, barcodes) | Recibos, tickets de 80 mm y fichas Paynet en PDF, con QR y código de barras (licencia AGPL) |
+| Expo Push | Notificaciones push a la app móvil |
+| Docker + Render | Publicación de la página y la API |
+| GitHub Actions + GitHub Pages | Publicación de la parte estática |
 
 **Aplicación móvil** (repositorio aparte)
 
@@ -941,12 +1039,18 @@ Fase 2 — Plataforma Web & Backend
 - [x] Reemplazar SHA-256 por BCrypt en las contraseñas.
 - [ ] Implementar sesiones seguras con tokens (JWT).
 - [x] Publicar la parte estática de la página en GitHub Pages.
-- [ ] Publicar la API en un hosting para que el catálogo, el registro y el panel también funcionen en línea.
+- [x] Publicar la página y la API en Render (Docker) para que el catálogo, el registro y el panel también funcionen en línea.
+- [x] Enviar los correos por la API de Brevo (Render bloquea SMTP).
 
 Fase 3 — Aplicación Móvil (Usuarios)
 - [x] Crear proyecto base en Expo.
 - [x] Diseñar pantallas clave (Auth, Tabs principales: Progreso, Rutinas, Entrenar).
 - [x] Implementar capa de API y conectar `fetch` hacia el backend en Spring Boot.
+- [x] Unirse a un gimnasio con código de invitación y directorio de gimnasios.
+- [x] Registro de entrenamientos, progreso e historial con datos reales.
+- [x] Notificaciones push de la membresía (Expo).
+- [x] Conectar la app al backend publicado en Render.
+- [ ] Pantalla de verificación de correo en la app.
 - [ ] Mejorar el manejo de la sesión persistente y seguridad (Tokens).
 
 Fase 4 — IoT (Control de Acceso)
@@ -977,18 +1081,18 @@ Fase 5 — Integración e Investigación
 # 📌 Estado del proyecto
 Estado: 🚧 En desarrollo activo
 
-La página web funciona completa en local:
+La página web está publicada completa en Render (https://gtweb.onrender.com):
 - página principal;
 - catálogo conectado a MongoDB Atlas;
 - contacto;
 - registro con verificación por correo;
 - inicio de sesión;
 - panel del gimnasio;
-- correos de la cuenta.
+- correos de la cuenta (Brevo).
 
-La aplicación móvil ya consume la misma API en un ambiente local. Faltan tres cosas:
-- publicar la página y la API en un hosting;
+La aplicación móvil consume por defecto la misma API publicada en Render. Faltan tres cosas:
 - implementar sesiones con tokens (JWT);
+- agregar la verificación de correo en la app;
 - integrar la capa de hardware IoT.
 
 ```plaintext
@@ -1061,6 +1165,19 @@ Cada integrante trabaja en su propia rama:
 | Valeria | Mensaje de WhatsApp | [#8](https://github.com/JoseOE/GTWeb/pull/8) |
 
 **Fuera de sprint:** panel del gimnasio y API de la app móvil ([#9](https://github.com/JoseOE/GTWeb/pull/9)).
+
+**Después del Sprint 2**
+
+| Integrante | Cambio | PR |
+|---|---|---|
+| José | README con la ejecución local de la página web | [#12](https://github.com/JoseOE/GTWeb/pull/12) |
+| José | Publicación de la página en GitHub Pages | [#13](https://github.com/JoseOE/GTWeb/pull/13) |
+| Edwin | Corrección de la ruta del mapa hacia las oficinas | [#14](https://github.com/JoseOE/GTWeb/pull/14) |
+| Yael | La ruta al gimnasio se traza sola y el panel de indicaciones se ve a su tamaño | [#15](https://github.com/JoseOE/GTWeb/pull/15) |
+| José | Sección "Nosotros" ampliada con el origen y la misión | [#16](https://github.com/JoseOE/GTWeb/pull/16), [#17](https://github.com/JoseOE/GTWeb/pull/17) |
+| Yael | Plantilla de EmailJS y confirmación animada del formulario de contacto | [#18](https://github.com/JoseOE/GTWeb/pull/18), [#19](https://github.com/JoseOE/GTWeb/pull/19) |
+| Edwin | Dockerfile para desplegar en Render y puerto configurable | [#20](https://github.com/JoseOE/GTWeb/pull/20) |
+| Valeria | Envío de correos por la API de Brevo en lugar de SMTP | [#21](https://github.com/JoseOE/GTWeb/pull/21) |
 
 🏋️ GymTrack
 Administra. Identifica. Accede. Entrena. Analiza. Mejora.
