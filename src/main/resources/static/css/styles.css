@@ -373,8 +373,7 @@ footer.bg-dark::before {
     background: linear-gradient(90deg, var(--brand), var(--brand-light), var(--glow-2));
 }
 .auth-icon-circle {
-    background: linear-gradient(145deg, rgba(var(--brand-rgb), 0.18), rgba(var(--brand-rgb), 0.05));
-    box-shadow: 0 10px 24px -10px rgba(var(--brand-rgb), 0.5);
+    background: rgba(var(--brand-rgb), 0.12);
 }
 .input-group-text {
     background-color: #f5f6f8 !important;
