@@ -6,6 +6,7 @@ import com.gymtrack.repository.GymRepository;
 import com.gymtrack.repository.UserRepository;
 import com.gymtrack.service.CorreoService;
 import com.gymtrack.service.CuentaService;
+import com.gymtrack.service.SesionService;
 import com.gymtrack.util.PasswordUtil;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,41 +25,49 @@ public class UserController {
     private final GymRepository gymRepository;
     private final CuentaService cuentaService;
     private final CorreoService correoService;
+    private final SesionService sesiones;
 
     public UserController(UserRepository userRepository, GymRepository gymRepository,
-                          CuentaService cuentaService, CorreoService correoService) {
+                          CuentaService cuentaService, CorreoService correoService, SesionService sesiones) {
         this.userRepository = userRepository;
         this.gymRepository = gymRepository;
         this.cuentaService = cuentaService;
         this.correoService = correoService;
+        this.sesiones = sesiones;
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> registerUser(@RequestBody User user) {
-        if (user.getEmail() == null || user.getEmail().isBlank()
-                || user.getPassword() == null || user.getPassword().isBlank()
-                || user.getNombre() == null || user.getNombre().isBlank()) {
+    public ResponseEntity<?> registerUser(@RequestBody RegistroRequest request) {
+        if (request.getEmail() == null || request.getEmail().isBlank()
+                || request.getPassword() == null || request.getPassword().isBlank()
+                || request.getNombre() == null || request.getNombre().isBlank()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Nombre, correo y contraseña son obligatorios."));
         }
-        if (userRepository.findByEmail(user.getEmail()).isPresent()) {
+        if (userRepository.findByEmail(request.getEmail().trim()).isPresent()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "El email ya está registrado."));
         }
 
+        // La cuenta se arma solo con nombre, correo y contraseña: nada de lo
+        // demás (fecha de corte, plan, gimnasio, estado) puede venir del cliente.
+        User user = new User();
+        user.setNombre(request.getNombre().trim());
+        user.setEmail(request.getEmail().trim());
         // La app móvil manda role="member" (usuario que se registra por su cuenta);
         // el registro del panel web no manda nada y crea un dueño de gimnasio.
-        boolean esMiembro = "member".equals(user.getRole());
+        boolean esMiembro = "member".equals(request.getRole());
         user.setRole(esMiembro ? "member" : "owner");
         user.setGymId(null);
         user.setMembershipStatus(User.STATUS_NONE);
         // Las cuentas de la página web confirman su correo antes de entrar. La app
         // todavía no tiene pantalla de verificación: sus miembros entran directo.
         user.setEmailVerificado(esMiembro ? null : false);
-        user.setPassword(PasswordUtil.hash(user.getPassword()));
+        user.setPassword(PasswordUtil.hash(request.getPassword()));
         userRepository.save(user);
 
         Map<String, Object> view = accountView(user, "Usuario registrado exitosamente");
         if (esMiembro) {
             correoService.bienvenida(user);
+            view.put("token", sesiones.abrir(user.getId()));
         } else {
             view.put("verificacionPendiente", true);
             view.put("correoEnviado", cuentaService.enviarCodigoDeVerificacion(user));
@@ -85,10 +94,22 @@ public class UserController {
                     pendiente.put("email", user.getEmail());
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).body(pendiente);
                 }
-                return ResponseEntity.ok(accountView(user, "Login exitoso"));
+                Map<String, Object> view = accountView(user, "Login exitoso");
+                // La sesión: la página la manda en cada llamada (Authorization: Bearer).
+                view.put("token", sesiones.abrir(user.getId()));
+                return ResponseEntity.ok(view);
             }
         }
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Credenciales incorrectas."));
+    }
+
+    // Cierra la sesión del token que llega. Sin token no hay nada que cerrar.
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@RequestHeader(value = "Authorization", required = false) String autorizacion) {
+        if (autorizacion != null && autorizacion.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            sesiones.cerrar(autorizacion.substring(7));
+        }
+        return ResponseEntity.ok(Map.of("message", "Sesión cerrada."));
     }
 
     // PUT /api/users/{id}/push-token → la app registra aquí el token de Expo del
@@ -160,5 +181,25 @@ public class UserController {
         }
         view.put("gym", gymView);
         return view;
+    }
+
+    // Lo único que se acepta al crear una cuenta; cualquier otro campo se ignora.
+    public static class RegistroRequest {
+        private String nombre;
+        private String email;
+        private String password;
+        private String role;
+
+        public String getNombre() { return nombre; }
+        public void setNombre(String nombre) { this.nombre = nombre; }
+
+        public String getEmail() { return email; }
+        public void setEmail(String email) { this.email = email; }
+
+        public String getPassword() { return password; }
+        public void setPassword(String password) { this.password = password; }
+
+        public String getRole() { return role; }
+        public void setRole(String role) { this.role = role; }
     }
 }

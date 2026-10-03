@@ -27,11 +27,14 @@ public class CuentaService {
     private final UserRepository userRepository;
     private final TokenCuentaRepository tokenRepository;
     private final CorreoService correoService;
+    private final SesionService sesiones;
 
-    public CuentaService(UserRepository userRepository, TokenCuentaRepository tokenRepository, CorreoService correoService) {
+    public CuentaService(UserRepository userRepository, TokenCuentaRepository tokenRepository, CorreoService correoService,
+                         SesionService sesiones) {
         this.userRepository = userRepository;
         this.tokenRepository = tokenRepository;
         this.correoService = correoService;
+        this.sesiones = sesiones;
     }
 
     // ─── Verificación del correo ───
@@ -107,12 +110,15 @@ public class CuentaService {
         if (user.correoPendienteDeVerificar()) user.setEmailVerificado(true);
         userRepository.save(user);
         tokenRepository.deleteByUserIdAndTipo(user.getId(), TokenCuenta.RECUPERAR_CONTRASENA);
+        // Quien conociera la contraseña anterior deja de estar dentro.
+        sesiones.cerrarTodas(user.getId());
         correoService.contrasenaCambiada(user);
     }
 
     // ─── Mi cuenta ───
 
-    public void cambiarContrasena(String userId, String actual, String nueva) {
+    // tokenActual es la sesión de quien la cambia: esa sigue abierta y las demás se cierran.
+    public void cambiarContrasena(String userId, String actual, String nueva, String tokenActual) {
         User user = usuario(userId);
         if (!PasswordUtil.coincide(actual, user.getPassword())) {
             throw new CuentaException(HttpStatus.BAD_REQUEST, "La contraseña actual no es correcta.");
@@ -120,6 +126,7 @@ public class CuentaService {
         exigirSegura(nueva);
         user.setPassword(PasswordUtil.hash(nueva));
         userRepository.save(user);
+        sesiones.cerrarOtras(user.getId(), tokenActual);
         correoService.contrasenaCambiada(user);
     }
 
