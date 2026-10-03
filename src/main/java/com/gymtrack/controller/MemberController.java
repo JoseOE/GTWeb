@@ -68,11 +68,17 @@ public class MemberController {
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Ese correo ya está registrado."));
         }
+        if (!PasswordUtil.esSegura(request.getPassword())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error",
+                    "La contraseña temporal necesita 8+ caracteres, una letra, un número y un símbolo. Usa \"Generar otra\"."));
+        }
 
         User member = new User();
         member.setNombre(request.getNombre());
         member.setEmail(request.getEmail());
         member.setPassword(PasswordUtil.hash(request.getPassword()));
+        // La eligió el dueño: el miembro la cambia en cuanto entra.
+        member.setContrasenaTemporal(true);
         member.setGymId(gymId);
         member.setRole("member");
         member.setMembershipStatus(User.STATUS_ACTIVE);
@@ -160,6 +166,7 @@ public class MemberController {
         view.put("planActual", user.getPlanActual());
         view.put("diasParaVencer", user.diasParaVencer(LocalDate.now()));
         view.put("tienePush", user.getPushToken() != null && !user.getPushToken().isBlank());
+        view.put("contrasenaTemporal", user.tieneContrasenaTemporal());
         return view;
     }
 }
