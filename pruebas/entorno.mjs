@@ -21,6 +21,8 @@ const valor = (nombre, porDefecto) => process.env[nombre] || archivo[nombre] || 
 export const API = valor('GYMTRACK_API', 'http://localhost:8080').replace(/\/$/, '');
 export const MEDUSA = valor('MEDUSA_URL', 'http://localhost:9000').replace(/\/$/, '');
 export const MONGO = valor('MONGODB_URI', 'mongodb://127.0.0.1:27017/gymtrackdb');
+// Secreto compartido de los avisos de Medusa a Spring (el bloque 1 manda avisos firmados).
+export const SECRETO_WEBHOOK = valor('MEDUSA_WEBHOOK_SECRET');
 // Log de Spring (su salida estándar): las pruebas leen ahí los códigos de
 // verificación, porque en local no hay correo configurado.
 export const LOG = process.env.SPRING_LOG || new URL('./spring.log', import.meta.url);

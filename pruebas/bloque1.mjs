@@ -1,7 +1,7 @@
 // Prueba de punta a punta del bloque 1 contra Spring (8080) y Medusa (9000) locales.
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import { API, ESTADO, LOG, MEDUSA, adminMedusa } from './entorno.mjs';
+import { API, ESTADO, LOG, MEDUSA, SECRETO_WEBHOOK, adminMedusa } from './entorno.mjs';
 
 const ADMIN = adminMedusa();
 
@@ -127,7 +127,7 @@ r = await api('GET', `/api/gyms/${gymId}/productos/${prod.id}`, null, owner.id);
 ok(r.body.variantes.find(v => v.id === bote.id).disponible === 6, 'stock disponible bajó de 8 a 6', r.body.variantes.find(v => v.id === bote.id));
 
 console.log('\n6. Aviso repetido');
-async function avisar(evento, orderId, paymentId, secreto = env.MEDUSA_WEBHOOK_SECRET, desfase = 0) {
+async function avisar(evento, orderId, paymentId, secreto = SECRETO_WEBHOOK, desfase = 0) {
   const cuerpo = JSON.stringify({ id: crypto.randomUUID(), evento, orderId, paymentId, enviadoEn: new Date().toISOString() });
   const t = Math.floor(Date.now() / 1000) - desfase;
   const firma = crypto.createHmac('sha256', secreto).update(`${t}.${cuerpo}`).digest('hex');
@@ -138,7 +138,7 @@ r = await avisar('order.placed', orden1.id);
 ok(r.status === 200 && r.body.message === 'Aviso ya procesado.', 'el mismo aviso se reconoce como procesado', r.body);
 r = await avisar('order.canceled', orden1.id, undefined, 'otra-clave');
 ok(r.status === 401, 'firma con otra clave → 401', r.body);
-r = await avisar('order.placed', orden1.id, undefined, env.MEDUSA_WEBHOOK_SECRET, 600);
+r = await avisar('order.placed', orden1.id, undefined, SECRETO_WEBHOOK, 600);
 ok(r.status === 401, 'firma de hace 10 minutos → 401', r.body);
 await fetch(MEDUSA + '/admin/orders/' + orden1.id, { headers: { Authorization: ADMIN } });
 // Aunque llegue con otro id de evento (payment.captured), no extiende dos veces.
