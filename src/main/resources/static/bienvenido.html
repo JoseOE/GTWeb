@@ -38,6 +38,7 @@
         <!-- ═══════ SIDEBAR ═══════ -->
         <aside class="dash-sidebar">
             <nav class="dash-nav" role="tablist" aria-label="Secciones del panel">
+                <span class="dash-nav-grupo" aria-hidden="true">Gimnasio</span>
                 <button type="button" class="dash-nav-link active" role="tab" id="tab-resumen" aria-controls="panel-resumen" aria-selected="true" data-panel="resumen">
                     <i class='bx bx-grid-alt'></i><span>Resumen</span>
                 </button>
@@ -50,6 +51,7 @@
                 <button type="button" class="dash-nav-link" role="tab" id="tab-membresias" aria-controls="panel-membresias" aria-selected="false" data-panel="membresias">
                     <i class='bx bx-credit-card'></i><span>Membresías y Pagos</span>
                 </button>
+                <span class="dash-nav-grupo" aria-hidden="true">Tienda</span>
                 <button type="button" class="dash-nav-link" role="tab" id="tab-mostrador" aria-controls="panel-mostrador" aria-selected="false" data-panel="mostrador">
                     <i class='bx bx-store'></i><span>Mostrador</span>
                 </button>
@@ -62,14 +64,16 @@
                 <button type="button" class="dash-nav-link" role="tab" id="tab-planes" aria-controls="panel-planes" aria-selected="false" data-panel="planes">
                     <i class='bx bx-purchase-tag-alt'></i><span>Planes</span>
                 </button>
+                <span class="dash-nav-grupo" aria-hidden="true">Entrenamiento</span>
                 <button type="button" class="dash-nav-link" role="tab" id="tab-rutinas" aria-controls="panel-rutinas" aria-selected="false" data-panel="rutinas">
                     <i class='bx bx-dumbbell'></i><span>Rutinas</span>
                 </button>
                 <button type="button" class="dash-nav-link" role="tab" id="tab-maquinas" aria-controls="panel-maquinas" aria-selected="false" data-panel="maquinas">
                     <i class='bx bx-cog'></i><span>Máquinas</span>
                 </button>
+                <span class="dash-nav-grupo" aria-hidden="true">Acceso</span>
                 <button type="button" class="dash-nav-link" role="tab" id="tab-accesos" aria-controls="panel-accesos" aria-selected="false" data-panel="accesos">
-                    <i class='bx bx-id-card'></i><span>Accesos RFID</span>
+                    <i class='bx bx-id-card'></i><span>Accesos RFID</span><span class="badge rounded-pill dash-nav-pronto">Pronto</span>
                 </button>
             </nav>
         </aside>
@@ -77,123 +81,48 @@
         <!-- ═══════ CONTENIDO ═══════ -->
         <main class="dash-content">
 
-            <!-- ─── RESUMEN ─── -->
+            <!-- ─── RESUMEN ───
+                 Lo que el dueño necesita hoy: primeros pasos (mientras falte alguno),
+                 sus números reales, lo pendiente y accesos rápidos. -->
             <div class="dash-panel active" id="panel-resumen" data-panel="resumen" role="tabpanel" aria-labelledby="tab-resumen" tabindex="0">
                 <div class="mb-4">
-                    <h2 class="fw-bold mb-1 d-flex align-items-center gap-2 flex-wrap">
-                        Hola, <span class="text-primary" id="dash-user-name">…</span>
-                        <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary fs-6 align-middle d-inline-flex align-items-center gap-1">
-                            <i class='bx bx-show'></i> Vista previa
-                        </span>
-                    </h2>
-                    <p class="text-body-secondary mb-0">Así se verá tu panel de administración cuando actives tu gimnasio en GymTrack.</p>
+                    <h2 class="fw-bold mb-1">Hola, <span class="text-primary" id="dash-user-name">…</span></h2>
+                    <p class="text-body-secondary mb-0" id="resumen-subtitulo">Así va tu gimnasio hoy.</p>
                 </div>
 
-                <!-- KPIs -->
-                <div class="row g-3 mb-4">
-                    <div class="col-6 col-lg-3">
-                        <div class="kpi-tile">
-                            <div class="icon-circle icon-brand rounded-circle d-flex align-items-center justify-content-center mb-3" style="width:46px;height:46px">
-                                <i class='bx bx-group'></i>
-                            </div>
-                            <div class="kpi-value">0</div>
-                            <p class="text-body-secondary small mb-0">Usuarios registrados</p>
+                <section class="dash-empty text-start p-4 mb-4 d-none" id="resumen-pasos" aria-labelledby="resumen-pasos-titulo">
+                    <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-2">
+                        <h3 class="fw-bold fs-5 mb-0" id="resumen-pasos-titulo">Primeros pasos</h3>
+                        <div class="d-flex align-items-baseline gap-3">
+                            <span class="small text-body-secondary" id="resumen-pasos-avance"></span>
+                            <button type="button" class="btn btn-link btn-sm p-0 text-body-secondary" id="resumen-pasos-ocultar">Ocultar guía</button>
                         </div>
                     </div>
-                    <div class="col-6 col-lg-3">
-                        <div class="kpi-tile">
-                            <div class="icon-circle icon-success rounded-circle d-flex align-items-center justify-content-center mb-3" style="width:46px;height:46px">
-                                <i class='bx bx-credit-card'></i>
-                            </div>
-                            <div class="kpi-value">0</div>
-                            <p class="text-body-secondary small mb-0">Membresías activas</p>
-                        </div>
+                    <div class="progress mb-3" style="height:6px" role="progressbar" aria-labelledby="resumen-pasos-titulo" id="resumen-pasos-progreso">
+                        <div class="progress-bar bg-primary" id="resumen-pasos-barra" style="width:0%"></div>
                     </div>
-                    <div class="col-6 col-lg-3">
-                        <div class="kpi-tile">
-                            <div class="icon-circle icon-warning rounded-circle d-flex align-items-center justify-content-center mb-3" style="width:46px;height:46px">
-                                <i class='bx bx-dumbbell'></i>
-                            </div>
-                            <div class="kpi-value">0</div>
-                            <p class="text-body-secondary small mb-0">Rutinas creadas</p>
-                        </div>
-                    </div>
-                    <div class="col-6 col-lg-3">
-                        <div class="kpi-tile">
-                            <div class="icon-circle icon-info rounded-circle d-flex align-items-center justify-content-center mb-3" style="width:46px;height:46px">
-                                <i class='bx bx-id-card'></i>
-                            </div>
-                            <div class="kpi-value">0</div>
-                            <p class="text-body-secondary small mb-0">Accesos RFID registrados</p>
-                        </div>
-                    </div>
-                </div>
+                    <ol class="list-unstyled mb-0 resumen-pasos" id="resumen-pasos-lista"></ol>
+                </section>
 
-                <!-- Mi Gimnasio + Mis Usuarios -->
-                <div class="row g-3 mb-4">
-                    <div class="col-lg-6">
-                        <div class="feature-preview-card">
-                            <div class="d-flex align-items-start justify-content-between gap-2 mb-3">
-                                <div class="icon-circle icon-brand rounded-circle d-flex align-items-center justify-content-center" style="width:54px;height:54px">
-                                    <i class='bx bx-store-alt fs-3'></i>
-                                </div>
-                                <span class="badge rounded-pill bg-warning bg-opacity-10 text-warning px-3 py-2 flex-shrink-0"><i class='bx bx-time-five'></i> Próximamente</span>
-                            </div>
-                            <h3 class="fw-bold mb-2 fs-5">Mi Gimnasio</h3>
-                            <p class="text-body-secondary small mb-3">Configura el nombre, dirección, horario y equipamiento real de tu gimnasio. Ese equipamiento es lo que luego personaliza las rutinas que asignas a tus usuarios.</p>
-                            <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-goto="gimnasio">Ver vista previa <i class='bx bx-right-arrow-alt'></i></button>
-                        </div>
-                    </div>
-                    <div class="col-lg-6">
-                        <div class="feature-preview-card">
-                            <div class="d-flex align-items-start justify-content-between gap-2 mb-3">
-                                <div class="icon-circle icon-info rounded-circle d-flex align-items-center justify-content-center" style="width:54px;height:54px">
-                                    <i class='bx bx-group fs-3'></i>
-                                </div>
-                                <span class="badge rounded-pill bg-warning bg-opacity-10 text-warning px-3 py-2 flex-shrink-0"><i class='bx bx-time-five'></i> Próximamente</span>
-                            </div>
-                            <h3 class="fw-bold mb-2 fs-5">Mis Usuarios</h3>
-                            <p class="text-body-secondary small mb-3">Da de alta a los clientes de tu gimnasio, asígnales una credencial RFID y consulta su membresía y estado de pago desde una sola tabla.</p>
-                            <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-goto="usuarios">Ver vista previa <i class='bx bx-right-arrow-alt'></i></button>
-                        </div>
-                    </div>
-                </div>
+                <div class="row g-3 mb-4" id="resumen-kpis"></div>
 
-                <!-- Roadmap secundario -->
-                <h4 class="text-uppercase fw-bold text-body-secondary small mb-3" style="letter-spacing:0.06em">También vienen en camino</h4>
                 <div class="row g-3">
-                    <div class="col-md-4">
-                        <div class="roadmap-tile" data-goto="membresias" role="button" tabindex="0">
-                            <div class="icon-circle icon-success rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:44px;height:44px">
-                                <i class='bx bx-credit-card'></i>
-                            </div>
-                            <div>
-                                <span class="fw-semibold d-block small">Membresías y Pagos</span>
-                                <small class="text-body-secondary">Vence, cobra, bloquea morosos</small>
-                            </div>
-                        </div>
+                    <div class="col-lg-7">
+                        <section class="dash-empty text-start p-4 h-100" aria-labelledby="resumen-pendientes-titulo">
+                            <h3 class="fw-bold fs-6 mb-3" id="resumen-pendientes-titulo">Pendientes</h3>
+                            <div id="resumen-pendientes"></div>
+                        </section>
                     </div>
-                    <div class="col-md-4">
-                        <div class="roadmap-tile" data-goto="rutinas" role="button" tabindex="0">
-                            <div class="icon-circle icon-warning rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:44px;height:44px">
-                                <i class='bx bx-dumbbell'></i>
+                    <div class="col-lg-5">
+                        <section class="dash-empty text-start p-4 h-100" aria-labelledby="resumen-atajos-titulo">
+                            <h3 class="fw-bold fs-6 mb-3" id="resumen-atajos-titulo">Accesos rápidos</h3>
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-primary rounded-pill" data-goto="mostrador"><i class='bx bx-store'></i> Vender en mostrador</button>
+                                <button type="button" class="btn btn-outline-primary rounded-pill" data-goto="usuarios" data-abrir="member-new-btn"><i class='bx bx-user-plus'></i> Agregar usuario</button>
+                                <button type="button" class="btn btn-outline-primary rounded-pill" data-goto="membresias"><i class='bx bx-dollar'></i> Registrar un pago</button>
+                                <button type="button" class="btn btn-outline-primary rounded-pill" data-goto="productos" data-abrir="producto-nuevo-btn"><i class='bx bx-package'></i> Nuevo producto</button>
                             </div>
-                            <div>
-                                <span class="fw-semibold d-block small">Rutinas</span>
-                                <small class="text-body-secondary">Según tu equipamiento real</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="roadmap-tile" data-goto="accesos" role="button" tabindex="0">
-                            <div class="icon-circle icon-info rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:44px;height:44px">
-                                <i class='bx bx-id-card'></i>
-                            </div>
-                            <div>
-                                <span class="fw-semibold d-block small">Accesos RFID</span>
-                                <small class="text-body-secondary">Entradas validadas en tiempo real</small>
-                            </div>
-                        </div>
+                        </section>
                     </div>
                 </div>
             </div>
@@ -298,6 +227,7 @@
                         <div id="gym-alert" class="col-12 alert alert-danger d-none py-2 small mb-0" role="alert"></div>
                         <div class="col-12 pt-2">
                             <button type="submit" class="btn btn-primary rounded-pill px-4" id="gym-save-btn"><i class='bx bx-save'></i> Guardar cambios</button>
+                            <span class="small text-success-emphasis ms-2 d-none" id="gym-guardado" role="status"><i class='bx bx-check-circle'></i> Cambios guardados</span>
                             <small class="text-body-secondary d-block mt-2">Todo lo que guardes aquí queda en la base de datos y la app lo descarga sola: no hace falta tener esta página abierta.</small>
                         </div>
                     </form>
@@ -334,8 +264,9 @@
                             <tbody id="members-tbody">
                                 <tr>
                                     <td colspan="5" class="text-center text-body-secondary py-5 px-4">
-                                        <i class='bx bx-group fs-1 d-block mb-2 opacity-50'></i>
+                                        <i class='bx bx-group fs-1 d-block mb-2 opacity-50' aria-hidden="true"></i>
                                         Configura primero "Mi Gimnasio" para poder dar de alta usuarios.
+                                        <div class="mt-3"><button type="button" class="btn btn-primary btn-sm rounded-pill px-3" data-goto="gimnasio">Configurar mi gimnasio</button></div>
                                     </td>
                                 </tr>
                             </tbody>
@@ -410,8 +341,9 @@
                             </thead>
                             <tbody id="billing-tbody">
                                 <tr><td colspan="5" class="text-center text-body-secondary py-5 px-4">
-                                    <i class='bx bx-wallet fs-1 d-block mb-2 opacity-50'></i>
-                                    Configura primero "Mi Gimnasio".
+                                    <i class='bx bx-wallet fs-1 d-block mb-2 opacity-50' aria-hidden="true"></i>
+                                    Configura primero "Mi Gimnasio" para registrar pagos.
+                                    <div class="mt-3"><button type="button" class="btn btn-primary btn-sm rounded-pill px-3" data-goto="gimnasio">Configurar mi gimnasio</button></div>
                                 </td></tr>
                             </tbody>
                         </table>
@@ -421,6 +353,7 @@
                 <div class="dash-empty text-start p-0 overflow-hidden">
                     <div class="p-4 border-bottom">
                         <h4 class="fw-bold mb-0 fs-6">Últimos pagos registrados</h4>
+                        <small class="text-body-secondary" id="payments-mes"></small>
                     </div>
                     <div class="table-responsive">
                         <table class="table dash-table mb-0">
@@ -867,8 +800,9 @@
                 <div class="dash-empty text-start mb-4">
                     <h4 class="fw-bold fs-6 mb-1"><i class='bx bx-bolt-circle text-primary me-1'></i> Agregar rápido</h4>
                     <p class="text-body-secondary small mb-3">Planes comunes con el precio calculado desde tu cuota mensual. Ajústalos antes de guardar.</p>
-                    <div class="d-flex flex-wrap gap-2" id="planes-presets">
+                    <div class="d-flex flex-wrap align-items-center gap-2" id="planes-presets">
                         <span class="text-body-secondary small">Configura primero "Mi Gimnasio".</span>
+                        <button type="button" class="btn btn-primary btn-sm rounded-pill px-3" data-goto="gimnasio">Configurar mi gimnasio</button>
                     </div>
                 </div>
                 <div id="planes-container"></div>
@@ -917,7 +851,7 @@
                                                 <option value="mes" selected>meses</option>
                                             </select>
                                         </div>
-                                        <small class="text-body-secondary d-block mt-1">Los planes por meses respetan el día de pago del usuario; los de días o semanas solo suman días.</small>
+                                        <small class="text-body-secondary d-block mt-1">Los planes por meses respetan el día de pago del usuario; los de días o semanas solo suman días. Si después paga un mes, ese mes empieza cuando termina lo que ya pagó.</small>
                                     </div>
                                     <div class="col-12">
                                         <label for="plan-beneficios" class="form-label fw-semibold small">Beneficios (uno por línea)</label>
@@ -1185,6 +1119,8 @@
             const panels = document.querySelectorAll('.dash-panel');
             const content = document.querySelector('.dash-content');
 
+            // Cada pestaña se entera cuando se muestra (evento "panel:mostrado") para
+            // traer datos frescos: solicitudes nuevas, pagos, ventas.
             function showPanel(key) {
                 panels.forEach(p => p.classList.toggle('active', p.dataset.panel === key));
                 navLinks.forEach(l => {
@@ -1192,15 +1128,20 @@
                     l.classList.toggle('active', isActive);
                     l.setAttribute('aria-selected', String(isActive));
                 });
-                content.scrollTo({ top: 0, behavior: 'smooth' });
+                content.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+                document.dispatchEvent(new CustomEvent('panel:mostrado', { detail: key }));
             }
 
             navLinks.forEach(link => link.addEventListener('click', () => showPanel(link.dataset.panel)));
-            document.querySelectorAll('[data-goto]').forEach(el => {
-                el.addEventListener('click', () => showPanel(el.dataset.goto));
-                el.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showPanel(el.dataset.goto); }
-                });
+            // [data-goto] lleva a otra pestaña; con data-abrir, además pulsa ese
+            // botón al llegar (p. ej. "Agregar usuario"). Delegado, porque varios se
+            // pintan después (Resumen, avisos de "configura tu gimnasio").
+            document.addEventListener('click', (e) => {
+                const destino = e.target.closest('[data-goto]');
+                if (!destino) return;
+                showPanel(destino.dataset.goto);
+                const abrir = destino.dataset.abrir && document.getElementById(destino.dataset.abrir);
+                if (abrir && !abrir.disabled) abrir.click();
             });
 
             initGymForm();
@@ -1212,7 +1153,192 @@
             initPlanes();
             initMostrador();
             initVentas();
+            initResumen();
         });
+
+        /* ═══════════════════════════════════════
+           RESUMEN — primeros pasos, ingresos y pendientes
+           Miembros, máquinas, ventas y pagos salen de la base (rápido). Planes y
+           productos vienen de la tienda: se usan los que ya cargaron sus
+           pestañas, porque Medusa puede tardar si está despertando.
+        ═══════════════════════════════════════ */
+        const PASOS_INICIO = [
+            { clave: 'gimnasio', titulo: 'Configura tu gimnasio', texto: 'Nombre, horario y cuota mensual. Con eso tus miembros te encuentran en la app.', boton: 'Configurar', destino: 'gimnasio' },
+            { clave: 'planes', titulo: 'Crea tus planes de membresía', texto: 'Mensualidad, visita, semana: lo que cobras en recepción y vendes en la tienda.', boton: 'Crear planes', destino: 'planes' },
+            { clave: 'miembros', titulo: 'Suma a tus miembros', texto: 'Comparte tu código de acceso o dales de alta tú mismo en recepción.', boton: 'Agregar usuario', destino: 'usuarios', abrir: 'member-new-btn' },
+            { clave: 'productos', titulo: 'Sube tus productos', texto: 'Suplementos, bebidas o accesorios para el mostrador y la tienda.', boton: 'Nuevo producto', destino: 'productos', abrir: 'producto-nuevo-btn' },
+            { clave: 'maquinas', titulo: 'Registra tus máquinas', texto: 'La app arma las rutinas con el equipo que de verdad tienes.', boton: 'Agregar máquinas', destino: 'maquinas' }
+        ];
+        // Cuántos hay de cada cosa; null mientras todavía no se sabe.
+        const resumenConteos = { planes: null, productos: null, miembros: null, maquinas: null };
+        let resumenTurno = 0;
+
+        function initResumen() {
+            document.addEventListener('panel:mostrado', (e) => { if (e.detail === 'resumen') cargarResumen(); });
+            document.getElementById('resumen-pasos-ocultar').addEventListener('click', () => {
+                localStorage.setItem('pasosOcultos', localStorage.getItem('gymId') || '');
+                pintarPasos();
+            });
+            cargarResumen();
+        }
+
+        function cargarResumen() {
+            const gymId = localStorage.getItem('gymId');
+            const turno = ++resumenTurno;
+            const pendientes = document.getElementById('resumen-pendientes');
+            document.getElementById('resumen-subtitulo').textContent = gymId
+                ? 'Así va tu gimnasio hoy.'
+                : 'Empieza por configurar tu gimnasio: con eso se activa todo lo demás.';
+            if (!gymId) {
+                document.getElementById('resumen-kpis').innerHTML = '';
+                pendientes.innerHTML = '<p class="text-body-secondary mb-0">Aquí verás las solicitudes nuevas y los cobros pendientes en cuanto configures tu gimnasio.</p>';
+                pintarPasos();
+                return;
+            }
+            pintarKpisResumen(null);
+            pendientes.innerHTML = '<p class="text-body-secondary mb-0"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Revisando pendientes…</p>';
+
+            const hoy = fechaMx(new Date());
+            const leer = (url) => fetch(url).then(r => r.ok ? r.json() : Promise.reject(new Error('No se pudo cargar.')));
+            Promise.allSettled([
+                leer('/api/gyms/' + gymId + '/members'),
+                leer('/api/gyms/' + gymId + '/machines'),
+                apiTienda('/api/gyms/' + gymId + '/ventas/resumen?desde=' + hoy + '&hasta=' + hoy),
+                apiTienda('/api/gyms/' + gymId + '/payments?desde=' + hoy.slice(0, 8) + '01&limite=500')
+            ]).then(([miembros, maquinas, ventas, pagos]) => {
+                if (turno !== resumenTurno) return;
+                const valor = (r) => r.status === 'fulfilled' ? r.value : null;
+                if (valor(miembros)) resumenConteos.miembros = valor(miembros).length;
+                if (valor(maquinas)) resumenConteos.maquinas = valor(maquinas).length;
+                pintarPasos();
+                pintarKpisResumen({ hoy, miembros: valor(miembros), ventas: valor(ventas), pagos: valor(pagos) });
+                pintarPendientes(valor(miembros), valor(ventas));
+            });
+        }
+
+        // Una guía de cinco pasos que se muestra mientras falte alguno (o hasta
+        // que el dueño la oculte). El siguiente paso lleva el botón principal.
+        function pintarPasos() {
+            const gymId = localStorage.getItem('gymId');
+            const seccion = document.getElementById('resumen-pasos');
+            // true: listo · false: falta · null: todavía no se sabe
+            const estados = PASOS_INICIO.map(p => {
+                if (p.clave === 'gimnasio') return !!gymId;
+                if (!gymId) return false;
+                return resumenConteos[p.clave] == null ? null : resumenConteos[p.clave] > 0;
+            });
+            const oculta = !!gymId && localStorage.getItem('pasosOcultos') === gymId;
+            seccion.classList.toggle('d-none', oculta || !estados.includes(false));
+            if (seccion.classList.contains('d-none')) return;
+
+            const listos = estados.filter(e => e === true).length;
+            const total = PASOS_INICIO.length;
+            const siguiente = estados.indexOf(false);
+            document.getElementById('resumen-pasos-avance').textContent = listos + ' de ' + total + ' listos';
+            const progreso = document.getElementById('resumen-pasos-progreso');
+            progreso.setAttribute('aria-valuemin', '0');
+            progreso.setAttribute('aria-valuemax', String(total));
+            progreso.setAttribute('aria-valuenow', String(listos));
+            progreso.setAttribute('aria-valuetext', listos + ' de ' + total + ' pasos listos');
+            document.getElementById('resumen-pasos-barra').style.width = (listos / total * 100) + '%';
+            document.getElementById('resumen-pasos-ocultar').classList.toggle('d-none', !gymId);
+            document.getElementById('resumen-pasos-lista').innerHTML = PASOS_INICIO.map((p, i) => {
+                const e = estados[i];
+                let accion = '';
+                if (e === null) {
+                    accion = '<span class="spinner-border spinner-border-sm text-body-secondary flex-shrink-0" role="status"><span class="visually-hidden">Revisando…</span></span>';
+                } else if (e === false && (gymId || p.clave === 'gimnasio')) {
+                    accion = '<button type="button" class="btn ' + (i === siguiente ? 'btn-primary' : 'btn-outline-primary') + ' btn-sm rounded-pill px-3 flex-shrink-0" data-goto="'
+                        + p.destino + '"' + (p.abrir ? ' data-abrir="' + p.abrir + '"' : '') + '>' + p.boton + '</button>';
+                }
+                return `
+                    <li class="resumen-paso${e ? ' hecho' : i === siguiente ? ' siguiente' : ''}">
+                        <span class="resumen-paso-marca" aria-hidden="true">${e ? "<i class='bx bx-check'></i>" : i + 1}</span>
+                        <div class="resumen-paso-texto">
+                            <div class="fw-semibold">${e ? '<span class="visually-hidden">Listo: </span>' : ''}${p.titulo}</div>
+                            ${e ? '' : '<div class="small text-body-secondary">' + p.texto + '</div>'}
+                        </div>
+                        ${accion}
+                    </li>`;
+            }).join('');
+        }
+
+        // Ingresos = ventas (tienda, app y mostrador) + pagos registrados a mano en
+        // "Membresías y Pagos". Los pagos que vienen de un pedido ya están en ventas.
+        function pintarKpisResumen(d) {
+            const tiles = [
+                { titulo: 'Ingresos de hoy', icono: 'bx-calendar-check' },
+                { titulo: 'Ingresos del mes', icono: 'bx-calendar' },
+                { titulo: 'Miembros activos', icono: 'bx-group' }
+            ];
+            if (d) {
+                const aMano = (d.pagos || []).filter(p => !p.orderId && !p.reembolsadoEn);
+                const sumar = (lista) => lista.reduce((s, p) => s + (Number(p.monto) || 0), 0);
+                const pagosHoy = sumar(aMano.filter(p => p.fechaPago === d.hoy));
+                const pagosMes = sumar(aMano);
+                const k = d.ventas && d.ventas.kpis;
+                if (k && d.pagos) {
+                    tiles[0].valor = dinero(k.hoy.total + pagosHoy);
+                    tiles[0].detalle = 'Ventas ' + dinero(k.hoy.total) + ' · Pagos ' + dinero(pagosHoy);
+                    tiles[1].valor = dinero(k.mes.total + pagosMes);
+                    tiles[1].detalle = 'Ventas ' + dinero(k.mes.total) + ' · Pagos ' + dinero(pagosMes);
+                }
+                if (d.miembros) {
+                    const activos = d.miembros.filter(m => m.membershipStatus === 'active');
+                    const alDia = activos.filter(m => m.diasParaVencer != null && m.diasParaVencer >= 0).length;
+                    tiles[2].valor = String(activos.length);
+                    tiles[2].detalle = alDia + ' con su pago al día';
+                }
+            }
+            document.getElementById('resumen-kpis').innerHTML = tiles.map(t => `
+                <div class="col-12 col-md-4">
+                    <div class="kpi-tile h-100">
+                        <div class="d-flex align-items-center gap-2 small fw-semibold text-body-secondary mb-2"><i class="bx ${t.icono} fs-5" aria-hidden="true"></i>${t.titulo}</div>
+                        <div class="kpi-value">${t.valor ? escapeHtml(t.valor) : '—'}</div>
+                        <small class="text-body-secondary d-block mt-2">${t.detalle ? escapeHtml(t.detalle) : (d ? 'No se pudo cargar.' : 'Cargando…')}</small>
+                    </div>
+                </div>`).join('');
+        }
+
+        // Solo lo que pide una acción del dueño, cada cosa con el botón que la resuelve.
+        function pintarPendientes(miembros, ventas) {
+            const contenedor = document.getElementById('resumen-pendientes');
+            if (!miembros) {
+                contenedor.innerHTML = '<p class="text-body-secondary mb-2">No pudimos revisar tus pendientes.</p>'
+                    + '<button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" id="resumen-reintentar">Reintentar</button>';
+                document.getElementById('resumen-reintentar').addEventListener('click', cargarResumen);
+                return;
+            }
+            const plural = (n, uno, varios) => n + ' ' + (n === 1 ? uno : varios);
+            const cobranza = miembros.filter(m => m.membershipStatus !== 'pending');
+            const solicitudes = miembros.length - cobranza.length;
+            // Las vencidas de hace más de un mes ya no son un cobro del día: siguen en Membresías y Pagos.
+            const vencidas = cobranza.filter(m => m.diasParaVencer != null && m.diasParaVencer < 0 && m.diasParaVencer >= -30).length;
+            const porVencer = cobranza.filter(m => m.diasParaVencer != null && m.diasParaVencer >= 0 && m.diasParaVencer <= 5).length;
+            const sinPagos = cobranza.filter(m => m.membershipStatus === 'active' && m.diasParaVencer == null).length;
+            const paynet = ventas && ventas.kpis ? ventas.kpis.paynetPendientes : null;
+            const filas = [
+                solicitudes && { icono: 'bx-user-plus', texto: plural(solicitudes, 'solicitud para unirse', 'solicitudes para unirse'), boton: 'Revisar', destino: 'usuarios' },
+                vencidas && { icono: 'bx-error-circle', texto: plural(vencidas, 'membresía vencida', 'membresías vencidas') + ' en los últimos 30 días', boton: 'Cobrar', destino: 'membresias' },
+                porVencer && { icono: 'bx-time-five', texto: plural(porVencer, 'membresía vence', 'membresías vencen') + ' en los próximos 5 días', boton: 'Ver', destino: 'membresias' },
+                sinPagos && { icono: 'bx-wallet', texto: plural(sinPagos, 'miembro activo sin pagos registrados', 'miembros activos sin pagos registrados'), boton: 'Registrar', destino: 'membresias' },
+                paynet && paynet.pedidos && { icono: 'bx-store', texto: plural(paynet.pedidos, 'ficha Paynet por cobrar', 'fichas Paynet por cobrar') + ' (' + dinero(paynet.total) + ')', boton: 'Ver', destino: 'ventas' }
+            ].filter(Boolean);
+            contenedor.innerHTML = filas.length
+                ? '<ul class="list-unstyled mb-0 resumen-pendientes">' + filas.map(f => `
+                    <li>
+                        <i class="bx ${f.icono}" aria-hidden="true"></i>
+                        <span class="flex-grow-1">${escapeHtml(f.texto)}</span>
+                        <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3 flex-shrink-0" data-goto="${f.destino}">${f.boton}<span class="visually-hidden">: ${escapeHtml(f.texto)}</span></button>
+                    </li>`).join('') + '</ul>'
+                : '<p class="text-body-secondary mb-0"><i class="bx bx-check-circle me-1" aria-hidden="true"></i>Todo al día: no hay solicitudes ni cobros pendientes.</p>';
+        }
+
+        // Lo que ve una pestaña mientras no hay gimnasio: el aviso y el botón para configurarlo.
+        function avisoSinGimnasio(texto, icono) {
+            return '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx ' + icono + ' fs-1 d-block mb-2 opacity-50" aria-hidden="true"></i>'
+                + texto + '<div class="mt-3"><button type="button" class="btn btn-primary btn-sm rounded-pill px-3" data-goto="gimnasio">Configurar mi gimnasio</button></div></div>';
+        }
 
         /* ═══════════════════════════════════════
            MI GIMNASIO — conectado a /api/gyms
@@ -1371,10 +1497,22 @@
                     btn.disabled = false;
                     btn.innerHTML = '<i class="bx bx-save"></i> Guardar cambios';
                     if (response.status === 200) {
+                        const primeraVez = !localStorage.getItem('gymId');
                         localStorage.setItem('gymId', response.body.id);
                         showCode(response.body.codigo);
                         setBadge('saved');
-                        unlockGymFeatures(response.body.id);
+                        // La primera vez se activan todas las pestañas; después solo
+                        // cambian los precios sugeridos de los planes (salen de la cuota).
+                        if (primeraVez) {
+                            unlockGymFeatures(response.body.id);
+                            cargarResumen();
+                        } else {
+                            loadPlanes(response.body.id);
+                        }
+                        const guardado = document.getElementById('gym-guardado');
+                        guardado.classList.remove('d-none');
+                        clearTimeout(guardado._ocultar);
+                        guardado._ocultar = setTimeout(() => guardado.classList.add('d-none'), 4000);
                     } else {
                         alertBox.textContent = response.body.error || 'No se pudo guardar el gimnasio.';
                         alertBox.classList.remove('d-none');
@@ -1525,19 +1663,22 @@
             if (gymId) {
                 document.getElementById('machine-new-btn').disabled = false;
                 document.getElementById('machine-import-btn').disabled = false;
-                loadMachines(gymId);
             }
+            // Sin gimnasio, loadMachines pinta el aviso para configurarlo.
+            loadMachines(gymId);
         }
 
         function loadMachines(gymId) {
             const container = document.getElementById('machines-container');
             if (!gymId) {
-                container.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-cog fs-1 d-block mb-2 opacity-50"></i>Configura primero "Mi Gimnasio".</div>';
+                container.innerHTML = avisoSinGimnasio('Configura primero "Mi Gimnasio" para registrar tus máquinas.', 'bx-cog');
                 return;
             }
             fetch('/api/gyms/' + gymId + '/machines')
                 .then(res => res.json())
                 .then(machines => {
+                    resumenConteos.maquinas = machines.length;
+                    pintarPasos();
                     if (!machines.length) {
                         container.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-cog fs-1 d-block mb-2 opacity-50"></i>Aún no registras máquinas. Usa "Importar catálogo base" para empezar rápido y luego ajústalas.</div>';
                         return;
@@ -1709,6 +1850,11 @@
 
             const gymId = localStorage.getItem('gymId');
             if (gymId) loadBilling(gymId);
+            // Los pagos de la tienda y del mostrador llegan solos: al abrir la
+            // pestaña se vuelve a pedir todo.
+            document.addEventListener('panel:mostrado', (e) => {
+                if (e.detail === 'membresias') loadBilling(localStorage.getItem('gymId'));
+            });
         }
 
         // Traduce los días restantes a algo que el dueño pueda leer de un vistazo.
@@ -1725,14 +1871,23 @@
             return { texto: 'Al corriente', clase: 'bg-success bg-opacity-10 text-success', icono: 'bx-check-circle', orden: 3 };
         }
 
+        // "2026-11-03" → "3 nov 2026": las fechas de la base, en español.
+        function fechaCorta(iso) {
+            if (!iso) return '';
+            const d = new Date(String(iso).slice(0, 10) + 'T12:00:00Z');
+            return isNaN(d) ? String(iso) : d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+        }
+
         function loadBilling(gymId) {
             const tbody = document.getElementById('billing-tbody');
             const kpis = document.getElementById('billing-kpis');
-            const paymentsBody = document.getElementById('payments-tbody');
             if (!gymId) return;
+            cargarPagosRecientes(gymId);
 
             fetch('/api/gyms/' + gymId + '/members')
                 .then(res => res.json())
+                // Las solicitudes pendientes todavía no son miembros: no cuentan en la cobranza.
+                .then(todos => todos.filter(m => m.membershipStatus !== 'pending'))
                 .then(members => {
                     const vencidos = members.filter(m => m.diasParaVencer != null && m.diasParaVencer < 0).length;
                     const porVencer = members.filter(m => m.diasParaVencer != null && m.diasParaVencer >= 0 && m.diasParaVencer <= 5).length;
@@ -1766,7 +1921,7 @@
                         <tr>
                             <td class="ps-4 fw-semibold">${escapeHtml(m.nombre)}<div class="text-body-secondary fw-normal small">${escapeHtml(m.email)}</div></td>
                             <td class="text-body-secondary">${m.diaDePago ? 'Día ' + m.diaDePago : '—'}</td>
-                            <td class="text-body-secondary">${m.fechaProximoPago ? escapeHtml(m.fechaProximoPago) : '—'}</td>
+                            <td class="text-body-secondary">${m.fechaProximoPago ? escapeHtml(fechaCorta(m.fechaProximoPago)) : '—'}</td>
                             <td><span class="badge rounded-pill ${est.clase} px-3 py-2"><i class="bx ${est.icono}"></i> ${est.texto}</span></td>
                             <td class="pe-4 text-end">
                                 <button type="button" class="btn btn-primary btn-sm rounded-pill px-3" data-pay-user="${m.id}" data-pay-name="${escapeHtml(m.nombre)}">
@@ -1775,34 +1930,45 @@
                             </td>
                         </tr>`;
                     }).join('');
-
-                    // El historial se arma con el de cada usuario y se ordena por fecha.
-                    Promise.all(members.map(m =>
-                        fetch('/api/gyms/' + gymId + '/members/' + m.id + '/payments')
-                            .then(r => r.json())
-                            .then(ps => ps.map(p => ({ ...p, nombre: m.nombre })))
-                            .catch(() => [])
-                    )).then(listas => {
-                        const pagos = listas.flat()
-                            .sort((a, b) => String(b.fechaPago).localeCompare(String(a.fechaPago)))
-                            .slice(0, 12);
-                        paymentsBody.innerHTML = pagos.length
-                            ? pagos.map(p => `
-                                <tr>
-                                    <td class="ps-4 fw-semibold">${escapeHtml(p.nombre)}</td>
-                                    <td class="text-body-secondary">${escapeHtml(p.fechaPago || '')}</td>
-                                    <td class="fw-semibold">${p.monto != null ? '$' + Number(p.monto).toFixed(2) : '—'}</td>
-                                    <td class="text-body-secondary">${escapeHtml(p.metodo || '—')}${p.plan ? '<div class="small">' + escapeHtml(p.plan) + '</div>' : ''}</td>
-                                    <td class="text-body-secondary">${escapeHtml(p.cubreHasta || '—')}${p.reembolsadoEn ? '<div><span class="badge rounded-pill bg-danger-subtle text-danger-emphasis">Reembolsado</span></div>' : ''}</td>
-                                    <td class="pe-4 text-end">
-                                        <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-recibo-pago="${escapeHtml(p.id)}" title="Descargar el recibo en PDF">
-                                            <i class='bx bx-receipt'></i> Recibo
-                                        </button>
-                                    </td>
-                                </tr>`).join('')
-                            : '<tr><td colspan="6" class="text-center text-body-secondary py-4 px-4">Aún no registras pagos.</td></tr>';
-                    });
                 });
+        }
+
+        // "Últimos pagos" y lo cobrado en el mes salen del historial del gimnasio
+        // (dos consultas, sin importar cuántos miembros haya).
+        function cargarPagosRecientes(gymId) {
+            const paymentsBody = document.getElementById('payments-tbody');
+            const delMes = document.getElementById('payments-mes');
+            apiTienda('/api/gyms/' + gymId + '/payments?limite=12')
+                .then(pagos => {
+                    paymentsBody.innerHTML = pagos.length
+                        ? pagos.map(p => `
+                            <tr>
+                                <td class="ps-4 fw-semibold">${escapeHtml(p.nombre || '—')}</td>
+                                <td class="text-body-secondary">${escapeHtml(fechaCorta(p.fechaPago))}</td>
+                                <td class="fw-semibold">${p.monto != null ? '$' + Number(p.monto).toFixed(2) : '—'}</td>
+                                <td class="text-body-secondary">${escapeHtml(p.metodo || '—')}${p.plan ? '<div class="small">' + escapeHtml(p.plan) + '</div>' : ''}</td>
+                                <td class="text-body-secondary">${p.cubreHasta ? escapeHtml(fechaCorta(p.cubreHasta)) : '—'}${p.reembolsadoEn ? '<div><span class="badge rounded-pill bg-danger-subtle text-danger-emphasis">Reembolsado</span></div>' : ''}</td>
+                                <td class="pe-4 text-end">
+                                    <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-recibo-pago="${escapeHtml(p.id)}" title="Descargar el recibo en PDF">
+                                        <i class='bx bx-receipt'></i> Recibo
+                                    </button>
+                                </td>
+                            </tr>`).join('')
+                        : '<tr><td colspan="6" class="text-center text-body-secondary py-4 px-4">Aún no registras pagos.</td></tr>';
+                })
+                .catch(err => {
+                    paymentsBody.innerHTML = '<tr><td colspan="6" class="text-center text-body-secondary py-4 px-4">' + escapeHtml(err.message) + '</td></tr>';
+                });
+
+            // Todas las membresías cobradas en el mes: a mano, en la tienda o en el mostrador.
+            apiTienda('/api/gyms/' + gymId + '/payments?desde=' + fechaMx(new Date()).slice(0, 8) + '01&limite=500')
+                .then(pagos => {
+                    const vigentes = pagos.filter(p => !p.reembolsadoEn);
+                    const total = vigentes.reduce((s, p) => s + (Number(p.monto) || 0), 0);
+                    delMes.textContent = 'Este mes: ' + dinero(total) + ' en ' + vigentes.length
+                        + (vigentes.length === 1 ? ' pago de membresía.' : ' pagos de membresía.');
+                })
+                .catch(() => { delMes.textContent = ''; });
         }
 
         /* ═══════════════════════════════════════
@@ -1901,7 +2067,7 @@
         function loadRoutines(gymId) {
             const container = document.getElementById('routines-container');
             if (!gymId) {
-                container.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-dumbbell fs-1 d-block mb-2 opacity-50"></i>Configura primero "Mi Gimnasio" para poder crear rutinas.</div>';
+                container.innerHTML = avisoSinGimnasio('Configura primero "Mi Gimnasio" para poder crear rutinas.', 'bx-dumbbell');
                 return;
             }
             fetch('/api/gyms/' + gymId + '/routines')
@@ -2022,6 +2188,11 @@
                 document.getElementById('member-new-btn').disabled = false;
                 loadMembers(gymId);
             }
+            // Las solicitudes llegan desde la app en cualquier momento: al abrir la
+            // pestaña se vuelve a pedir la lista.
+            document.addEventListener('panel:mostrado', (e) => {
+                if (e.detail === 'usuarios') loadMembers(localStorage.getItem('gymId'));
+            });
         }
 
         function loadMembers(gymId) {
@@ -2031,6 +2202,8 @@
             fetch('/api/gyms/' + gymId + '/members')
                 .then(res => res.json())
                 .then(members => {
+                    resumenConteos.miembros = members.length;
+                    pintarPasos();
                     const pendientes = members.filter(m => m.membershipStatus === 'pending').length;
                     countLabel.textContent = members.length + (members.length === 1 ? ' usuario' : ' usuarios')
                         + (pendientes ? ' · ' + pendientes + (pendientes === 1 ? ' solicitud por revisar' : ' solicitudes por revisar') : '');
@@ -2063,20 +2236,23 @@
 
                     tbody.innerHTML = members.map(m => {
                         const estado = ESTADOS[m.membershipStatus] || ESTADOS.active;
+                        // Una solicitud todavía no es miembro: ni estado de pago ni botón de cobro.
+                        const esSolicitud = m.membershipStatus === 'pending';
                         const pago = estadoDePago(m);
                         return `
-                        <tr${m.membershipStatus === 'pending' ? ' class="table-warning bg-opacity-10"' : ''}>
+                        <tr${esSolicitud ? ' class="table-warning bg-opacity-10"' : ''}>
                             <td class="ps-4 fw-semibold">${escapeHtml(m.nombre)}</td>
                             <td class="text-body-secondary">${escapeHtml(m.email)}</td>
                             <td>${estado.badge}</td>
                             <td>
+                                ${esSolicitud ? '<span class="text-body-secondary small">Al aprobarla</span>' : `
                                 <span class="badge rounded-pill ${pago.clase} px-3 py-2"><i class="bx ${pago.icono}"></i> ${pago.texto}</span>
-                                ${m.fechaProximoPago ? '<div class="text-body-secondary small mt-1">Vence ' + escapeHtml(m.fechaProximoPago) + '</div>' : ''}
+                                ${m.fechaProximoPago ? '<div class="text-body-secondary small mt-1">Vence el ' + escapeHtml(fechaCorta(m.fechaProximoPago)) + '</div>' : ''}`}
                             </td>
                             <td class="pe-4 text-end">
-                                <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3 mb-1" data-pay-user="${m.id}" data-pay-name="${escapeHtml(m.nombre)}">
+                                ${esSolicitud ? '' : `<button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3 mb-1" data-pay-user="${m.id}" data-pay-name="${escapeHtml(m.nombre)}">
                                     <i class='bx bx-dollar'></i> Pago
-                                </button>
+                                </button>`}
                                 ${estado.acciones(m.id)}
                             </td>
                         </tr>`;
@@ -2237,7 +2413,7 @@
             const gymId = localStorage.getItem('gymId');
             const kpis = document.getElementById('ventas-kpis');
             if (!gymId) {
-                kpis.innerHTML = '<div class="col-12"><div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-line-chart fs-1 d-block mb-2 opacity-50"></i>Configura primero "Mi Gimnasio" para ver tus ventas.</div></div>';
+                kpis.innerHTML = '<div class="col-12">' + avisoSinGimnasio('Configura primero "Mi Gimnasio" para ver tus ventas.', 'bx-line-chart') + '</div>';
                 return;
             }
             const dias = Number(document.getElementById('ventas-periodo').value);
@@ -2763,12 +2939,17 @@
         function loadProductos(gymId) {
             const container = document.getElementById('productos-container');
             if (!gymId) {
-                container.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-package fs-1 d-block mb-2 opacity-50"></i>Configura primero "Mi Gimnasio" para abrir tu tienda.</div>';
+                container.innerHTML = avisoSinGimnasio('Configura primero "Mi Gimnasio" para abrir tu tienda.', 'bx-package');
                 return;
             }
             estadoCargando(container, 'Cargando productos…');
             apiTienda('/api/gyms/' + gymId + '/productos')
-                .then(productos => { productosCache = productos; renderProductos(); })
+                .then(productos => {
+                    productosCache = productos;
+                    resumenConteos.productos = productos.length;
+                    pintarPasos();
+                    renderProductos();
+                })
                 .catch(err => estadoError(container, err.message, () => loadProductos(gymId)));
         }
 
@@ -2923,6 +3104,9 @@
             apiTienda('/api/gyms/' + gymId + '/planes')
                 .then(planes => {
                     planesCache = planes;
+                    resumenConteos.planes = planes.filter(p => !p.pagoUnico).length;
+                    pintarPasos();
+                    pintarPresets();
                     if (!planes.length) {
                         container.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-purchase-tag-alt fs-1 d-block mb-2 opacity-50"></i>Aún no tienes planes. Empieza con uno de "Agregar rápido".</div>';
                         return;
@@ -2952,13 +3136,21 @@
                 .catch(err => estadoError(container, err.message, () => loadPlanes(gymId)));
 
             apiTienda('/api/gyms/' + gymId + '/planes/presets')
-                .then(lista => {
-                    presetsCache = lista;
-                    presets.innerHTML = lista.map((p, i) =>
-                        '<button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-preset="' + i + '"><i class="bx bx-plus"></i> '
-                        + escapeHtml(p.nombre) + (p.precio != null ? ' · ' + dinero(p.precio) : '') + '</button>').join('');
-                })
+                .then(lista => { presetsCache = lista; pintarPresets(); })
                 .catch(() => { presets.innerHTML = '<span class="text-body-secondary small">No se pudieron cargar las sugerencias.</span>'; });
+        }
+
+        // Las sugerencias que ya tienes (mismo nombre, o misma duración) se marcan
+        // en lugar de ofrecerse otra vez: así no quedan dos "Mensual".
+        function pintarPresets() {
+            if (!presetsCache.length) return;
+            const normal = (s) => String(s || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+            const yaLoTienes = (p) => planesCache.some(x => normal(x.nombre) === normal(p.nombre)
+                || (!p.pagoUnico && !x.pagoUnico && x.duracionUnidad === p.duracionUnidad && x.duracionCantidad === p.duracionCantidad));
+            document.getElementById('planes-presets').innerHTML = presetsCache.map((p, i) => yaLoTienes(p)
+                ? '<span class="preset-creado"><i class="bx bx-check" aria-hidden="true"></i> ' + escapeHtml(p.nombre) + ' · ya lo tienes</span>'
+                : '<button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-preset="' + i + '"><i class="bx bx-plus" aria-hidden="true"></i> '
+                    + escapeHtml(p.nombre) + (p.precio != null ? ' · ' + dinero(p.precio) : '') + '</button>').join('');
         }
 
         /* ═══════════════════════════════════════
@@ -3342,7 +3534,7 @@
         function loadMostrador(gymId, avisosDelServidor) {
             const catalogo = document.getElementById('mostrador-catalogo');
             if (!gymId) {
-                catalogo.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-store fs-1 d-block mb-2 opacity-50"></i>Configura primero "Mi Gimnasio" para vender en mostrador.</div>';
+                catalogo.innerHTML = avisoSinGimnasio('Configura primero "Mi Gimnasio" para vender en mostrador.', 'bx-store');
                 return;
             }
             mostradorTicket = leerTicketGuardado();

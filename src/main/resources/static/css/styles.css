@@ -644,6 +644,27 @@ footer.bg-dark::before {
 }
 .dash-nav-link.active::before { transform: scaleY(1); }
 
+/* Grupos del menú: Gimnasio · Tienda · Entrenamiento · Acceso */
+.dash-nav-grupo {
+    display: block;
+    padding: 1rem 0.9rem 0.3rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #5c5f57;
+}
+.dash-nav-grupo:first-child { padding-top: 0.2rem; }
+.dash-nav-pronto {
+    margin-left: auto;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #5c5f57;
+    background: transparent;
+    border: 1px solid currentColor;
+}
+.dash-nav-link.active .dash-nav-pronto { color: inherit; }
+
 .dash-content {
     flex: 1;
     min-width: 0;
@@ -676,30 +697,56 @@ footer.bg-dark::before {
 .dash-table td, .dash-table th { vertical-align: middle; }
 .dash-table tbody tr:hover { background: rgba(var(--brand-rgb), 0.03); }
 
-.feature-preview-card {
-    background: #fff;
-    border-radius: 1.25rem;
-    border: 1px solid rgba(20, 20, 25, 0.06);
-    box-shadow: var(--shadow-soft);
-    padding: 1.75rem;
-    height: 100%;
-    transition: transform 0.3s var(--ease-out), box-shadow 0.3s var(--ease-out);
+/* ─── Resumen: primeros pasos y pendientes ─── */
+.resumen-paso {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.9rem;
+    padding: 0.75rem 0;
+    border-top: 1px solid rgba(20, 20, 25, 0.08);
 }
-.feature-preview-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-hover); }
+.resumen-paso:first-child { border-top: 0; padding-top: 0.25rem; }
+.resumen-paso-marca {
+    width: 1.9rem;
+    height: 1.9rem;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1.5px solid #8a8c82;
+    color: #4a4c45;
+    font-size: 0.85rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.resumen-paso.siguiente .resumen-paso-marca { border-color: var(--brand); color: var(--brand-dark); }
+.resumen-paso.hecho .resumen-paso-marca { background: #20221f; border-color: #20221f; color: #fff; font-size: 1.1rem; }
+.resumen-paso.hecho .resumen-paso-texto { color: #62645d; }
+.resumen-paso-texto { flex: 1 1 14rem; min-width: 0; }
 
-.roadmap-tile {
-    background: #fff;
-    border-radius: 1rem;
-    border: 1px solid rgba(20, 20, 25, 0.06);
-    padding: 1.1rem 1.25rem;
+.resumen-pendientes li {
     display: flex;
     align-items: center;
-    gap: 0.9rem;
-    cursor: pointer;
-    transition: transform 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out), border-color 0.25s ease;
+    gap: 0.75rem;
+    padding: 0.6rem 0;
+    border-top: 1px solid rgba(20, 20, 25, 0.08);
 }
-.roadmap-tile:hover { transform: translateY(-3px); box-shadow: var(--shadow-soft); border-color: rgba(var(--brand-rgb), 0.3); }
-.roadmap-tile:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.resumen-pendientes li:first-child { border-top: 0; padding-top: 0; }
+.resumen-pendientes li > i { font-size: 1.35rem; color: var(--brand-dark); flex-shrink: 0; }
+
+/* Sugerencia de plan que el gimnasio ya tiene */
+.preset-creado {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 50rem;
+    border: 1px dashed rgba(20, 20, 25, 0.25);
+    color: #62645d;
+    font-size: 0.875rem;
+}
 
 @media (max-width: 991.98px) {
     .dash-wrap { flex-direction: column; min-height: auto; }
@@ -708,6 +755,7 @@ footer.bg-dark::before {
     .dash-nav-link { width: auto; white-space: nowrap; flex-shrink: 0; }
     .dash-nav-link::before { left: 50%; top: auto; bottom: -0.35rem; width: 60%; height: 3px; transform: scaleX(0); }
     .dash-nav-link.active::before { transform: scaleX(1); }
+    .dash-nav-grupo { display: none; }
     .dash-content { max-height: none; overflow-y: visible; }
 }
 
