@@ -164,8 +164,10 @@ const Tienda = (() => {
                 </div>
             </div>`);
 
-        document.getElementById('cerrar-sesion').addEventListener('click', () => {
-            ['userName', 'userId', 'gymId', 'role', CACHE].forEach(k => localStorage.removeItem(k));
+        document.getElementById('cerrar-sesion').addEventListener('click', (e) => {
+            e.preventDefault();
+            try { localStorage.removeItem(CACHE); } catch (err) { /* sin almacenamiento */ }
+            Sesion.cerrar();
         });
         document.getElementById('boton-carrito').addEventListener('click', abrirCarrito);
         document.getElementById('barra-ver').addEventListener('click', abrirCarrito);

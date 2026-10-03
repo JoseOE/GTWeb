@@ -10,6 +10,7 @@
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/editorial.css">
+    <script src="js/sesion.js"></script>
 </head>
 <body class="gym-interior bg-body-tertiary d-flex flex-column min-vh-100">
 
@@ -67,6 +68,7 @@
                                 </div>
                             </div>
 
+                            <div id="alert-sesion" class="alert alert-warning d-none small py-2" role="status"></div>
                             <div id="alert-error" class="alert alert-danger d-none small py-2" role="alert"></div>
 
                             <button type="submit" class="btn btn-primary btn-lg w-100 rounded-pill fw-bold shadow-sm" id="btn-submit">
@@ -85,6 +87,17 @@
     </section>
 
     <script>
+        // Por qué llegó aquí: la sesión venció, o era de antes de que existiera el token.
+        const motivoSesion = new URLSearchParams(location.search).get('sesion');
+        if (motivoSesion) {
+            const aviso = document.getElementById('alert-sesion');
+            aviso.innerHTML = '<i class="bx bx-time-five"></i> ' + (motivoSesion === 'vencida'
+                ? 'Tu sesión venció. Vuelve a entrar para continuar.'
+                : 'Actualizamos la seguridad de tu cuenta: entra de nuevo una sola vez.');
+            aviso.classList.remove('d-none');
+            history.replaceState(null, '', 'login.html');
+        }
+
         document.getElementById('toggle-pw').addEventListener('click', () => {
             const pw = document.getElementById('password');
             const icon = document.getElementById('toggle-pw-icon');
@@ -117,16 +130,9 @@
             .then(res => res.json().then(data => ({ status: res.status, body: data })))
             .then(response => {
                 if (response.status === 200) {
-                    localStorage.setItem('userName', response.body.nombre);
-                    localStorage.setItem('userId', response.body.id || '');
-                    localStorage.setItem('role', response.body.role || 'owner');
-                    if (response.body.gymId) {
-                        localStorage.setItem('gymId', response.body.gymId);
-                    } else {
-                        localStorage.removeItem('gymId');
-                    }
+                    Sesion.iniciar(response.body);
                     // El panel es del dueño; un miembro de un gimnasio entra directo a su tienda.
-                    window.location.href = response.body.role === 'member' ? 'tienda.html' : 'bienvenido.html';
+                    window.location.href = Sesion.destino(response.body);
                 } else if (response.body.verificacionPendiente) {
                     // Cuenta creada pero sin confirmar el correo: se manda a verificarlo.
                     sessionStorage.setItem('correoPorVerificar', response.body.email || email);
