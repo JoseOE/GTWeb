@@ -27,6 +27,7 @@ GitHub Pages solo sirve archivos estáticos, así que ahí funcionan la página 
 - [Problemas comunes](#-problemas-comunes)
 - [Estructura del proyecto](#-estructura-del-proyecto)
 - [API](#-api)
+- [Seguridad y sesiones](#-seguridad-y-sesiones)
 - [Correos de la cuenta](#-correos-de-la-cuenta)
 - [Tienda](#-tienda)
 - [Contexto del proyecto](#problemática)
@@ -162,6 +163,7 @@ Y abre http://localhost:5500. **Ojo:** así no funcionan el catálogo, el regist
 | `MAIL_USERNAME` | No* | Correo remitente. Debe estar verificado en Brevo → **Senders, Domains & Dedicated IPs**. |
 | `APP_URL` | No | Dirección con la que se arman los enlaces de los correos. Por defecto `http://localhost:8080`; en Render debe ser `https://gtweb.onrender.com`. |
 | `PORT` | No | Puerto del servidor. Por defecto `8080`; Render lo asigna solo. |
+| `EXIGIR_TOKEN` | No | `true` para que toda la API exija el token de sesión. Por defecto `false` mientras la app móvil se actualiza (ver [Seguridad y sesiones](#-seguridad-y-sesiones)). |
 
 \* Sin `BREVO_API_KEY` y `MAIL_USERNAME` la página funciona igual: los códigos de verificación y los enlaces de recuperación se escriben en la consola en lugar de enviarse.
 
@@ -239,7 +241,8 @@ GTWeb/
 |---|---|---|
 | GET | `/api/servicios` · `/api/servicios/{id}` | Catálogo de soluciones |
 | POST | `/api/users/register` | Crear cuenta (dueño desde la página; miembro desde la app con `role: "member"`) |
-| POST | `/api/users/login` | Iniciar sesión |
+| POST | `/api/users/login` | Iniciar sesión → la cuenta y su `token` de sesión |
+| POST | `/api/users/logout` | Cerrar la sesión del token que llega (`Authorization: Bearer`) |
 | GET | `/api/users/{id}/me` | Estado vigente de la cuenta y su gimnasio |
 | POST | `/api/cuenta/verificar` · `/api/cuenta/verificar/reenviar` | Verificar el correo · pedir otro código |
 | POST | `/api/cuenta/recuperar` · `/api/cuenta/restablecer` | Enlace de recuperación · guardar contraseña nueva |
@@ -257,7 +260,6 @@ GTWeb/
 | GET · POST | `/api/gyms/{gymId}/members/{userId}/payments` | Pagos de cada miembro |
 | GET · POST | `/api/gyms/{gymId}/machines` · PUT · DELETE `/api/machines/{id}` | Máquinas del gimnasio |
 | GET · POST | `/api/gyms/{gymId}/routines` · PUT · DELETE `/api/routines/{id}` | Rutinas del gimnasio |
-| POST | `/api/billing/run` | Revisar vencimientos ahora (también corre sola todos los días a las 6:00) |
 
 ### App móvil
 
@@ -272,6 +274,44 @@ GTWeb/
 | GET | `/api/users/{userId}/workouts/stats` | Estadísticas de la pestaña Progreso |
 
 Las notificaciones push (solicitud aprobada, pago por vencer, membresía vencida) se envían por el servicio de push de Expo.
+
+---
+
+## 🔐 Seguridad y sesiones
+
+- **La sesión.**
+  - `POST /api/users/login` y `POST /api/cuenta/verificar` devuelven un `token` al azar, que vale 30 días.
+  - La página lo guarda (`js/sesion.js`) y lo manda en cada llamada a `/api/` como `Authorization: Bearer <token>`.
+  - En la base solo queda su huella SHA-256 (colección `sesiones`). Quien lea la base no puede usar las sesiones.
+- **La identidad sale del token, no del cliente.** Con token, el servidor llena él mismo el `X-User-Id` que usan las rutas. Si la página manda otro, responde 403.
+- **Quién puede qué.** `SesionFilter` revisa, además de la sesión:
+  - que el gimnasio de la ruta sea del dueño que llama (miembros, pagos, código, rutinas, máquinas, productos, planes, mostrador y ventas);
+  - que cada cuenta (`/api/users/{id}/...`) sea de quien llama.
+
+  La tienda, los recibos y los simuladores lo revisan en `AccesoService`.
+- **Al cerrar o cambiar la contraseña.**
+  - "Cerrar sesión" invalida el token en el servidor.
+  - Restablecer la contraseña cierra todas las sesiones de la cuenta.
+  - Cambiarla desde "Mi cuenta" cierra las demás y deja abierta la actual.
+- **Al verificar el correo** se entra directo al panel: verificar demuestra que el correo es suyo.
+- **Al registrarse** solo se aceptan nombre, correo, contraseña y `role`. Lo demás (fecha de corte, plan, gimnasio) nunca viene del cliente.
+- **El detalle de un gimnasio.** `GET /api/gyms/{id}` le da todo a su dueño. A cualquier otro le da solo lo público, sin el código de acceso ni los datos internos de la tienda.
+
+**Transición de la app móvil.**
+
+- Mientras la app no mande el token, `EXIGIR_TOKEN=false` deja que las rutas que comparte con la página sigan aceptando el `X-User-Id` de siempre.
+- Las rutas que solo usa el panel exigen token desde ya:
+  - gimnasio y su código;
+  - miembros y alta de pagos;
+  - rutinas y máquinas (crear, editar, borrar);
+  - productos, planes y mostrador;
+  - ventas y "Simular pago en tienda".
+- Para terminar la transición, la app debe:
+  1. guardar el `token` que devuelven `/api/users/login` y `/api/users/register` (los miembros entran directo);
+  2. mandarlo en cada llamada (`Authorization: Bearer <token>`) y llamar a `/api/users/logout` al salir;
+  3. con eso publicado, poner `EXIGIR_TOKEN=true` en Render.
+
+  Hasta entonces, las rutas de la app siguen tan abiertas como antes.
 
 ---
 
