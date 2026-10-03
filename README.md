@@ -620,7 +620,8 @@ Para crear o editar se manda `nombre`, `descripcion`, `categoria` (el handle), `
 - Lo pueden comprar los miembros vinculados al gimnasio con estado `active` o `inactive`; `pending` no.
 - Cuando el pedido queda **pagado** (`captured`), `BillingService` extiende la membresía:
   - los planes por mes respetan el día de pago, como la mensualidad;
-  - los de días o semanas suman días.
+  - los de días o semanas suman días;
+  - si alguien con una visita o semana todavía vigente paga un mes, ese mes empieza **al terminar lo que ya pagó** y su día de pago pasa a ser ese día (semana del 1 al 8 + mes pagado el 3 → cubre del 8 al 8 del mes siguiente). Pagar tarde no mueve el día de pago.
 - Se guarda un `Payment` con `metodo`, `plan` y `orderId`. `orderId` tiene **índice único**, así que un aviso repetido nunca extiende dos veces. El usuario guarda `planActual`.
 - Un pedido Paynet pendiente **no** activa nada hasta que se captura.
 - Si el pedido se reembolsa desde Ventas, la membresía vuelve a su fecha de corte anterior (ver "Ventas").

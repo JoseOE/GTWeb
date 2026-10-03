@@ -24,7 +24,8 @@ import java.util.Objects;
 // siguiente. El día 21 (el primero después de la fecha de corte) la membresía
 // pasa a "inactive" sola, sin que el dueño tenga que acordarse. Los planes de
 // varios meses (trimestral, anual...) siguen la misma regla; los de días o
-// semanas (visita, semana) solo suman días.
+// semanas (visita, semana) solo suman días, y si después paga un mes, ese mes
+// empieza cuando termina lo que ya había pagado.
 @Service
 public class BillingService {
 
@@ -87,18 +88,23 @@ public class BillingService {
             }
         }
 
-        // El día de pago se fija con el primer abono mensual y ya no se mueve: si
-        // pagaste el 20, tu corte siempre cae en 20, aunque un mes pagues tarde.
-        // Una visita o una semana no lo fijan: no dicen nada de cuándo paga cada mes.
-        if (duracion.esPorMes() && member.getDiaDePago() == null) {
-            member.setDiaDePago(pago.getDayOfMonth());
-        }
-
         // Si todavía tiene saldo a favor, el plan nuevo se encadena al corte vigente
         // en vez de regalarle días o quitárselos por pagar antes de tiempo.
-        LocalDate base = (member.getFechaProximoPago() != null && member.getFechaProximoPago().isAfter(pago))
-                ? member.getFechaProximoPago()
-                : pago;
+        boolean conSaldo = member.getFechaProximoPago() != null && member.getFechaProximoPago().isAfter(pago);
+        LocalDate base = conSaldo ? member.getFechaProximoPago() : pago;
+
+        // El día de pago se fija con el primer abono mensual y ya no se mueve: si
+        // pagaste el 20, tu corte siempre cae en 20, aunque un mes pagues tarde.
+        // Una visita o una semana no lo fijan. Si al pagar el mes todavía le queda
+        // una visita o una semana, el mes empieza cuando termina lo que ya pagó y
+        // el día de pago pasa a ser ese (regla acordada: "al terminar lo pagado").
+        if (duracion.esPorMes()) {
+            if (member.getDiaDePago() == null) {
+                member.setDiaDePago(base.getDayOfMonth());
+            } else if (conSaldo && !esDiaDeCorte(base, member.getDiaDePago())) {
+                member.setDiaDePago(base.getDayOfMonth());
+            }
+        }
         LocalDate cubreHasta = extender(base, duracion, member.getDiaDePago());
 
         payment.setCorteAnterior(member.getFechaProximoPago());
@@ -127,6 +133,12 @@ public class BillingService {
         if (diaDePago == null) return siguiente;
         int dia = Math.min(diaDePago, siguiente.lengthOfMonth());
         return siguiente.withDayOfMonth(dia);
+    }
+
+    // ¿Esa fecha es un corte normal para ese día de pago? (El 30 de noviembre
+    // lo es para quien paga los 31.) Si no, el corte vino de una visita o semana.
+    private static boolean esDiaDeCorte(LocalDate fecha, int diaDePago) {
+        return fecha.getDayOfMonth() == Math.min(diaDePago, fecha.lengthOfMonth());
     }
 
     // Qué le pasó a la membresía al reembolsar el pedido que la había extendido.
