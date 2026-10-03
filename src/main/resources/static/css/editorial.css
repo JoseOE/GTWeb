@@ -98,7 +98,7 @@ button,a,input,summary {
     border-bottom:1px solid #41423a;
     box-shadow:none;
     backdrop-filter:none;
-    transition:padding .25s var(--ease-out)
+    transition:none
 }
 .gym-editorial #main-navbar.scrolled {
     padding:12px 0;
