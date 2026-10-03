@@ -419,6 +419,7 @@ Todas las rutas de la tienda identifican a quien llama con el encabezado **`X-Us
 | POST | `/api/gyms/{gymId}/imagenes` | Subir una foto `{"dataUrl": "data:image/jpeg;base64,..."}` → `{id, url}` |
 | GET | `/api/imagenes/{id}` | Ver la foto (pública, en caché un año) |
 | POST | `/api/gyms/{gymId}/members/{userId}/payments` | Registrar un pago a mano; acepta `planId` para usar la duración de un plan |
+| GET | `/api/gyms/{gymId}/payments?limite=12` · `?desde=AAAA-MM-DD&limite=500` | Pagos de todo el gimnasio, del más reciente al más viejo, con el nombre del miembro y `orderId` si vino de un pedido (solo el dueño). Lo usan "Últimos pagos" y el Resumen |
 
 **Tienda del miembro (página y app)**
 
