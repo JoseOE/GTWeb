@@ -127,6 +127,7 @@ Para detener el servidor presiona **Ctrl + C** en la terminal.
 5. **Login y panel:** inicia sesión y registra tu gimnasio, miembros, pagos, máquinas y rutinas en el panel.
 6. **Mi cuenta:** desde el panel prueba cambiar la contraseña y el correo.
 7. **Recuperación:** cierra sesión y usa "¿Olvidaste tu contraseña?".
+8. **Pruebas automáticas:** con Spring, Medusa y MongoDB levantados, `cd pruebas && npm install && npm run todas` recorre estos flujos de punta a punta (ver [pruebas/README.md](pruebas/README.md)). En GitHub, cada PR se compila solo (`.github/workflows/ci.yml`).
 
 ### Opcional: cambiar el puerto
 
