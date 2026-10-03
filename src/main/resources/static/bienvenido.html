@@ -53,6 +53,9 @@
                 <button type="button" class="dash-nav-link" role="tab" id="tab-mostrador" aria-controls="panel-mostrador" aria-selected="false" data-panel="mostrador">
                     <i class='bx bx-store'></i><span>Mostrador</span>
                 </button>
+                <button type="button" class="dash-nav-link" role="tab" id="tab-ventas" aria-controls="panel-ventas" aria-selected="false" data-panel="ventas">
+                    <i class='bx bx-line-chart'></i><span>Ventas</span>
+                </button>
                 <button type="button" class="dash-nav-link" role="tab" id="tab-productos" aria-controls="panel-productos" aria-selected="false" data-panel="productos">
                     <i class='bx bx-package'></i><span>Productos</span>
                 </button>
@@ -597,6 +600,159 @@
                 </div>
             </div>
 
+            <!-- ─── VENTAS (dashboard de la tienda) ─── -->
+            <div class="dash-panel" id="panel-ventas" data-panel="ventas" role="tabpanel" aria-labelledby="tab-ventas" tabindex="0">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+                    <div>
+                        <h3 class="fw-bold mb-1"><i class='bx bx-line-chart text-primary me-1'></i> Ventas</h3>
+                        <p class="text-body-secondary mb-0">Lo que vendes en la página, la app y el mostrador: cuánto, cómo te pagan y qué se vende más.</p>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="ventas-actualizar">
+                        <i class='bx bx-refresh'></i> Actualizar
+                    </button>
+                </div>
+                <div class="alert alert-info d-none small py-2 tienda-despertando" role="status">
+                    <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span> Despertando la tienda… esto puede tardar un minuto.
+                </div>
+
+                <div class="row g-3 mb-4" id="ventas-kpis"></div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-lg-8">
+                        <div class="dash-empty text-start p-0 overflow-hidden h-100">
+                            <div class="p-4 pb-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <div>
+                                    <h4 class="fw-bold mb-0 fs-6">Ventas por día</h4>
+                                    <small class="text-body-secondary" id="ventas-periodo-texto"></small>
+                                </div>
+                                <select class="form-select form-select-sm w-auto" id="ventas-periodo" aria-label="Periodo de las gráficas">
+                                    <option value="7">Últimos 7 días</option>
+                                    <option value="30" selected>Últimos 30 días</option>
+                                    <option value="90">Últimos 90 días</option>
+                                </select>
+                            </div>
+                            <div class="px-3 pb-3"><div class="ventas-grafica" id="ventas-dias"></div></div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="dash-empty text-start p-0 overflow-hidden h-100">
+                            <div class="p-4 pb-2">
+                                <h4 class="fw-bold mb-0 fs-6">Por forma de pago</h4>
+                                <small class="text-body-secondary">En el periodo</small>
+                            </div>
+                            <div class="px-3 pb-3"><div class="ventas-grafica" id="ventas-metodos"></div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-lg-7">
+                        <div class="dash-empty text-start p-4 h-100">
+                            <h4 class="fw-bold mb-0 fs-6">Lo más vendido</h4>
+                            <small class="text-body-secondary d-block mb-3">Por lo que dejó en el periodo</small>
+                            <div id="ventas-top"></div>
+                        </div>
+                    </div>
+                    <div class="col-lg-5">
+                        <div class="dash-empty text-start p-4 h-100">
+                            <h4 class="fw-bold mb-0 fs-6">Por canal</h4>
+                            <small class="text-body-secondary d-block mb-3">Dónde se hizo cada venta</small>
+                            <div id="ventas-canales"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dash-empty text-start p-0 overflow-hidden">
+                    <div class="p-4 border-bottom">
+                        <h4 class="fw-bold mb-3 fs-6">Pedidos</h4>
+                        <form class="row g-2 align-items-end" id="ventas-filtros" role="search" aria-label="Filtrar pedidos">
+                            <div class="col-12 col-lg-6">
+                                <label for="ventas-buscar" class="form-label small text-body-secondary mb-1">Buscar</label>
+                                <input type="search" class="form-control form-control-sm" id="ventas-buscar" placeholder="Folio, cliente o correo">
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label for="ventas-f-desde" class="form-label small text-body-secondary mb-1">Desde</label>
+                                <input type="date" class="form-control form-control-sm" id="ventas-f-desde">
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label for="ventas-f-hasta" class="form-label small text-body-secondary mb-1">Hasta</label>
+                                <input type="date" class="form-control form-control-sm" id="ventas-f-hasta">
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label for="ventas-f-metodo" class="form-label small text-body-secondary mb-1">Forma de pago</label>
+                                <select class="form-select form-select-sm" id="ventas-f-metodo">
+                                    <option value="">Todas</option>
+                                    <option value="tarjeta">Tarjeta</option>
+                                    <option value="paypal">PayPal</option>
+                                    <option value="paynet">Paynet</option>
+                                    <option value="efectivo">Efectivo</option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label for="ventas-f-estado" class="form-label small text-body-secondary mb-1">Estado</label>
+                                <select class="form-select form-select-sm" id="ventas-f-estado">
+                                    <option value="">Todos</option>
+                                    <option value="pagado">Pagado</option>
+                                    <option value="pendiente_pago">Pendiente de pago</option>
+                                    <option value="cancelado">Cancelado</option>
+                                    <option value="reembolsado">Reembolsado</option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <label for="ventas-f-canal" class="form-label small text-body-secondary mb-1">Canal</label>
+                                <select class="form-select form-select-sm" id="ventas-f-canal">
+                                    <option value="">Todos</option>
+                                    <option value="web">Página web</option>
+                                    <option value="app">App</option>
+                                    <option value="mostrador">Mostrador</option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-lg-3">
+                                <button type="reset" class="btn btn-outline-secondary btn-sm w-100">Limpiar filtros</button>
+                            </div>
+                        </form>
+                        <small class="text-body-secondary d-block mt-3" id="ventas-conteo" aria-live="polite"></small>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table dash-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="ps-4">Pedido</th>
+                                    <th>Cliente</th>
+                                    <th>Canal</th>
+                                    <th>Pago</th>
+                                    <th>Estado</th>
+                                    <th class="pe-4 text-end">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ventas-tbody"></tbody>
+                        </table>
+                    </div>
+                    <nav class="p-3 border-top d-flex justify-content-between align-items-center gap-2 d-none" id="ventas-paginacion" aria-label="Páginas de pedidos">
+                        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="ventas-anterior"><i class='bx bx-chevron-left'></i> Anteriores</button>
+                        <small class="text-body-secondary" id="ventas-pagina"></small>
+                        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="ventas-siguiente">Siguientes <i class='bx bx-chevron-right'></i></button>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- ─── MODAL: DETALLE DE UN PEDIDO ─── -->
+            <div class="modal fade" id="ventaDetalleModal" tabindex="-1" aria-labelledby="ventaDetalleLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                    <div class="modal-content border-0 rounded-4">
+                        <div class="modal-header border-0 pb-0">
+                            <h5 class="modal-title fw-bold" id="ventaDetalleLabel">Pedido</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                        </div>
+                        <div class="modal-body" id="venta-detalle-cuerpo"></div>
+                        <div class="modal-footer border-0 pt-0 d-block">
+                            <div class="alert d-none small py-2 mb-2" id="venta-detalle-aviso" role="status"></div>
+                            <div class="d-flex flex-wrap gap-2" id="venta-detalle-acciones"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- ─── PRODUCTOS DE LA TIENDA ─── -->
             <div class="dash-panel" id="panel-productos" data-panel="productos" role="tabpanel" aria-labelledby="tab-productos" tabindex="0">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
@@ -1055,6 +1211,7 @@
             initProductos();
             initPlanes();
             initMostrador();
+            initVentas();
         });
 
         /* ═══════════════════════════════════════
@@ -1636,7 +1793,7 @@
                                     <td class="text-body-secondary">${escapeHtml(p.fechaPago || '')}</td>
                                     <td class="fw-semibold">${p.monto != null ? '$' + Number(p.monto).toFixed(2) : '—'}</td>
                                     <td class="text-body-secondary">${escapeHtml(p.metodo || '—')}${p.plan ? '<div class="small">' + escapeHtml(p.plan) + '</div>' : ''}</td>
-                                    <td class="text-body-secondary">${escapeHtml(p.cubreHasta || '—')}</td>
+                                    <td class="text-body-secondary">${escapeHtml(p.cubreHasta || '—')}${p.reembolsadoEn ? '<div><span class="badge rounded-pill bg-danger-subtle text-danger-emphasis">Reembolsado</span></div>' : ''}</td>
                                     <td class="pe-4 text-end">
                                         <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-recibo-pago="${escapeHtml(p.id)}" title="Descargar el recibo en PDF">
                                             <i class='bx bx-receipt'></i> Recibo
@@ -2003,6 +2160,425 @@
             container.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-error-circle fs-1 d-block mb-2 text-danger"></i>'
                 + escapeHtml(mensaje) + '<div class="mt-3"><button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3">Reintentar</button></div></div>';
             container.querySelector('button').addEventListener('click', reintentar);
+        }
+
+        /* ═══════════════════════════════════════
+           VENTAS — /api/gyms/{id}/ventas
+           KPIs, gráficas, la lista de pedidos con filtros y el detalle con sus
+           acciones. Los datos salen de la copia local de los pedidos, así que
+           abrir la pestaña no despierta a Medusa; solo las acciones (simular el
+           pago Paynet, reembolsar, cancelar) pasan por ella.
+        ═══════════════════════════════════════ */
+        const COLORES_VENTAS = ['#f45124', '#20221f', '#8a8c82', '#f2a541', '#5b8def'];
+        const CANALES_VENTAS = { web: 'Página web', app: 'App', mostrador: 'Mostrador' };
+        const ESTADOS_VENTAS = {
+            pagado: { texto: 'Pagado', clase: 'bg-success-subtle text-success-emphasis' },
+            pendiente_pago: { texto: 'Pendiente de pago', clase: 'bg-warning-subtle text-warning-emphasis' },
+            cancelado: { texto: 'Cancelado', clase: 'bg-secondary-subtle text-secondary-emphasis' },
+            reembolsado: { texto: 'Reembolsado', clase: 'bg-danger-subtle text-danger-emphasis' }
+        };
+        let ventasPagina = 0;
+        let ventasTurno = 0;
+        let ventaActual = null;
+        let graficasVentas = [];
+        let chartJsCargando = null;
+
+        function initVentas() {
+            const filtros = document.getElementById('ventas-filtros');
+            const detalleModal = new bootstrap.Modal(document.getElementById('ventaDetalleModal'));
+            let busqueda = null;
+
+            document.getElementById('tab-ventas').addEventListener('click', cargarVentas);
+            document.getElementById('ventas-actualizar').addEventListener('click', cargarVentas);
+            document.getElementById('ventas-periodo').addEventListener('change', cargarResumenVentas);
+            filtros.addEventListener('submit', (e) => e.preventDefault());
+            filtros.addEventListener('change', (e) => {
+                if (e.target.id === 'ventas-buscar') return;
+                ventasPagina = 0;
+                cargarPedidosVentas();
+            });
+            filtros.addEventListener('input', (e) => {
+                if (e.target.id !== 'ventas-buscar') return;
+                clearTimeout(busqueda);
+                busqueda = setTimeout(() => { ventasPagina = 0; cargarPedidosVentas(); }, 300);
+            });
+            filtros.addEventListener('reset', () => setTimeout(() => { ventasPagina = 0; cargarPedidosVentas(); }));
+            document.getElementById('ventas-anterior').addEventListener('click', () => { ventasPagina--; cargarPedidosVentas(); });
+            document.getElementById('ventas-siguiente').addEventListener('click', () => { ventasPagina++; cargarPedidosVentas(); });
+
+            document.getElementById('ventas-tbody').addEventListener('click', (e) => {
+                const fila = e.target.closest('[data-venta]');
+                if (!fila) return;
+                avisoVenta('');
+                document.getElementById('venta-detalle-acciones').innerHTML = '';
+                estadoCargando(document.getElementById('venta-detalle-cuerpo'), 'Cargando el pedido…');
+                detalleModal.show();
+                apiTienda(rutaVenta(fila.dataset.venta))
+                    .then(pintarDetalleVenta)
+                    .catch(err => estadoError(document.getElementById('venta-detalle-cuerpo'), err.message, () => fila.click()));
+            });
+            document.getElementById('venta-detalle-acciones').addEventListener('click', (e) => {
+                const boton = e.target.closest('[data-accion]');
+                if (boton) accionVenta(boton.dataset.accion, boton);
+            });
+        }
+
+        function rutaVenta(orderId) {
+            return '/api/gyms/' + localStorage.getItem('gymId') + '/ventas/pedidos/' + encodeURIComponent(orderId);
+        }
+
+        function cargarVentas() {
+            cargarResumenVentas();
+            cargarPedidosVentas();
+        }
+
+        // ─── Resumen: KPIs y gráficas ───
+        function cargarResumenVentas() {
+            const gymId = localStorage.getItem('gymId');
+            const kpis = document.getElementById('ventas-kpis');
+            if (!gymId) {
+                kpis.innerHTML = '<div class="col-12"><div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-line-chart fs-1 d-block mb-2 opacity-50"></i>Configura primero "Mi Gimnasio" para ver tus ventas.</div></div>';
+                return;
+            }
+            const dias = Number(document.getElementById('ventas-periodo').value);
+            const hasta = fechaMx(new Date());
+            const desde = sumarDias(hasta, 1 - dias);
+            kpis.innerHTML = '<div class="col-12" id="ventas-kpis-estado"></div>';
+            estadoCargando(document.getElementById('ventas-kpis-estado'), 'Cargando tus ventas…');
+            apiTienda('/api/gyms/' + gymId + '/ventas/resumen?desde=' + desde + '&hasta=' + hasta)
+                .then(pintarResumenVentas)
+                .catch(err => estadoError(document.getElementById('ventas-kpis-estado'), err.message, cargarResumenVentas));
+        }
+
+        function pintarResumenVentas(r) {
+            const k = r.kpis;
+            const tiles = [
+                { valor: dinero(k.hoy.total), texto: 'Ventas de hoy', detalle: textoPedidos(k.hoy.pedidos), icono: 'bx-calendar-check', color: 'icon-brand' },
+                { valor: dinero(k.mes.total), texto: 'Ventas del mes', detalle: textoPedidos(k.mes.pedidos), icono: 'bx-calendar', color: 'icon-success' },
+                { valor: dinero(k.ticketPromedio), texto: 'Ticket promedio', detalle: 'Este mes', icono: 'bx-receipt', color: 'icon-info' },
+                { valor: String(k.paynetPendientes.pedidos), texto: 'Fichas Paynet por cobrar', detalle: dinero(k.paynetPendientes.total), icono: 'bx-store', color: 'icon-warning' },
+                { valor: String(k.membresiasDelMes), texto: 'Membresías vendidas', detalle: 'Este mes, en la tienda', icono: 'bx-purchase-tag-alt', color: 'icon-brand' }
+            ];
+            document.getElementById('ventas-kpis').innerHTML = tiles.map((t, i) => `
+                <div class="${i === tiles.length - 1 ? 'col-12' : 'col-6'} col-md-4 col-xl">
+                    <div class="kpi-tile h-100">
+                        <div class="icon-circle ${t.color} rounded-circle d-flex align-items-center justify-content-center mb-3" style="width:42px;height:42px">
+                            <i class='bx ${t.icono}' aria-hidden="true"></i>
+                        </div>
+                        <div class="ventas-dinero fw-bold">${escapeHtml(t.valor)}</div>
+                        <div class="small fw-semibold">${t.texto}</div>
+                        <small class="text-body-secondary">${escapeHtml(t.detalle)}</small>
+                    </div>
+                </div>`).join('');
+
+            document.getElementById('ventas-periodo-texto').textContent = 'Del ' + diaCorto(r.desde) + ' al ' + diaCorto(r.hasta)
+                + ' · ' + dinero(r.periodo.total) + ' en ' + textoPedidos(r.periodo.pedidos);
+            pintarBarrasVentas(document.getElementById('ventas-top'), r.topProductos.map(p => ({
+                nombre: p.titulo, total: p.total,
+                extra: (p.tipo === 'membresia' ? 'Plan · ' : '') + p.cantidad + (p.cantidad === 1 ? ' vendido' : ' vendidos')
+            })), 'Todavía no hay ventas en el periodo.', true);
+            pintarBarrasVentas(document.getElementById('ventas-canales'), r.porCanal.map(c => ({
+                nombre: CANALES_VENTAS[c.nombre] || c.nombre, total: c.total, extra: textoPedidos(c.pedidos)
+            })), 'Todavía no hay ventas en el periodo.', false);
+            pintarGraficasVentas(r);
+        }
+
+        // Lista con barras proporcionales (lo más vendido y los canales).
+        function pintarBarrasVentas(contenedor, filas, vacio, numerar) {
+            const maximo = Math.max(0, ...filas.map(f => f.total));
+            contenedor.innerHTML = filas.length ? filas.map((f, i) => `
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between gap-2 small">
+                        <span class="fw-semibold text-truncate">${numerar ? (i + 1) + '. ' : ''}${escapeHtml(f.nombre)}</span>
+                        <strong class="text-nowrap">${dinero(f.total)}</strong>
+                    </div>
+                    <div class="ventas-barra my-1" aria-hidden="true"><span style="width:${maximo ? Math.max(3, f.total / maximo * 100) : 0}%"></span></div>
+                    <small class="text-body-secondary">${escapeHtml(f.extra)}</small>
+                </div>`).join('')
+                : '<p class="text-body-secondary small mb-0">' + vacio + '</p>';
+        }
+
+        // Chart.js se carga la primera vez que se abre la pestaña. Si no carga
+        // (sin internet, CDN bloqueado), las gráficas se muestran como lista.
+        function cargarChartJs() {
+            if (window.Chart) return Promise.resolve(window.Chart);
+            if (!chartJsCargando) {
+                chartJsCargando = new Promise(resolve => {
+                    const script = document.createElement('script');
+                    script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+                    script.onload = () => resolve(window.Chart || null);
+                    script.onerror = () => { chartJsCargando = null; resolve(null); };
+                    document.head.appendChild(script);
+                });
+            }
+            return chartJsCargando;
+        }
+
+        function pintarGraficasVentas(r) {
+            const dias = document.getElementById('ventas-dias');
+            const metodos = document.getElementById('ventas-metodos');
+            cargarChartJs().then(Chart => {
+                graficasVentas.forEach(g => g.destroy());
+                graficasVentas = [];
+                if (!Chart) {
+                    pintarBarrasVentas(dias, r.porDia.filter(d => d.total > 0).map(d => ({ nombre: diaCorto(d.fecha), total: d.total, extra: textoPedidos(d.pedidos) })),
+                        'Sin ventas en el periodo.', false);
+                    pintarBarrasVentas(metodos, r.porMetodo.map(m => ({ nombre: m.nombre, total: m.total, extra: textoPedidos(m.pedidos) })),
+                        'Sin ventas en el periodo.', false);
+                    dias.style.height = metodos.style.height = 'auto';
+                    return;
+                }
+                const sinAnimacion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+                Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+                Chart.defaults.color = '#62645d';
+
+                dias.innerHTML = '<canvas role="img" aria-label="Ventas por día del periodo"></canvas>';
+                graficasVentas.push(new Chart(dias.querySelector('canvas'), {
+                    type: 'bar',
+                    data: {
+                        labels: r.porDia.map(d => diaCorto(d.fecha)),
+                        datasets: [{ label: 'Ventas', data: r.porDia.map(d => d.total), backgroundColor: COLORES_VENTAS[0], borderRadius: 4, maxBarThickness: 28 }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false, animation: sinAnimacion ? false : undefined,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { callbacks: { label: c => dinero(c.parsed.y) + ' · ' + textoPedidos(r.porDia[c.dataIndex].pedidos) } }
+                        },
+                        scales: {
+                            y: { beginAtZero: true, ticks: { callback: v => '$' + Number(v).toLocaleString('es-MX'), maxTicksLimit: 5 } },
+                            x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 7 } }
+                        }
+                    }
+                }));
+
+                if (!r.porMetodo.length) {
+                    metodos.innerHTML = '<p class="text-body-secondary small mb-0 pt-2">Sin ventas en el periodo.</p>';
+                    metodos.style.height = 'auto';
+                    return;
+                }
+                metodos.style.height = '';
+                metodos.innerHTML = '<canvas role="img" aria-label="Ventas por forma de pago: '
+                    + escapeHtml(r.porMetodo.map(m => m.nombre + ' ' + dinero(m.total)).join(', ')) + '"></canvas>';
+                graficasVentas.push(new Chart(metodos.querySelector('canvas'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: r.porMetodo.map(m => m.nombre),
+                        datasets: [{ data: r.porMetodo.map(m => m.total), backgroundColor: COLORES_VENTAS, borderWidth: 0 }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false, cutout: '62%', animation: sinAnimacion ? false : undefined,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { boxWidth: 10, usePointStyle: true } },
+                            tooltip: { callbacks: { label: c => ' ' + c.label + ': ' + dinero(c.parsed) + ' (' + textoPedidos(r.porMetodo[c.dataIndex].pedidos) + ')' } }
+                        }
+                    }
+                }));
+            });
+        }
+
+        // ─── Lista de pedidos ───
+        function cargarPedidosVentas() {
+            const gymId = localStorage.getItem('gymId');
+            const tbody = document.getElementById('ventas-tbody');
+            if (!gymId) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-body-secondary py-5 px-4">Configura primero "Mi Gimnasio".</td></tr>';
+                return;
+            }
+            const params = new URLSearchParams();
+            let conFiltros = false;
+            [['buscar', 'ventas-buscar'], ['metodo', 'ventas-f-metodo'], ['estado', 'ventas-f-estado'], ['canal', 'ventas-f-canal'],
+             ['desde', 'ventas-f-desde'], ['hasta', 'ventas-f-hasta']].forEach(([clave, id]) => {
+                const valor = document.getElementById(id).value.trim();
+                if (valor) { params.set(clave, valor); conFiltros = true; }
+            });
+            params.set('pagina', ventasPagina);
+            params.set('tamano', 15);
+            const turno = ++ventasTurno;
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-body-secondary py-4"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Cargando pedidos…</td></tr>';
+            apiTienda('/api/gyms/' + gymId + '/ventas/pedidos?' + params)
+                .then(r => { if (turno === ventasTurno) pintarPedidosVentas(r, conFiltros); })
+                .catch(err => {
+                    if (turno !== ventasTurno) return;
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4 px-4">' + escapeHtml(err.message) + '</td></tr>';
+                });
+        }
+
+        function pintarPedidosVentas(r, conFiltros) {
+            document.getElementById('ventas-conteo').textContent = r.total
+                ? (r.total === 1 ? '1 pedido' : r.total + ' pedidos') + ' · cobrado ' + dinero(r.cobrado)
+                : '';
+            document.getElementById('ventas-tbody').innerHTML = r.pedidos.length
+                ? r.pedidos.map(v => `
+                    <tr class="ventas-fila" data-venta="${escapeHtml(v.orderId)}">
+                        <td class="ps-4">
+                            <button type="button" class="btn btn-link p-0 fw-semibold text-decoration-none" data-venta="${escapeHtml(v.orderId)}">#${escapeHtml(v.folio)}</button>
+                            <div class="small text-body-secondary text-nowrap">${fechaHoraVenta(v.creadoEn)}</div>
+                        </td>
+                        <td>${escapeHtml(v.cliente || '—')}<div class="small text-body-secondary">${v.articulos} ${v.articulos === 1 ? 'artículo' : 'artículos'}</div></td>
+                        <td class="text-nowrap">${escapeHtml(CANALES_VENTAS[v.canal] || v.canal || '')}</td>
+                        <td>${escapeHtml(v.metodo)}<div class="small text-body-secondary text-truncate" style="max-width:220px">${escapeHtml(v.detallePago)}</div></td>
+                        <td>${insigniaVenta(v.estado)}</td>
+                        <td class="pe-4 text-end fw-semibold text-nowrap">${dinero(v.total)}</td>
+                    </tr>`).join('')
+                : '<tr><td colspan="6" class="text-center text-body-secondary py-5 px-4"><i class="bx bx-receipt fs-1 d-block mb-2 opacity-50"></i>'
+                    + (conFiltros ? 'Ningún pedido coincide con los filtros.' : 'Todavía no hay pedidos. Aparecen aquí al vender en la tienda, la app o el mostrador.') + '</td></tr>';
+            const paginacion = document.getElementById('ventas-paginacion');
+            paginacion.classList.toggle('d-none', r.paginas <= 1);
+            document.getElementById('ventas-pagina').textContent = 'Página ' + (r.pagina + 1) + ' de ' + r.paginas;
+            document.getElementById('ventas-anterior').disabled = r.pagina <= 0;
+            document.getElementById('ventas-siguiente').disabled = r.pagina + 1 >= r.paginas;
+        }
+
+        // ─── Detalle y acciones ───
+        function pintarDetalleVenta(d) {
+            ventaActual = d;
+            document.getElementById('ventaDetalleLabel').textContent = 'Pedido #' + d.folio;
+            const fila = (titulo, valor) => valor ? '<dt class="col-4 text-body-secondary fw-normal">' + titulo + '</dt><dd class="col-8 mb-2">' + valor + '</dd>' : '';
+            const vence = d.paynet && d.paynet.vence ? new Date(d.paynet.vence).toLocaleString('es-MX', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : '';
+            document.getElementById('venta-detalle-cuerpo').innerHTML = `
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                    ${insigniaVenta(d.estado)}
+                    <span class="small text-body-secondary">${fechaHoraVenta(d.creadoEn)} · ${escapeHtml(CANALES_VENTAS[d.canal] || d.canal || '')}</span>
+                </div>
+                <dl class="row small mb-2">
+                    ${fila('Cliente', escapeHtml(d.clienteNombre || 'Público en general') + (d.email ? '<br><span class="text-body-secondary">' + escapeHtml(d.email) + '</span>' : ''))}
+                    ${fila('Pago', escapeHtml(d.detallePago || d.metodo))}
+                    ${d.paynet ? fila('Referencia', '<span class="font-monospace">' + escapeHtml(d.paynet.referencia) + '</span>' + (vence ? '<br><span class="text-body-secondary">Vence el ' + escapeHtml(vence) + '</span>' : '')) : ''}
+                    ${fila('Pagado', d.pagadoEn ? fechaHoraVenta(d.pagadoEn) : '')}
+                    ${fila('Cancelado', d.canceladoEn ? fechaHoraVenta(d.canceladoEn) : '')}
+                    ${fila('Cobró', escapeHtml(d.vendedor || ''))}
+                </dl>
+                <div class="border-top pt-2">
+                    ${d.partidas.map(p => `
+                        <div class="d-flex justify-content-between gap-3 py-1 small">
+                            <span style="min-width:0"><span class="fw-semibold">${p.cantidad} × ${escapeHtml(p.titulo)}</span>${p.variante ? '<br><span class="text-body-secondary">' + escapeHtml(p.variante) + '</span>' : ''}</span>
+                            <span class="text-nowrap">${dinero(p.total)}</span>
+                        </div>`).join('')}
+                    <div class="d-flex justify-content-between small text-body-secondary pt-2 border-top mt-1"><span>Subtotal (sin IVA)</span><span>${dinero(d.subtotal)}</span></div>
+                    <div class="d-flex justify-content-between small text-body-secondary"><span>IVA 16 %</span><span>${dinero(d.iva)}</span></div>
+                    <div class="d-flex justify-content-between fw-bold"><span>Total</span><span>${dinero(d.total)}</span></div>
+                </div>
+                ${d.planAplicado && d.estado === 'pagado' ? '<div class="alert alert-light border small py-2 mt-3 mb-0"><i class="bx bx-purchase-tag-alt"></i> Este pedido extendió una membresía. Si lo reembolsas, la membresía vuelve a su fecha anterior.</div>' : ''}
+                ${d.fichaVencida ? '<div class="alert alert-warning small py-2 mt-3 mb-0">La ficha ya venció: el pedido se cancelará solo en unos minutos.</div>' : ''}`;
+
+            const a = d.acciones;
+            const botones = [
+                a.simularPaynet && ['simular', 'btn-primary', 'bx-store', 'Simular pago en tienda'],
+                a.recibo && ['recibo', 'btn-outline-primary', 'bx-receipt', 'Recibo (PDF)'],
+                a.ficha && ['ficha', 'btn-outline-primary', 'bx-barcode', 'Ficha Paynet (PDF)'],
+                a.reenviar && ['reenviar', 'btn-outline-secondary', 'bx-envelope', 'Reenviar correo'],
+                a.reembolsar && ['reembolsar', 'btn-outline-danger', 'bx-undo', 'Reembolsar'],
+                a.cancelar && ['cancelar', 'btn-outline-danger', 'bx-x-circle', 'Cancelar pedido']
+            ].filter(Boolean);
+            document.getElementById('venta-detalle-acciones').innerHTML = botones.map(([accion, clase, icono, texto]) =>
+                `<button type="button" class="btn ${clase} btn-sm rounded-pill px-3" data-accion="${accion}"><i class='bx ${icono}' aria-hidden="true"></i> ${texto}</button>`).join('');
+        }
+
+        function accionVenta(accion, boton) {
+            const d = ventaActual;
+            if (!d) return;
+            if (accion === 'recibo' || accion === 'ficha') {
+                // La ventana se abre antes del fetch para que el navegador no la bloquee.
+                const ruta = accion === 'recibo'
+                    ? '/api/recibos/pedidos/' + encodeURIComponent(d.orderId) + '.pdf'
+                    : '/api/recibos/paynet/' + encodeURIComponent(d.orderId) + '.pdf';
+                const ventana = window.open('', '_blank');
+                fetch(ruta, { headers: { 'X-User-Id': localStorage.getItem('userId') || '' } })
+                    .then(res => res.ok ? res.blob() : res.json().catch(() => ({})).then(b => { throw new Error(b.error || 'No se pudo generar el PDF.'); }))
+                    .then(blob => { if (ventana) ventana.location = URL.createObjectURL(blob); })
+                    .catch(err => { if (ventana) ventana.close(); avisoVenta(err.message, 'danger'); });
+                return;
+            }
+            const cliente = d.clienteNombre || 'Público en general';
+            if (accion === 'reembolsar' && !confirm('¿Reembolsar ' + dinero(d.total) + ' a ' + cliente + '?\n\nEs un reembolso simulado: no se mueve dinero real. Los productos no regresan al inventario'
+                    + (d.planAplicado ? ' y la membresía vuelve a su fecha anterior' : '') + '.')) return;
+            if (accion === 'cancelar' && !confirm('¿Cancelar el pedido #' + d.folio + '? La ficha deja de servir y se libera lo apartado.')) return;
+
+            const rutas = {
+                reenviar: '/api/recibos/pedidos/' + encodeURIComponent(d.orderId) + '/enviar',
+                simular: '/api/simuladores/paynet/' + encodeURIComponent(d.orderId) + '/pagar',
+                reembolsar: rutaVenta(d.orderId) + '/reembolsar',
+                cancelar: rutaVenta(d.orderId) + '/cancelar'
+            };
+            const original = boton.innerHTML;
+            boton.disabled = true;
+            boton.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> ' + boton.textContent.trim();
+            avisoVenta('');
+            apiTienda(rutas[accion], { method: 'POST' })
+                .then(r => {
+                    if (accion === 'reenviar') {
+                        avisoVenta(r.message || 'Listo.', r.enviado === false ? 'warning' : 'success');
+                        boton.disabled = false;
+                        boton.innerHTML = original;
+                        return;
+                    }
+                    // "Simular pago" responde con el pedido; las demás, con el detalle ya actualizado.
+                    const detalle = accion === 'simular' ? apiTienda(rutaVenta(d.orderId)) : Promise.resolve(r);
+                    return detalle.then(nuevo => {
+                        pintarDetalleVenta(nuevo);
+                        avisoVenta(mensajeDeAccion(accion, r), 'success');
+                        cargarVentas();
+                        const gymId = localStorage.getItem('gymId');
+                        if (accion === 'simular' || r.membresia) { loadMembers(gymId); loadBilling(gymId); }
+                    });
+                })
+                .catch(err => {
+                    avisoVenta(err.message, 'danger');
+                    boton.disabled = false;
+                    boton.innerHTML = original;
+                });
+        }
+
+        function mensajeDeAccion(accion, r) {
+            if (accion === 'simular') return 'Pago en tienda simulado: el pedido quedó pagado.';
+            if (accion === 'cancelar') return 'Pedido cancelado.';
+            let texto = 'Reembolso simulado listo.';
+            if (r.membresia && r.membresia.ajustada) {
+                texto += ' La membresía de ' + r.membresia.miembro + ' vuelve a vencer el ' + diaLargo(r.membresia.vence) + '.';
+            } else if (r.membresia) {
+                texto += ' La membresía de ' + r.membresia.miembro + ' no se movió porque tiene pagos posteriores: revísala en Membresías y Pagos.';
+            }
+            return texto;
+        }
+
+        function avisoVenta(mensaje, tipo) {
+            const caja = document.getElementById('venta-detalle-aviso');
+            caja.textContent = mensaje;
+            caja.className = 'alert small py-2 mb-2 alert-' + (tipo || 'info') + (mensaje ? '' : ' d-none');
+        }
+
+        // ─── Formatos ───
+        function insigniaVenta(estado) {
+            const e = ESTADOS_VENTAS[estado] || { texto: estado, clase: 'bg-secondary-subtle text-secondary-emphasis' };
+            return '<span class="badge rounded-pill ' + e.clase + '">' + escapeHtml(e.texto) + '</span>';
+        }
+
+        function textoPedidos(n) {
+            return n === 1 ? '1 pedido' : n + ' pedidos';
+        }
+
+        // Fechas en la hora de México, que es la del gimnasio.
+        function fechaMx(fecha) {
+            return fecha.toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
+        }
+
+        function sumarDias(iso, dias) {
+            const d = new Date(iso + 'T12:00:00Z');
+            d.setUTCDate(d.getUTCDate() + dias);
+            return d.toISOString().slice(0, 10);
+        }
+
+        function diaCorto(iso) {
+            return new Date(iso + 'T12:00:00Z').toLocaleDateString('es-MX', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+        }
+
+        function diaLargo(iso) {
+            return new Date(iso + 'T12:00:00Z').toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+        }
+
+        function fechaHoraVenta(instante) {
+            return instante ? new Date(instante).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'America/Mexico_City' }) : '';
         }
 
         /* ─── Productos ─── */

@@ -50,7 +50,7 @@ public class PedidoService {
 
     private static final String CAMPOS = String.join(",",
             "id", "display_id", "status", "payment_status", "email", "metadata", "sales_channel_id",
-            "created_at", "canceled_at", "total", "subtotal", "tax_total",
+            "created_at", "canceled_at", "total", "original_total", "subtotal", "tax_total",
             "items.id", "items.title", "items.variant_title", "items.product_id", "items.variant_id",
             "items.product_type", "items.quantity", "items.unit_price", "items.total", "items.metadata",
             "payment_collections.payments.provider_id", "payment_collections.payments.captured_at",
@@ -105,7 +105,10 @@ public class PedidoService {
         p.setGymId(gymRepository.findByTiendaSalesChannelId(o.path("sales_channel_id").asText())
                 .map(Gym::getId)
                 .orElse(texto(metadata.path("gymId"))));
-        p.setTotal(o.path("total").asDouble());
+        // Al reembolsar, Medusa agrega una línea de crédito y su "total" baja a 0.
+        // El pedido conserva lo que se vendió, que es lo que muestran el recibo y Ventas.
+        boolean reembolsado = o.path("payment_status").asText().contains("refunded");
+        p.setTotal(o.path(reembolsado ? "original_total" : "total").asDouble());
         p.setSubtotal(o.path("subtotal").asDouble());
         p.setIva(o.path("tax_total").asDouble());
         p.setCreadoEn(instante(o.path("created_at")));
@@ -293,6 +296,9 @@ public class PedidoService {
         }
         if (d.get("referencia") != null) {
             return "Paynet · referencia " + referenciaLegible(String.valueOf(d.get("referencia")));
+        }
+        if (MetodosPago.PAYPAL.equals(p.getProveedorPago()) && d.get("cuenta") != null) {
+            return "PayPal · " + d.get("cuenta");
         }
         return MetodosPago.nombre(p.getProveedorPago());
     }

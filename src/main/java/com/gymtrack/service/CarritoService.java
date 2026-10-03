@@ -55,15 +55,18 @@ public class CarritoService {
     private final CarritoRepository carritos;
     private final PedidoService pedidos;
     private final SimuladorStripeService stripe;
+    private final SimuladorPaypalService paypal;
 
     public CarritoService(MedusaClient medusa, TiendaGymService tiendas, EscaparateService escaparate,
-                          CarritoRepository carritos, PedidoService pedidos, SimuladorStripeService stripe) {
+                          CarritoRepository carritos, PedidoService pedidos, SimuladorStripeService stripe,
+                          SimuladorPaypalService paypal) {
         this.medusa = medusa;
         this.tiendas = tiendas;
         this.escaparate = escaparate;
         this.carritos = carritos;
         this.pedidos = pedidos;
         this.stripe = stripe;
+        this.paypal = paypal;
     }
 
     // Todo lo que una operación necesita saber del carrito de esa persona.
@@ -209,6 +212,11 @@ public class CarritoService {
         String proveedor = proveedorDe(metodo);
         Contexto c = contexto(user, gymId, canal);
         JsonNode cart = revisarParaCobrar(c, totalVisto);
+        // PayPal llega como la orden que el comprador aprobó en paypal-sim.html:
+        // se cambia por sus datos guardados, igual que el token de la tarjeta.
+        if (MetodosPago.PAYPAL.equals(proveedor)) {
+            datos = paypal.consumir(user.getId(), c.gymId(), c.canal(), cart.path("total").asDouble(), datos);
+        }
         // La tarjeta llega como token: se cambia por los datos guardados del token
         // para que el resultado del cobro no se pueda inventar desde el navegador.
         if (MetodosPago.STRIPE.equals(proveedor)) datos = stripe.consumir(user.getId(), datos);

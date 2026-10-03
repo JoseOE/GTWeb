@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#20221f">
+    <meta name="robots" content="noindex">
+    <title>Simulador PayPal | GymTrack</title>
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/2964/2964514.png">
+    <link rel="stylesheet" href="css/fonts.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/editorial.css">
+    <link rel="stylesheet" href="css/pagos/paypal-sim.css">
+</head>
+<!--
+    Simulador PayPal: aquí se aprueba o se cancela un pago de prueba de la
+    tienda. No es PayPal: no lleva sus logotipos, no pide contraseña y no cobra.
+    Se abre desde el checkout de la web o desde el navegador de la app (que no
+    tiene la sesión de la página): el id de la orden en la URL hace de llave.
+    Al terminar regresa a la dirección que dio quien creó la orden.
+-->
+<body class="pp-pagina">
+
+    <header class="pp-barra">
+        <div class="pp-barra-contenido">
+            <span class="pp-marca"><i class="bx bx-wallet" aria-hidden="true"></i> Simulador PayPal</span>
+            <span class="pp-simulacion">Pagos de prueba</span>
+        </div>
+    </header>
+
+    <main class="pp-principal" id="orden" aria-live="polite">
+        <div class="pp-tarjeta" aria-hidden="true"><div class="placeholder-glow"><span class="placeholder col-5"></span><br><span class="placeholder col-8 placeholder-lg"></span></div></div>
+    </main>
+
+    <footer class="pp-pie">
+        Esta página simula la aprobación de un pago de PayPal para las pruebas de GymTrack.
+        No es PayPal, no pide contraseñas y no cobra dinero real.
+    </footer>
+
+    <script>
+        (function () {
+            const raiz = document.getElementById('orden');
+            const token = new URLSearchParams(location.search).get('token') || '';
+
+            function escapar(s) {
+                const div = document.createElement('div');
+                div.textContent = s == null ? '' : String(s);
+                return div.innerHTML;
+            }
+
+            function dinero(n) {
+                return '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            function api(ruta, opciones) {
+                return fetch('/api/simuladores/paypal/ordenes/' + encodeURIComponent(token) + ruta,
+                        Object.assign({ headers: { 'Content-Type': 'application/json' } }, opciones))
+                    .then(res => res.json().catch(() => ({})).then(cuerpo => {
+                        if (!res.ok) throw new Error(cuerpo.error || 'No se pudo completar la operación. Intenta de nuevo.');
+                        return cuerpo;
+                    }));
+            }
+
+            // Pantallas de una sola acción: pago ya aprobado, cancelado, usado o no encontrado.
+            function pintarEstado(icono, titulo, texto, accion) {
+                raiz.innerHTML = `
+                    <section class="pp-tarjeta pp-estado">
+                        <i class="bx ${icono}" aria-hidden="true"></i>
+                        <h1 class="fs-4 fw-bold mt-2">${escapar(titulo)}</h1>
+                        <p class="text-body-secondary mb-0">${escapar(texto)}</p>
+                        ${accion ? '<a class="btn btn-primary btn-lg w-100 mt-4" href="' + escapar(accion.url) + '">' + escapar(accion.texto) + '</a>' : ''}
+                    </section>`;
+            }
+
+            function pintar(orden) {
+                if (orden.estado === 'aprobada') {
+                    return pintarEstado('bx-check-circle', 'Ya aprobaste este pago', 'Lo aprobaste con ' + orden.cuenta + '.',
+                        orden.regreso && { texto: 'Volver a la tienda', url: orden.regreso });
+                }
+                if (orden.estado === 'cancelada') {
+                    return pintarEstado('bx-x-circle', 'Cancelaste este pago', 'No se cobró nada.',
+                        orden.regreso && { texto: 'Volver a la tienda', url: orden.regreso });
+                }
+                if (orden.estado === 'usada') {
+                    return pintarEstado('bx-check-double', 'Este pago ya se completó', 'Ya puedes cerrar esta página.', null);
+                }
+                const articulos = orden.articulos === 1 ? '1 artículo' : orden.articulos + ' artículos';
+                raiz.innerHTML = `
+                    <section class="pp-tarjeta" aria-labelledby="pp-titulo">
+                        <div class="small text-body-secondary">Pagar a</div>
+                        <h1 class="fs-5 fw-bold mb-0" id="pp-titulo">${escapar(orden.comercio)}</h1>
+                        <div class="pp-monto">${dinero(orden.monto)} <span class="pp-moneda">${escapar(orden.moneda)}</span></div>
+                        <div class="small text-body-secondary">${articulos} · orden <span class="pp-orden">${escapar(orden.id)}</span></div>
+                    </section>
+                    <form class="pp-tarjeta mt-3" id="pp-form" novalidate>
+                        <fieldset>
+                            <legend class="fs-6 fw-bold mb-2">Elige una cuenta de prueba</legend>
+                            ${orden.cuentas.map((c, i) => `
+                                <label class="pp-cuenta">
+                                    <input type="radio" name="cuenta" value="${escapar(c.correo)}" ${i === 0 ? 'checked' : ''}>
+                                    <span><span class="fw-semibold d-block">${escapar(c.nombre)}</span><small>${escapar(c.correo)}</small></span>
+                                </label>`).join('')}
+                            <label class="pp-cuenta">
+                                <input type="radio" name="cuenta" value="otra">
+                                <span><span class="fw-semibold d-block">Otra cuenta</span><small>Escribe cualquier correo de prueba</small></span>
+                            </label>
+                            <input type="email" class="form-control form-control-lg d-none" id="pp-otra" placeholder="correo@ejemplo.com"
+                                   autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Correo de la cuenta de prueba">
+                        </fieldset>
+                        <p class="small text-body-secondary mt-3 mb-3"><i class="bx bx-lock-alt" aria-hidden="true"></i>
+                            No se pide contraseña: es una simulación. No escribas datos de tu cuenta real.</p>
+                        <div class="alert alert-danger small py-2 d-none" id="pp-error" role="alert"></div>
+                        <button type="submit" class="btn btn-primary btn-lg w-100" id="pp-aprobar">Aprobar pago de ${dinero(orden.monto)}</button>
+                        <button type="button" class="btn btn-link w-100 mt-1" id="pp-cancelar">Cancelar y volver a la tienda</button>
+                    </form>`;
+
+                const form = document.getElementById('pp-form');
+                const otra = document.getElementById('pp-otra');
+                const error = document.getElementById('pp-error');
+                const botones = [document.getElementById('pp-aprobar'), document.getElementById('pp-cancelar')];
+
+                form.addEventListener('change', () => {
+                    const elegida = form.querySelector('input[name="cuenta"]:checked').value;
+                    otra.classList.toggle('d-none', elegida !== 'otra');
+                    if (elegida === 'otra') otra.focus();
+                });
+
+                function ocupado(si, texto) {
+                    botones.forEach(b => { b.disabled = si; });
+                    if (texto) botones[0].innerHTML = texto;
+                }
+
+                function fallo(err) {
+                    error.textContent = err.message;
+                    error.classList.remove('d-none');
+                    ocupado(false, 'Aprobar pago de ' + dinero(orden.monto));
+                }
+
+                form.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    error.classList.add('d-none');
+                    const elegida = form.querySelector('input[name="cuenta"]:checked').value;
+                    const cuenta = elegida === 'otra' ? otra.value.trim() : elegida;
+                    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cuenta)) {
+                        return fallo(new Error('Escribe el correo de una cuenta de prueba.'));
+                    }
+                    ocupado(true, '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Aprobando…');
+                    api('/aprobar', { method: 'POST', body: JSON.stringify({ cuenta }) })
+                        .then(r => {
+                            pintarEstado('bx-check-circle', 'Pago aprobado', 'Regresando a la tienda para terminar la compra…', { texto: 'Volver a la tienda', url: r.redirect });
+                            location.href = r.redirect;
+                        })
+                        .catch(fallo);
+                });
+
+                document.getElementById('pp-cancelar').addEventListener('click', () => {
+                    error.classList.add('d-none');
+                    ocupado(true);
+                    api('/cancelar', { method: 'POST' })
+                        .then(r => { location.href = r.redirect; })
+                        .catch(fallo);
+                });
+            }
+
+            if (!token) {
+                pintarEstado('bx-error-circle', 'Falta la orden de pago', 'Vuelve a la tienda e inténtalo de nuevo.', { texto: 'Ir a la tienda', url: 'tienda.html' });
+                return;
+            }
+            api('', { method: 'GET' })
+                .then(pintar)
+                .catch(err => pintarEstado('bx-error-circle', 'No encontramos este pago', err.message, { texto: 'Ir a la tienda', url: 'tienda.html' }));
+        })();
+    </script>
+</body>
+</html>
