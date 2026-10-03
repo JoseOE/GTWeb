@@ -136,22 +136,26 @@ public class CarritoService {
 
         int total = piezas + (existente == null ? 0 : existente.path("quantity").asInt());
         validarExistencias(variante, total, titulo);
+        // Medusa devuelve el carrito ya actualizado y el catálogo es el que se
+        // leyó arriba: así "Agregar" hace 3 llamadas a Medusa en lugar de 5.
+        JsonNode actualizado;
         try {
             if (existente != null) {
-                medusa.storePost(c.llave(), "/store/carts/" + cart.path("id").asText() + "/line-items/"
-                        + existente.path("id").asText() + q("fields", "id"), Map.of("quantity", total));
+                actualizado = medusa.storePost(c.llave(), "/store/carts/" + cart.path("id").asText() + "/line-items/"
+                        + existente.path("id").asText() + q("fields", CAMPOS), Map.of("quantity", total)).path("cart");
             } else {
                 Map<String, Object> partida = new HashMap<>();
                 partida.put("variant_id", varianteId);
                 partida.put("quantity", piezas);
                 if (!metadata.isEmpty()) partida.put("metadata", metadata);
-                medusa.storePost(c.llave(), "/store/carts/" + cart.path("id").asText() + "/line-items" + q("fields", "id"), partida);
+                actualizado = medusa.storePost(c.llave(), "/store/carts/" + cart.path("id").asText() + "/line-items"
+                        + q("fields", CAMPOS), partida).path("cart");
             }
         } catch (TiendaException e) {
             throw traducir(e, titulo);
         }
         tocar(c);
-        return vista(c, leer(c), List.of(), escaparate.listado(c.gymId()));
+        return vista(c, actualizado, List.of(), listado);
     }
 
     public Map<String, Object> cambiarCantidad(User user, String gymId, String canal, String partidaId, Integer cantidad) {
@@ -174,14 +178,15 @@ public class CarritoService {
                     Map.of("carrito", vista(c, leer(c), List.of(), listado)));
         }
         validarExistencias(EscaparateService.variante(producto, partida.path("variant_id").asText()), cantidad, titulo);
+        JsonNode actualizado;
         try {
-            medusa.storePost(c.llave(), "/store/carts/" + cart.path("id").asText() + "/line-items/" + partidaId
-                    + q("fields", "id"), Map.of("quantity", cantidad));
+            actualizado = medusa.storePost(c.llave(), "/store/carts/" + cart.path("id").asText() + "/line-items/" + partidaId
+                    + q("fields", CAMPOS), Map.of("quantity", cantidad)).path("cart");
         } catch (TiendaException e) {
             throw traducir(e, titulo);
         }
         tocar(c);
-        return vista(c, leer(c), List.of(), escaparate.listado(c.gymId()));
+        return vista(c, actualizado, List.of(), listado);
     }
 
     public Map<String, Object> quitar(User user, String gymId, String canal, String partidaId) {
@@ -577,13 +582,14 @@ public class CarritoService {
     private JsonNode crear(Contexto c) {
         // metadata viaja al pedido: así Spring sabe de quién es y por dónde compró.
         Map<String, Object> metadata = Map.of("userId", c.user().getId(), "gymId", c.gymId(), "canal", c.canal());
-        JsonNode cart = medusa.storePost(c.llave(), "/store/carts" + q("fields", "id"), Map.of(
+        // Se pide el carrito completo en la misma llamada: no hace falta volver a leerlo.
+        JsonNode cart = medusa.storePost(c.llave(), "/store/carts" + q("fields", CAMPOS), Map.of(
                 "region_id", tiendas.base().regionId(),
                 "email", c.user().getEmail(),
                 "metadata", metadata)).path("cart");
         c.registro().setCartId(cart.path("id").asText());
         tocar(c);
-        return leer(c);
+        return cart;
     }
 
     private JsonNode leer(Contexto c) {
