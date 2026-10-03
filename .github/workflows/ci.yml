@@ -1,0 +1,78 @@
+# Revisión de cada PR antes de mezclarlo a main (y de cada cambio en main):
+# compila Spring Boot, compila la tienda de Medusa y revisa la sintaxis de las
+# pruebas de punta a punta. Si algo no compila, el PR lo muestra en rojo antes
+# de que llegue a Render.
+name: Revisión
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Un push nuevo a la misma rama cancela la revisión anterior.
+concurrency:
+  group: revision-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  spring:
+    name: Spring Boot
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Compilar y empaquetar
+        run: mvn -B -ntp package
+
+  medusa:
+    name: Tienda (Medusa)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: medusa
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Node 24 (la misma versión que en Render)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: medusa/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Compilar
+        run: npm run build
+
+  pruebas:
+    name: Sintaxis de las pruebas
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Revisar los scripts
+        run: for f in pruebas/*.mjs; do node --check "$f"; done
