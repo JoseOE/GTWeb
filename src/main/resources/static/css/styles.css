@@ -648,7 +648,7 @@ footer.bg-dark::before {
 .dash-nav-grupo {
     display: block;
     padding: 1rem 0.9rem 0.3rem;
-    font-size: 0.68rem;
+    font-size: 0.6875rem;
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -657,7 +657,7 @@ footer.bg-dark::before {
 .dash-nav-grupo:first-child { padding-top: 0.2rem; }
 .dash-nav-pronto {
     margin-left: auto;
-    font-size: 0.65rem;
+    font-size: 0.6875rem;
     font-weight: 700;
     color: #5c5f57;
     background: transparent;
