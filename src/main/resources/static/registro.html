@@ -21,7 +21,7 @@
             </a>
             <div class="ms-auto d-flex gap-2">
                 <a href="index.html" aria-label="Volver al inicio" class="btn btn-outline-light rounded-pill px-3 d-flex align-items-center gap-1"><i class='bx bx-home-alt'></i> <span class="d-none d-sm-inline">Inicio</span></a>
-                <a href="login.html" class="btn btn-outline-light rounded-pill px-4">Iniciar Sesión</a>
+                <a href="login.html" class="btn btn-outline-light rounded-pill px-4">Iniciar sesión</a>
             </div>
         </div>
     </nav>
@@ -32,31 +32,31 @@
                 <!-- Columna izquierda: beneficios -->
                 <div class="col-lg-5 d-none d-lg-block page-fade-in">
                     <h2 class="fw-bold mb-4 font-display">Únete a <span class="text-primary">GymTrack</span></h2>
-                    <p class="text-body-secondary fs-5 mb-4">Crea tu cuenta y accede a todas las herramientas para modernizar tu gimnasio.</p>
+                    <p class="text-body-secondary fs-5 mb-4">Crea tu cuenta de dueño, configura tu gimnasio y empieza a cobrar desde el panel.</p>
                     <div class="d-flex flex-column gap-3">
                         <div class="d-flex align-items-center gap-3">
                             <div class="icon-circle icon-brand rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:45px;height:45px">
                                 <i class='bx bx-check fs-4'></i>
                             </div>
-                            <span class="text-body-secondary">Controla membresías y cobros</span>
+                            <span class="text-body-secondary">Membresías, pagos y vencimientos automáticos</span>
                         </div>
                         <div class="d-flex align-items-center gap-3">
                             <div class="icon-circle icon-brand rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:45px;height:45px">
                                 <i class='bx bx-check fs-4'></i>
                             </div>
-                            <span class="text-body-secondary">Acceso IoT con torniquete RFID</span>
+                            <span class="text-body-secondary">Tienda en línea y cobro en mostrador</span>
                         </div>
                         <div class="d-flex align-items-center gap-3">
                             <div class="icon-circle icon-brand rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:45px;height:45px">
                                 <i class='bx bx-check fs-4'></i>
                             </div>
-                            <span class="text-body-secondary">Analíticas de negocio en tiempo real</span>
+                            <span class="text-body-secondary">Ventas del día y del mes en un solo panel</span>
                         </div>
                         <div class="d-flex align-items-center gap-3">
                             <div class="icon-circle icon-brand rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:45px;height:45px">
                                 <i class='bx bx-check fs-4'></i>
                             </div>
-                            <span class="text-body-secondary">Soporte técnico 24/7</span>
+                            <span class="text-body-secondary">Rutinas y máquinas para la app de tus miembros</span>
                         </div>
                     </div>
                 </div>
@@ -68,20 +68,20 @@
                             <div class="auth-icon-circle rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width:60px;height:60px">
                                 <i class='bx bx-user-plus text-primary fs-2'></i>
                             </div>
-                            <h3 class="fw-bold">Crear Cuenta</h3>
+                            <h3 class="fw-bold">Crear cuenta</h3>
                             <p class="text-body-secondary small">Completa el formulario para registrarte.</p>
                         </div>
 
                         <form id="register-form">
                             <div class="mb-3">
-                                <label for="nombre" class="form-label fw-semibold small">Nombre Completo</label>
+                                <label for="nombre" class="form-label fw-semibold small">Nombre completo</label>
                                 <div class="input-group">
                                     <span class="input-group-text bg-body-tertiary border-end-0"><i class='bx bx-user text-body-secondary'></i></span>
                                     <input type="text" class="form-control form-control-lg rounded-end-3 border-start-0" id="nombre" placeholder="Ej. Juan Pérez" required>
                                 </div>
                             </div>
                             <div class="mb-3">
-                                <label for="email" class="form-label fw-semibold small">Correo Electrónico</label>
+                                <label for="email" class="form-label fw-semibold small">Correo electrónico</label>
                                 <div class="input-group">
                                     <span class="input-group-text bg-body-tertiary border-end-0"><i class='bx bx-envelope text-body-secondary'></i></span>
                                     <input type="email" class="form-control form-control-lg rounded-end-3 border-start-0" id="email" autocomplete="email" placeholder="ejemplo@correo.com" aria-describedby="email-ayuda" required>
@@ -106,7 +106,7 @@
                                 </div>
                             </div>
                             <div class="mb-3">
-                                <label for="confirm-password" class="form-label fw-semibold small">Confirmar Contraseña</label>
+                                <label for="confirm-password" class="form-label fw-semibold small">Confirmar contraseña</label>
                                 <div class="input-group">
                                     <span class="input-group-text bg-body-tertiary border-end-0"><i class='bx bx-lock text-body-secondary'></i></span>
                                     <input type="password" class="form-control form-control-lg rounded-end-3 border-start-0" id="confirm-password" placeholder="Repite tu contraseña" required>
@@ -117,7 +117,7 @@
                             <div id="alert-success" class="alert alert-success d-none small py-2" role="alert"></div>
 
                             <button type="submit" class="btn btn-primary btn-lg w-100 rounded-pill fw-bold shadow-sm mt-2" id="btn-submit">
-                                Crear Cuenta
+                                Crear cuenta
                             </button>
 
                             <div class="text-center mt-4">
@@ -216,14 +216,14 @@
                 } else {
                     alertError.innerHTML = '<i class="bx bx-error-circle"></i> ' + (response.body.error || 'Error en el servidor.');
                     alertError.classList.remove('d-none');
-                    btn.innerHTML = 'Crear Cuenta';
+                    btn.innerHTML = 'Crear cuenta';
                     btn.disabled = false;
                 }
             })
             .catch(() => {
                 alertError.innerHTML = '<i class="bx bx-error-circle"></i> Error de conexión con el servidor.';
                 alertError.classList.remove('d-none');
-                btn.innerHTML = 'Crear Cuenta';
+                btn.innerHTML = 'Crear cuenta';
                 btn.disabled = false;
             });
         });

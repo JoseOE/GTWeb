@@ -73,3 +73,12 @@ function botonCargando(btn, cargando, texto) {
         btn.disabled = false;
     }
 }
+
+// Mi cuenta la usan dueños y miembros: el botón de volver lleva a donde
+// trabaja cada uno (el panel es solo del dueño; el miembro vuelve a su tienda).
+(function () {
+    const volver = document.getElementById('cuenta-volver');
+    if (!volver || localStorage.getItem('role') !== 'member') return;
+    volver.href = 'tienda.html';
+    volver.innerHTML = "<i class='bx bx-store' aria-hidden=\"true\"></i> <span class=\"d-none d-sm-inline\">Tienda</span>";
+})();

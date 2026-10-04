@@ -122,7 +122,7 @@ La primera vez tarda un poco más porque Maven descarga las dependencias. Cuando
 
 Para detener el servidor presiona **Ctrl + C** en la terminal.
 
-> Si la colección `servicios` está vacía, el catálogo se llena solo con 8 soluciones de ejemplo al arrancar.
+> El catálogo de módulos de la portada (colección `servicios`) se sincroniza solo al arrancar: agrega los que falten y actualiza los textos de los que ya existen, así que no hay que borrarlo a mano después de cambiarlos en `GymTrackApplication`.
 
 ### 5. Flujo de prueba sugerido
 
