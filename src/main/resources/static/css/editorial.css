@@ -929,7 +929,7 @@ button,a,input,summary {
 .gym-interior .dash-nav-link::before {
     display:none
 }
-.gym-interior .kpi-tile,.gym-interior .dash-empty,.gym-interior .feature-preview-card,.gym-interior .roadmap-tile {
+.gym-interior .kpi-tile,.gym-interior .dash-empty {
     box-shadow:none;
     border-color:var(--line);
     border-radius:12px
