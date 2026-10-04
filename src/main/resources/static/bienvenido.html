@@ -10,6 +10,7 @@
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/editorial.css">
+    <script src="js/sesion.js" data-protegida></script>
 </head>
 <body class="gym-interior bg-body-tertiary d-flex flex-column min-vh-100">
 
@@ -27,7 +28,7 @@
                 <a href="cuenta.html" class="btn btn-outline-light btn-sm rounded-pill px-3 d-inline-flex align-items-center gap-1">
                     <i class='bx bx-user-circle'></i> <span class="d-none d-sm-inline">Mi cuenta</span>
                 </a>
-                <a href="login.html" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="localStorage.removeItem('userName'); localStorage.removeItem('userId'); localStorage.removeItem('gymId'); localStorage.removeItem('role')">
+                <a href="login.html" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="Sesion.cerrar(); return false;">
                     <i class='bx bx-log-out'></i> <span class="d-none d-sm-inline">Cerrar Sesión</span>
                 </a>
             </div>
@@ -385,9 +386,6 @@
                         <h3 class="fw-bold mb-1"><i class='bx bx-credit-card text-primary me-1'></i> Membresías y Pagos</h3>
                         <p class="text-body-secondary mb-0">Quién debe, quién está por vencer y cuánto llevas cobrado este mes.</p>
                     </div>
-                    <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="billing-run-btn" title="Aplica las bajas por falta de pago en este momento">
-                        <i class='bx bx-refresh'></i> Revisar vencimientos ahora
-                    </button>
                 </div>
 
                 <div class="row g-3 mb-4" id="billing-kpis"></div>
@@ -1633,22 +1631,6 @@
                 if (cuota) document.getElementById('payment-monto').value = cuota;
                 actualizarPreview();
                 modal.show();
-            });
-
-            document.getElementById('billing-run-btn').addEventListener('click', (e) => {
-                const btn = e.currentTarget;
-                btn.disabled = true;
-                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Revisando...';
-                fetch('/api/billing/run', { method: 'POST' })
-                    .then(() => {
-                        const gymId = localStorage.getItem('gymId');
-                        loadBilling(gymId);
-                        loadMembers(gymId);
-                    })
-                    .finally(() => {
-                        btn.disabled = false;
-                        btn.innerHTML = '<i class="bx bx-refresh"></i> Revisar vencimientos ahora';
-                    });
             });
 
             form.addEventListener('submit', (e) => {

@@ -10,6 +10,7 @@
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/editorial.css">
+    <script src="js/sesion.js"></script>
 </head>
 <body class="gym-interior bg-body-tertiary d-flex flex-column min-vh-100">
 
@@ -85,16 +86,25 @@
         emailInput.value = sessionStorage.getItem('correoPorVerificar') || '';
         (emailInput.value ? codigoInput : emailInput).focus();
 
-        function terminar(mensaje) {
+        // Verificar demuestra que el correo es suyo: la respuesta trae la sesión
+        // y la cuenta entra directo a su panel, sin volver a escribir la contraseña.
+        function terminar(respuesta) {
             sessionStorage.removeItem('correoPorVerificar');
             form.classList.add('d-none');
             document.getElementById('verificado').classList.remove('d-none');
-            document.getElementById('alerta-final').textContent = mensaje;
+            document.getElementById('alerta-final').textContent = respuesta.message;
+            if (respuesta.token) {
+                Sesion.iniciar(respuesta);
+                setTimeout(() => { location.href = Sesion.destino(respuesta); }, 900);
+            }
         }
 
-        // Solo números en el código.
+        // Solo números en el código; al completar los 6 se envía solo.
         codigoInput.addEventListener('input', () => {
             codigoInput.value = codigoInput.value.replace(/\D/g, '').slice(0, 6);
+            if (codigoInput.value.length === 6 && emailInput.value.trim() && !btnVerificar.disabled) {
+                form.requestSubmit();
+            }
         });
 
         form.addEventListener('submit', (e) => {
@@ -109,7 +119,7 @@
             botonCargando(btnVerificar, true, 'Verificando...');
             enviarJSON('/api/cuenta/verificar', { email, codigo }).then(r => {
                 botonCargando(btnVerificar, false);
-                if (r.ok) terminar(r.body.message);
+                if (r.ok) terminar(r.body);
                 else mostrarAlerta(alerta, 'danger', r.body.error || 'No pudimos verificar el código.');
             });
         });
@@ -157,7 +167,7 @@
             botonCargando(btnVerificar, true, 'Verificando...');
             enviarJSON('/api/cuenta/verificar', { token }).then(r => {
                 botonCargando(btnVerificar, false);
-                if (r.ok) terminar(r.body.message);
+                if (r.ok) terminar(r.body);
                 else mostrarAlerta(alerta, 'danger', r.body.error || 'El enlace no es válido.');
             });
         }
