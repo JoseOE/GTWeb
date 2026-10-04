@@ -296,9 +296,13 @@
                                 </div>
                                 <div class="mb-1">
                                     <label for="member-password" class="form-label fw-semibold small">Contraseña temporal</label>
-                                    <input type="text" id="member-password" class="form-control" placeholder="El usuario podrá cambiarla después" required>
+                                    <div class="input-group">
+                                        <input type="text" id="member-password" class="form-control font-monospace" autocomplete="off" spellcheck="false" aria-describedby="member-password-ayuda" required>
+                                        <button type="button" class="btn btn-outline-secondary" id="member-password-generar" aria-label="Generar otra contraseña"><i class='bx bx-refresh' aria-hidden="true"></i> Otra</button>
+                                        <button type="button" class="btn btn-outline-secondary" id="member-password-copiar"><i class='bx bx-copy' aria-hidden="true"></i> <span class="copiar-texto">Copiar</span></button>
+                                    </div>
                                 </div>
-                                <small class="text-body-secondary d-block mt-2">Para altas en recepción: le creas la cuenta y entra directo. Si el usuario ya tiene la app, es más simple que se una con tu código de acceso.</small>
+                                <small class="text-body-secondary d-block mt-2" id="member-password-ayuda">Entrégasela al usuario: al entrar, la página y la app le pedirán cambiarla. Si ya tiene la app, es más simple que se una con tu código de acceso.</small>
                                 <div id="member-alert" class="alert alert-danger d-none py-2 small mt-3 mb-0" role="alert"></div>
                             </div>
                             <div class="modal-footer border-0 pt-0">
@@ -3716,5 +3720,6 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/pagos/metodos.js"></script>
+    <script src="js/alta-recepcion.js"></script>
 </body>
 </html>

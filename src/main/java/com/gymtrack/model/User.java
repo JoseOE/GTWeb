@@ -42,6 +42,9 @@ public class User {
     // iniciar sesión. null = cuenta anterior a la verificación o creada desde la
     // app (que todavía no tiene esa pantalla), a la que no se le exige.
     private Boolean emailVerificado;
+    // true = el dueño creó la cuenta en recepción con una contraseña temporal
+    // que el miembro todavía no cambia. La página y la app le piden cambiarla.
+    private Boolean contrasenaTemporal;
 
     public User() {}
 
@@ -100,6 +103,19 @@ public class User {
 
     public Boolean getEmailVerificado() { return emailVerificado; }
     public void setEmailVerificado(Boolean emailVerificado) { this.emailVerificado = emailVerificado; }
+
+    public Boolean getContrasenaTemporal() { return contrasenaTemporal; }
+    public void setContrasenaTemporal(Boolean contrasenaTemporal) { this.contrasenaTemporal = contrasenaTemporal; }
+
+    public boolean tieneContrasenaTemporal() {
+        return Boolean.TRUE.equals(contrasenaTemporal);
+    }
+
+    // El usuario eligió su propia contraseña: deja de ser temporal.
+    public void cambiarContrasena(String hash) {
+        this.password = hash;
+        this.contrasenaTemporal = null;
+    }
 
     public boolean correoPendienteDeVerificar() {
         return Boolean.FALSE.equals(emailVerificado);

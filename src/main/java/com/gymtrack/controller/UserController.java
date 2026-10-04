@@ -148,6 +148,8 @@ public class UserController {
         view.put("membershipStatus", user.getMembershipStatus());
         view.put("membershipActive", user.getMembershipActive());
         view.put("emailVerificado", user.getEmailVerificado());
+        // La página y la app piden cambiarla mientras sea la que dio el gimnasio.
+        view.put("contrasenaTemporal", user.tieneContrasenaTemporal());
         view.put("hasGymAccess", user.tieneAccesoAlGimnasio());
         // Datos de cobranza: la app los usa para avisar "te quedan N días".
         view.put("fechaProximoPago", user.getFechaProximoPago());

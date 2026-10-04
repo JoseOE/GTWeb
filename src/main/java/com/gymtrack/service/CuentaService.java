@@ -105,7 +105,7 @@ public class CuentaService {
         User user = userRepository.findById(token.getUserId())
                 .orElseThrow(() -> new CuentaException(HttpStatus.BAD_REQUEST, error));
 
-        user.setPassword(PasswordUtil.hash(nueva));
+        user.cambiarContrasena(PasswordUtil.hash(nueva));
         // Abrir el enlace demuestra que el correo es suyo: si faltaba verificarlo, queda verificado.
         if (user.correoPendienteDeVerificar()) user.setEmailVerificado(true);
         userRepository.save(user);
@@ -124,7 +124,7 @@ public class CuentaService {
             throw new CuentaException(HttpStatus.BAD_REQUEST, "La contraseña actual no es correcta.");
         }
         exigirSegura(nueva);
-        user.setPassword(PasswordUtil.hash(nueva));
+        user.cambiarContrasena(PasswordUtil.hash(nueva));
         userRepository.save(user);
         sesiones.cerrarOtras(user.getId(), tokenActual);
         correoService.contrasenaCambiada(user);
