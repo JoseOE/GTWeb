@@ -1042,10 +1042,14 @@ Fase 2 — Plataforma Web & Backend
 - [x] Formulario de contacto (EmailJS) y mensajes de WhatsApp.
 - [x] Verificación por correo, recuperación y cambio de contraseña.
 - [x] Reemplazar SHA-256 por BCrypt en las contraseñas.
-- [ ] Implementar sesiones seguras con tokens (JWT).
+- [x] Implementar sesiones seguras con tokens (token de sesión con huella SHA-256 y vencimiento; ver "Seguridad y sesiones").
 - [x] Publicar la parte estática de la página en GitHub Pages.
 - [x] Publicar la página y la API en Render (Docker) para que el catálogo, el registro y el panel también funcionen en línea.
 - [x] Enviar los correos por la API de Brevo (Render bloquea SMTP).
+- [x] Tienda por gimnasio con Medusa: productos, planes de membresía, carrito y pedidos.
+- [x] Pagos simulados (tarjeta, Paynet y PayPal), venta en mostrador y recibos en PDF.
+- [x] Pestaña de Ventas en el panel con gráficas, reembolsos y cancelaciones.
+- [x] Pruebas de punta a punta de la web y revisión automática de cada PR (GitHub Actions).
 
 Fase 3 — Aplicación Móvil (Usuarios)
 - [x] Crear proyecto base en Expo.
@@ -1056,7 +1060,7 @@ Fase 3 — Aplicación Móvil (Usuarios)
 - [x] Notificaciones push de la membresía (Expo).
 - [x] Conectar la app al backend publicado en Render.
 - [ ] Pantalla de verificación de correo en la app.
-- [ ] Mejorar el manejo de la sesión persistente y seguridad (Tokens).
+- [ ] Mejorar el manejo de la sesión persistente y seguridad (Tokens): mandar el token de sesión y pedir el cambio de la contraseña temporal (`contrasenaTemporal`).
 
 Fase 4 — IoT (Control de Acceso)
 - [ ] Configurar el microcontrolador ESP32 y Lector RFID.
@@ -1093,10 +1097,11 @@ La página web está publicada completa en Render (https://gtweb.onrender.com):
 - registro con verificación por correo;
 - inicio de sesión;
 - panel del gimnasio;
-- correos de la cuenta (Brevo).
+- correos de la cuenta (Brevo);
+- tienda de cada gimnasio, con pagos simulados, mostrador y ventas. Medusa corre como segundo servicio en Render (https://gymtrack-tienda.onrender.com), con su base en Neon.
 
-La aplicación móvil consume por defecto la misma API publicada en Render. Faltan tres cosas:
-- implementar sesiones con tokens (JWT);
+La sesión de la página usa token. La aplicación móvil consume por defecto la misma API publicada en Render. Faltan tres cosas:
+- que la app mande el token de sesión, para activar `EXIGIR_TOKEN=true` en Render;
 - agregar la verificación de correo en la app;
 - integrar la capa de hardware IoT.
 
@@ -1183,6 +1188,36 @@ Cada integrante trabaja en su propia rama:
 | Yael | Plantilla de EmailJS y confirmación animada del formulario de contacto | [#18](https://github.com/JoseOE/GTWeb/pull/18), [#19](https://github.com/JoseOE/GTWeb/pull/19) |
 | Edwin | Dockerfile para desplegar en Render y puerto configurable | [#20](https://github.com/JoseOE/GTWeb/pull/20) |
 | Valeria | Envío de correos por la API de Brevo en lugar de SMTP | [#21](https://github.com/JoseOE/GTWeb/pull/21) |
+
+**Sprint 3: tienda por gimnasio** — ✅ terminado
+
+| Integrante | Entregable | PR |
+|---|---|---|
+| José | Bloque 1: Medusa, integración con Spring, productos y planes de membresía | [#22](https://github.com/JoseOE/GTWeb/pull/22) |
+| Yael | Bloque 2: tienda web del miembro, carrito y pedidos | [#23](https://github.com/JoseOE/GTWeb/pull/23) |
+| Eduardo | Bloque 3: pago con tarjeta simulado y venta en mostrador | [#24](https://github.com/JoseOE/GTWeb/pull/24) |
+| Valeria | Bloque 4: ficha Paynet simulada, recibos en PDF y correos | [#27](https://github.com/JoseOE/GTWeb/pull/27) |
+| Edwin | Bloque 5: PayPal simulado y pestaña de Ventas con gráficas | [#31](https://github.com/JoseOE/GTWeb/pull/31) |
+
+Ajustes dentro del sprint:
+
+| Integrante | Cambio | PR |
+|---|---|---|
+| Eduardo | Mostrador: una tarjeta por producto y una sola para las membresías | [#25](https://github.com/JoseOE/GTWeb/pull/25) |
+| José | Presentaciones en kilos y orden de las presentaciones | [#26](https://github.com/JoseOE/GTWeb/pull/26) |
+| José | Pasos probados para desplegar la tienda en Render | [#28](https://github.com/JoseOE/GTWeb/pull/28) |
+| Eduardo | El ticket del mostrador se arma al instante en el navegador | [#29](https://github.com/JoseOE/GTWeb/pull/29) |
+| Yael | Quita el botón «Ver mi tienda» del panel | [#30](https://github.com/JoseOE/GTWeb/pull/30) |
+
+**Después del Sprint 3: revisión completa del sitio**
+
+| Integrante | Cambio | PR |
+|---|---|---|
+| José | Seguridad: sesión con token y permisos en la API | [#32](https://github.com/JoseOE/GTWeb/pull/32) |
+| Valeria | Panel del dueño: Resumen con datos reales, menú agrupado y regla Visita + mes | [#33](https://github.com/JoseOE/GTWeb/pull/33) |
+| Edwin | Contraste AA, limpieza de estilos y contraseña temporal en el alta de recepción | [#34](https://github.com/JoseOE/GTWeb/pull/34) |
+| Yael | Textos ajustados a lo real, catálogo sincronizado y carrito más rápido | [#35](https://github.com/JoseOE/GTWeb/pull/35) |
+| Eduardo | Pruebas de punta a punta en el repositorio y revisión automática de cada PR | [#36](https://github.com/JoseOE/GTWeb/pull/36) |
 
 🏋️ GymTrack
 Administra. Identifica. Accede. Entrena. Analiza. Mejora.
