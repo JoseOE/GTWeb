@@ -112,14 +112,8 @@ public class ReciboController {
 
     private Pedido pedido(String orderId, String userId) {
         acceso.exigirUsuario(userId);
-        Pedido p = pedidoRepository.findByOrderId(orderId).orElseGet(() -> {
-            try {
-                return pedidoService.sincronizar(orderId);
-            } catch (TiendaException e) {
-                if (e.getStatus() == HttpStatus.NOT_FOUND) throw new TiendaException(HttpStatus.NOT_FOUND, "Pedido no encontrado.");
-                throw e;
-            }
-        });
+        Pedido p = pedidoRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new TiendaException(HttpStatus.NOT_FOUND, "Pedido no encontrado."));
         acceso.exigirAccesoAPedido(p, userId);
         return p;
     }
