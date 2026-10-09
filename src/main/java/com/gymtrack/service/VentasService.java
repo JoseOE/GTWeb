@@ -6,8 +6,10 @@ import com.gymtrack.model.User;
 import com.gymtrack.repository.PedidoRepository;
 import com.gymtrack.repository.UserRepository;
 import com.gymtrack.util.MetodosPago;
+import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +18,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -28,9 +31,10 @@ import java.util.stream.Collectors;
 
 import static com.gymtrack.service.MedusaClient.q;
 
-// Dashboard de ventas del panel (pestaña Ventas). Todo sale de la copia local
-// de los pedidos (colección "pedidos"), así que abrirlo no le pregunta nada a
-// Medusa. Solo las acciones (reembolsar, cancelar) pasan por Medusa.
+// Dashboard de ventas del panel (pestaña Ventas). Todo sale de la colección
+// "pedidos": el resumen es una sola agregación de MongoDB (no se traen los
+// pedidos a memoria) y los índices por gimnasio y fecha la mantienen rápida.
+// Solo las acciones (reembolsar, cancelar) pasan por Medusa.
 //
 // Una venta es un pedido pagado; cuenta el día en que se pagó, en la hora de
 // México. Los reembolsados y cancelados no suman.
@@ -56,108 +60,162 @@ public class VentasService {
     private final UserRepository userRepository;
     private final MedusaClient medusa;
     private final BillingService billing;
+    private final MongoTemplate mongo;
 
     public VentasService(PedidoRepository pedidoRepository, PedidoService pedidos, UserRepository userRepository,
-                         MedusaClient medusa, BillingService billing) {
+                         MedusaClient medusa, BillingService billing, MongoTemplate mongo) {
         this.pedidoRepository = pedidoRepository;
         this.pedidos = pedidos;
         this.userRepository = userRepository;
         this.medusa = medusa;
         this.billing = billing;
+        this.mongo = mongo;
     }
 
     // ═══════════════════════════ RESUMEN ═══════════════════════════
 
     // KPIs de hoy y del mes, y las gráficas del periodo (por defecto, los
     // últimos 30 días): ventas por día, por método, por canal y los productos
-    // que más venden.
+    // que más venden. Todo en una agregación: $facet arma cada bloque a partir
+    // de los pedidos pagados del gimnasio desde el día más antiguo que se pide.
     public Map<String, Object> resumen(String gymId, LocalDate desde, LocalDate hasta) {
         LocalDate hoy = LocalDate.now(ZONA_MX);
         LocalDate fin = hasta == null ? hoy : hasta;
         LocalDate inicio = desde == null ? fin.minusDays(DIAS_POR_DEFECTO - 1L) : desde;
         validarPeriodo(inicio, fin);
-
-        List<Pedido> todos = pedidoRepository.findByGymIdOrderByCreadoEnDesc(gymId);
-        List<Pedido> pagados = todos.stream().filter(p -> Pedido.ESTADO_PAGADO.equals(p.getEstado())).toList();
         LocalDate inicioMes = hoy.withDayOfMonth(1);
-        List<Pedido> deHoy = pagados.stream().filter(p -> fechaDeVenta(p).equals(hoy)).toList();
-        List<Pedido> delMes = pagados.stream().filter(p -> entre(fechaDeVenta(p), inicioMes, hoy)).toList();
-        List<Pedido> delPeriodo = pagados.stream().filter(p -> entre(fechaDeVenta(p), inicio, fin)).toList();
-        List<Pedido> paynet = todos.stream()
-                .filter(p -> Pedido.ESTADO_PENDIENTE_PAGO.equals(p.getEstado()) && MetodosPago.PAYNET.equals(p.getProveedorPago()))
-                .toList();
+        LocalDate primero = inicio.isBefore(inicioMes) ? inicio : inicioMes;
+        Date desdeInstante = Date.from(primero.atStartOfDay(ZONA_MX).toInstant());
 
+        // Una venta cuenta el día en que se pagó (hora de México).
+        Document fecha = new Document("$dateToString", new Document("format", "%Y-%m-%d")
+                .append("date", new Document("$ifNull", List.of("$pagadoEn", "$creadoEn")))
+                .append("timezone", ZONA_MX.getId()));
+        Document delPeriodo = rango(inicio, fin);
+        List<Document> pipeline = List.of(
+                new Document("$match", new Document("gymId", gymId).append("estado", Pedido.ESTADO_PAGADO)
+                        .append("$or", List.of(
+                                new Document("pagadoEn", new Document("$gte", desdeInstante)),
+                                new Document("pagadoEn", null).append("creadoEn", new Document("$gte", desdeInstante))))),
+                new Document("$project", new Document("fecha", fecha)
+                        .append("total", new Document("$ifNull", List.of("$total", 0)))
+                        .append("proveedorPago", 1)
+                        .append("canal", new Document("$ifNull", List.of("$canal", Pedido.CANAL_WEB)))
+                        .append("partidas", 1)),
+                new Document("$facet", new Document()
+                        .append("hoy", List.of(rango(hoy, hoy), grupoSuma(null)))
+                        .append("mes", List.of(rango(inicioMes, hoy), grupoSuma(null)))
+                        .append("periodo", List.of(delPeriodo, grupoSuma(null)))
+                        .append("porDia", List.of(delPeriodo, grupoSuma("$fecha")))
+                        .append("porMetodo", List.of(delPeriodo, grupoSuma("$proveedorPago")))
+                        .append("porCanal", List.of(delPeriodo, grupoSuma("$canal")))
+                        .append("topProductos", List.of(delPeriodo,
+                                new Document("$unwind", "$partidas"),
+                                new Document("$group", new Document("_id", "$partidas.titulo")
+                                        .append("tipo", new Document("$first", "$partidas.tipo"))
+                                        .append("cantidad", new Document("$sum", new Document("$ifNull", List.of("$partidas.cantidad", 0))))
+                                        .append("total", new Document("$sum", new Document("$ifNull", List.of("$partidas.total", 0))))),
+                                new Document("$sort", new Document("total", -1).append("_id", 1)),
+                                new Document("$limit", 5)))
+                        .append("membresiasDelMes", List.of(rango(inicioMes, hoy),
+                                new Document("$unwind", "$partidas"),
+                                new Document("$match", new Document("partidas.tipo", TiendaGymService.TIPO_MEMBRESIA)),
+                                new Document("$group", new Document("_id", null)
+                                        .append("cantidad", new Document("$sum", new Document("$ifNull", List.of("$partidas.cantidad", 0)))))))));
+        Document r = mongo.getCollection("pedidos").aggregate(pipeline).first();
+        if (r == null) r = new Document();
+
+        Map<String, Object> mes = sumaDe(r, "mes");
         Map<String, Object> kpis = new LinkedHashMap<>();
-        kpis.put("hoy", suma(deHoy));
-        kpis.put("mes", suma(delMes));
-        double totalMes = total(delMes);
-        kpis.put("ticketPromedio", delMes.isEmpty() ? 0.0 : centavos(totalMes / delMes.size()));
-        kpis.put("paynetPendientes", suma(paynet));
-        kpis.put("membresiasDelMes", delMes.stream()
-                .flatMap(p -> p.getPartidas().stream())
-                .filter(Pedido.Partida::esPlan)
-                .mapToInt(x -> x.getCantidad() == null ? 0 : x.getCantidad())
-                .sum());
+        kpis.put("hoy", sumaDe(r, "hoy"));
+        kpis.put("mes", mes);
+        int pedidosMes = (int) mes.get("pedidos");
+        kpis.put("ticketPromedio", pedidosMes == 0 ? 0.0 : centavos((double) mes.get("total") / pedidosMes));
+        kpis.put("paynetPendientes", paynetPendientes(gymId));
+        List<Document> membresias = r.getList("membresiasDelMes", Document.class, List.of());
+        kpis.put("membresiasDelMes", membresias.isEmpty() ? 0 : numero(membresias.get(0).get("cantidad")).intValue());
 
         // Un punto por día del periodo, aunque ese día no se haya vendido nada.
-        Map<LocalDate, List<Pedido>> porFecha = delPeriodo.stream().collect(Collectors.groupingBy(this::fechaDeVenta));
+        Map<String, Document> porFecha = new HashMap<>();
+        r.getList("porDia", Document.class, List.of()).forEach(d -> porFecha.put(d.getString("_id"), d));
         List<Map<String, Object>> porDia = new ArrayList<>();
         for (LocalDate d = inicio; !d.isAfter(fin); d = d.plusDays(1)) {
             Map<String, Object> punto = new LinkedHashMap<>();
             punto.put("fecha", d.toString());
-            punto.putAll(suma(porFecha.getOrDefault(d, List.of())));
+            punto.putAll(sumaDe(porFecha.get(d.toString())));
             porDia.add(punto);
         }
 
-        Map<String, Object> r = new LinkedHashMap<>();
-        r.put("desde", inicio.toString());
-        r.put("hasta", fin.toString());
-        r.put("kpis", kpis);
-        r.put("periodo", suma(delPeriodo));
-        r.put("porDia", porDia);
-        r.put("porMetodo", agrupar(delPeriodo, p -> MetodosPago.nombre(p.getProveedorPago())));
-        r.put("porCanal", agrupar(delPeriodo, p -> p.getCanal() == null ? Pedido.CANAL_WEB : p.getCanal()));
-        r.put("topProductos", topProductos(delPeriodo, 5));
-        return r;
+        Map<String, Object> resultado = new LinkedHashMap<>();
+        resultado.put("desde", inicio.toString());
+        resultado.put("hasta", fin.toString());
+        resultado.put("kpis", kpis);
+        resultado.put("periodo", sumaDe(r, "periodo"));
+        resultado.put("porDia", porDia);
+        resultado.put("porMetodo", grupos(r.getList("porMetodo", Document.class, List.of()), MetodosPago::nombre));
+        resultado.put("porCanal", grupos(r.getList("porCanal", Document.class, List.of()), c -> c));
+        resultado.put("topProductos", r.getList("topProductos", Document.class, List.of()).stream().map(d -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("titulo", d.get("_id"));
+            m.put("tipo", d.get("tipo"));
+            m.put("cantidad", numero(d.get("cantidad")).intValue());
+            m.put("total", centavos(numero(d.get("total")).doubleValue()));
+            return m;
+        }).toList());
+        return resultado;
     }
 
-    private List<Map<String, Object>> agrupar(List<Pedido> lista, Function<Pedido, String> clave) {
-        Map<String, List<Pedido>> grupos = lista.stream().collect(Collectors.groupingBy(clave, LinkedHashMap::new, Collectors.toList()));
+    // Fichas Paynet que todavía no se pagan (sin importar la fecha).
+    private Map<String, Object> paynetPendientes(String gymId) {
+        Document r = mongo.getCollection("pedidos").aggregate(List.of(
+                new Document("$match", new Document("gymId", gymId)
+                        .append("estado", Pedido.ESTADO_PENDIENTE_PAGO)
+                        .append("proveedorPago", MetodosPago.PAYNET)),
+                grupoSuma(null))).first();
+        return sumaDe(r);
+    }
+
+    // Etapa $match por días (yyyy-MM-dd, ya en la hora de México).
+    private static Document rango(LocalDate desde, LocalDate hasta) {
+        return new Document("$match", new Document("fecha",
+                new Document("$gte", desde.toString()).append("$lte", hasta.toString())));
+    }
+
+    // Etapa $group que cuenta pedidos y suma su total (agrupando por "clave", o todo junto).
+    private static Document grupoSuma(String clave) {
+        return new Document("$group", new Document("_id", clave)
+                .append("pedidos", new Document("$sum", 1))
+                .append("total", new Document("$sum", "$total")));
+    }
+
+    private static Map<String, Object> sumaDe(Document facet, String nombre) {
+        List<Document> lista = facet.getList(nombre, Document.class, List.of());
+        return sumaDe(lista.isEmpty() ? null : lista.get(0));
+    }
+
+    private static Map<String, Object> sumaDe(Document grupo) {
+        Map<String, Object> s = new LinkedHashMap<>();
+        s.put("pedidos", grupo == null ? 0 : numero(grupo.get("pedidos")).intValue());
+        s.put("total", grupo == null ? 0.0 : centavos(numero(grupo.get("total")).doubleValue()));
+        return s;
+    }
+
+    // Grupos de mayor a menor total, con el nombre que ve el dueño.
+    private static List<Map<String, Object>> grupos(List<Document> lista, Function<String, String> nombre) {
         List<Map<String, Object>> salida = new ArrayList<>();
-        grupos.forEach((nombre, grupo) -> {
+        for (Document d : lista) {
             Map<String, Object> g = new LinkedHashMap<>();
-            g.put("nombre", nombre);
-            g.putAll(suma(grupo));
+            g.put("nombre", nombre.apply(d.getString("_id")));
+            g.putAll(sumaDe(d));
             salida.add(g);
-        });
-        salida.sort(Comparator.comparingDouble((Map<String, Object> g) -> (Double) g.get("total")).reversed());
+        }
+        salida.sort(Comparator.comparingDouble((Map<String, Object> g) -> (Double) g.get("total")).reversed()
+                .thenComparing(g -> String.valueOf(g.get("nombre"))));
         return salida;
     }
 
-    // Lo que más dinero dejó en el periodo, por producto (los planes cuentan).
-    private static List<Map<String, Object>> topProductos(List<Pedido> lista, int cuantos) {
-        Map<String, double[]> acumulado = new LinkedHashMap<>();
-        Map<String, String> tipos = new HashMap<>();
-        for (Pedido p : lista) {
-            for (Pedido.Partida x : p.getPartidas()) {
-                double[] a = acumulado.computeIfAbsent(x.getTitulo(), k -> new double[2]);
-                a[0] += x.getCantidad() == null ? 0 : x.getCantidad();
-                a[1] += x.getTotal() == null ? 0 : x.getTotal();
-                tipos.put(x.getTitulo(), x.getTipo());
-            }
-        }
-        return acumulado.entrySet().stream()
-                .sorted((a, b) -> Double.compare(b.getValue()[1], a.getValue()[1]))
-                .limit(cuantos)
-                .map(e -> {
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("titulo", e.getKey());
-                    m.put("tipo", tipos.get(e.getKey()));
-                    m.put("cantidad", (int) e.getValue()[0]);
-                    m.put("total", centavos(e.getValue()[1]));
-                    return m;
-                })
-                .toList();
+    private static Number numero(Object n) {
+        return n instanceof Number num ? num : 0;
     }
 
     // ═══════════════════════════ PEDIDOS ═══════════════════════════
@@ -361,13 +419,6 @@ public class VentasService {
         if (ChronoUnit.DAYS.between(desde, hasta) >= MAX_DIAS) {
             throw new TiendaException(HttpStatus.BAD_REQUEST, "El periodo puede ser de hasta un año.");
         }
-    }
-
-    private static Map<String, Object> suma(List<Pedido> lista) {
-        Map<String, Object> s = new LinkedHashMap<>();
-        s.put("pedidos", lista.size());
-        s.put("total", centavos(total(lista)));
-        return s;
     }
 
     private static double total(List<Pedido> lista) {
