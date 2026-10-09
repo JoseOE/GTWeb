@@ -177,7 +177,7 @@ public class CatalogoService {
     // (inscripción) o si no tiene una duración válida.
     public static Optional<PlanPagado> plan(Producto p) {
         Producto.Plan m = p.getPlan();
-        if (!p.esPlan() || m == null || m.isPagoUnico() || !PlanPagado.UNIDADES.contains(m.getDuracionUnidad())
+        if (!p.esPlan() || m == null || m.isPagoUnico() || !PlanPagado.esUnidad(m.getDuracionUnidad())
                 || m.getDuracionCantidad() == null || m.getDuracionCantidad() < 1) {
             return Optional.empty();
         }
@@ -459,7 +459,7 @@ public class CatalogoService {
             throw new TiendaException(HttpStatus.BAD_REQUEST, "Ponle precio al plan.");
         }
         if (!Boolean.TRUE.equals(r.getPagoUnico())) {
-            if (r.getDuracionUnidad() == null || !PlanPagado.UNIDADES.contains(r.getDuracionUnidad())) {
+            if (r.getDuracionUnidad() == null || !PlanPagado.esUnidad(r.getDuracionUnidad())) {
                 throw new TiendaException(HttpStatus.BAD_REQUEST, "Elige si el plan dura días, semanas o meses.");
             }
             if (r.getDuracionCantidad() == null || r.getDuracionCantidad() < 1 || r.getDuracionCantidad() > 36) {

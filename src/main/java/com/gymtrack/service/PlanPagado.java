@@ -8,6 +8,11 @@ public record PlanPagado(String planId, String nombre, String unidad, int cantid
 
     public static final Set<String> UNIDADES = Set.of("dia", "semana", "mes");
 
+    // Set.of no acepta null en contains(): una inscripción no tiene unidad.
+    public static boolean esUnidad(String unidad) {
+        return unidad != null && UNIDADES.contains(unidad);
+    }
+
     // Lo que valía un pago antes de que existieran los planes: un mes.
     public static final PlanPagado MENSUAL = new PlanPagado(null, null, "mes", 1);
 

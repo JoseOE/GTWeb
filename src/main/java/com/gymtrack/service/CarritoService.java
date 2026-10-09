@@ -465,7 +465,7 @@ public class CarritoService {
     // Plan que extiende la membresía (la inscripción de pago único no cuenta).
     private static Carrito.Partida planEnCarrito(Carrito c) {
         return c.getItems().stream()
-                .filter(p -> p.isEsPlan() && PlanPagado.UNIDADES.contains(p.getDuracionUnidad()))
+                .filter(p -> p.isEsPlan() && PlanPagado.esUnidad(p.getDuracionUnidad()))
                 .findFirst().orElse(null);
     }
 
@@ -537,7 +537,7 @@ public class CarritoService {
     }
 
     private static String textoDelPlan(Carrito.Partida p) {
-        if (!PlanPagado.UNIDADES.contains(p.getDuracionUnidad()) || p.getDuracionCantidad() == null || p.getDuracionCantidad() < 1) {
+        if (!PlanPagado.esUnidad(p.getDuracionUnidad()) || p.getDuracionCantidad() == null || p.getDuracionCantidad() < 1) {
             return "Pago único";
         }
         return CatalogoService.duracionTexto(new PlanPagado(null, null, p.getDuracionUnidad(), p.getDuracionCantidad()));

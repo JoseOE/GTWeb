@@ -211,7 +211,7 @@ public class PedidoService {
     // La duración viaja congelada en la partida. Si no viene (pedidos traídos
     // de Medusa), se lee del plan, si todavía existe.
     private Optional<PlanPagado> duracionDe(Pedido.Partida x) {
-        if (PlanPagado.UNIDADES.contains(x.getDuracionUnidad()) && x.getDuracionCantidad() != null && x.getDuracionCantidad() > 0) {
+        if (PlanPagado.esUnidad(x.getDuracionUnidad()) && x.getDuracionCantidad() != null && x.getDuracionCantidad() > 0) {
             return Optional.of(new PlanPagado(x.getProductoId(), x.getTitulo(), x.getDuracionUnidad(), x.getDuracionCantidad()));
         }
         if (x.getProductoId() == null) return Optional.empty();
