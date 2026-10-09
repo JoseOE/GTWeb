@@ -22,7 +22,7 @@
        montar(contenedor, resumen) {},
 
        // Valida lo que capturó la persona y resuelve con los datos que viajan
-       // a Medusa en la sesión de pago (POST /api/tienda/carrito/checkout →
+       // al servidor con el cobro (POST /api/tienda/carrito/checkout →
        // "datos"). Si falta algo, rechaza con new Error('mensaje para la persona').
        // Nunca mandes el número completo de una tarjeta ni el CVC: solo el token.
        obtenerDatos() { return Promise.resolve({}); },

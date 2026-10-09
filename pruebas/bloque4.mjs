@@ -1,7 +1,7 @@
-// Prueba del bloque 4 (Paynet, recibos iText y correos) contra Spring y Medusa locales.
+// Prueba del bloque 4 (Paynet, recibos iText y correos) contra Spring y MongoDB locales.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
-import { API, ESTADO, LOG, MONGO } from './entorno.mjs';
+import { API, ESTADO, MONGO, leerLog } from './entorno.mjs';
 
 const require = createRequire(import.meta.url);
 const { MongoClient } = require('mongodb');
@@ -21,7 +21,7 @@ async function binario(ruta, userId) {
   const buf = Buffer.from(await r.arrayBuffer());
   return { status: r.status, tipo: r.headers.get('content-type'), buf };
 }
-const lineasLog = (texto) => fs.readFileSync(LOG, 'latin1').split('\n').filter(l => l.includes(texto));
+const lineasLog = (texto) => leerLog().split('\n').filter(l => l.includes(texto));
 const luhn = (d) => { let s = 0, dob = false; for (let i = d.length - 1; i >= 0; i--) { let x = +d[i]; if (dob) { x *= 2; if (x > 9) x -= 9; } s += x; dob = !dob; } return s % 10 === 0; };
 const { gymId, owner, member, planes } = n;
 fs.mkdirSync(new URL('./pdfs/', import.meta.url), { recursive: true });

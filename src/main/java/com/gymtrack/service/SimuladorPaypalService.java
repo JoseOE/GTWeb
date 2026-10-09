@@ -29,8 +29,8 @@ import java.util.Set;
 //      No se pide contraseña: es una simulación.
 //   3. Vuelve a la dirección que dio el checkout (una página de esta web o un
 //      enlace de la app) con token y PayerID, y el checkout paga: consumir()
-//      revisa la orden y la cambia por los datos que el proveedor sim-paypal de
-//      Medusa necesita para autorizar y capturar.
+//      revisa la orden y la cambia por los datos con que SimuladorPagoService
+//      autoriza y captura el pago.
 @Service
 public class SimuladorPaypalService {
 

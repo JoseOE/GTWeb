@@ -11,7 +11,7 @@ import java.util.Map;
 
 // Planes de membresía que el gimnasio vende (visita, semana, mensual,
 // trimestral...) y la inscripción de pago único. Son productos de tipo
-// "membresia" en Medusa: al pagarse extienden la membresía del miembro.
+// "membresia": al pagarse extienden la membresía del miembro.
 @RestController
 @RequestMapping("/api/gyms/{gymId}/planes")
 public class PlanController {

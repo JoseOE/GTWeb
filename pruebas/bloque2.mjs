@@ -1,4 +1,4 @@
-// Prueba del bloque 2 (API del miembro) contra Spring y Medusa locales.
+// Prueba del bloque 2 (API del miembro) contra Spring y MongoDB locales.
 import fs from 'node:fs';
 import { API, ESTADO } from './entorno.mjs';
 

@@ -19,25 +19,25 @@ const archivo = leerEnv();
 const valor = (nombre, porDefecto) => process.env[nombre] || archivo[nombre] || porDefecto;
 
 export const API = valor('GYMTRACK_API', 'http://localhost:8080').replace(/\/$/, '');
-export const MEDUSA = valor('MEDUSA_URL', 'http://localhost:9000').replace(/\/$/, '');
 export const MONGO = valor('MONGODB_URI', 'mongodb://127.0.0.1:27017/gymtrackdb');
-// Secreto compartido de los avisos de Medusa a Spring (el bloque 1 manda avisos firmados).
-export const SECRETO_WEBHOOK = valor('MEDUSA_WEBHOOK_SECRET');
 // Log de Spring (su salida estándar): las pruebas leen ahí los códigos de
 // verificación, porque en local no hay correo configurado.
 export const LOG = process.env.SPRING_LOG || new URL('./spring.log', import.meta.url);
+
+// Java escribe el log en la codificación del sistema: Windows-1252 en Windows
+// y UTF-8 en Linux (la CI). Se lee como UTF-8 y, si no lo es, como Latin-1.
+export function leerLog() {
+  const bytes = fs.readFileSync(LOG);
+  const texto = bytes.toString('utf8');
+  return texto.includes('�') ? bytes.toString('latin1') : texto;
+}
+
 // Lo que deja el bloque 1 (gimnasio, dueño, miembro, planes) para los demás.
 export const ESTADO = new URL('./ultima-prueba.json', import.meta.url);
 
-export function adminMedusa() {
-  const llave = valor('MEDUSA_ADMIN_TOKEN');
-  if (!llave) throw new Error('Falta MEDUSA_ADMIN_TOKEN (en el .env o como variable de entorno).');
-  return 'Basic ' + Buffer.from(llave + ':').toString('base64');
-}
-
 const esLocal = (url) => /^(https?|mongodb):\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/.test(url);
 if (process.env.PRUEBAS_PERMITIR_REMOTO !== '1') {
-  for (const [nombre, url] of [['GYMTRACK_API', API], ['MEDUSA_URL', MEDUSA], ['MONGODB_URI', MONGO]]) {
+  for (const [nombre, url] of [['GYMTRACK_API', API], ['MONGODB_URI', MONGO]]) {
     if (!esLocal(url)) {
       console.error(`${nombre} apunta a ${url.replace(/\/\/[^@/]*@/, '//***@')}, que no es local.`
         + ' Las pruebas crean datos de prueba: córrelas solo contra tu entorno local'

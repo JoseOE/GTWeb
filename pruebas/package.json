@@ -1,7 +1,7 @@
 {
   "name": "gymtrack-pruebas",
   "private": true,
-  "description": "Pruebas de punta a punta de GymTrack contra el entorno local (Spring, Medusa y MongoDB).",
+  "description": "Pruebas de punta a punta de GymTrack contra el entorno local (Spring y MongoDB).",
   "type": "module",
   "scripts": {
     "todas": "node correr-todas.mjs",
