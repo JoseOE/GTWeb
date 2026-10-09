@@ -9,7 +9,10 @@ import com.gymtrack.util.MetodosPago;
 import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -26,8 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
+import java.util.regex.Pattern;
 
 import static com.gymtrack.service.MedusaClient.q;
 
@@ -223,6 +225,7 @@ public class VentasService {
     public record Filtros(String metodo, String estado, String canal, LocalDate desde, LocalDate hasta, String buscar) {}
 
     // Lista paginada de pedidos (todos los estados), del más nuevo al más viejo.
+    // Filtra, cuenta, pagina y suma lo cobrado en la base: solo viaja la página.
     public Map<String, Object> pedidos(String gymId, Filtros f, Integer pagina, Integer tamano) {
         int tam = tamano == null ? 20 : Math.max(1, Math.min(tamano, 100));
         int pag = pagina == null ? 0 : Math.max(0, pagina);
@@ -230,49 +233,81 @@ public class VentasService {
             throw new TiendaException(HttpStatus.BAD_REQUEST, "La fecha inicial va después de la final.");
         }
 
-        List<Pedido> filtrados = pedidoRepository.findByGymIdOrderByCreadoEnDesc(gymId).stream()
-                .filter(filtro(f))
-                .toList();
-        List<Pedido> pagina0 = filtrados.stream().skip((long) pag * tam).limit(tam).toList();
+        Criteria criterios = criterios(gymId, f);
+        long total = mongo.count(Query.query(criterios), Pedido.class);
+        List<Pedido> pagina0 = mongo.find(Query.query(criterios)
+                .with(Sort.by(Sort.Direction.DESC, "creadoEn"))
+                .skip((long) pag * tam)
+                .limit(tam), Pedido.class);
         Map<String, User> miembros = miembros(pagina0);
 
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("pedidos", pagina0.stream().map(p -> fila(p, miembros)).toList());
-        r.put("total", filtrados.size());
+        r.put("total", (int) total);
         r.put("pagina", pag);
-        r.put("paginas", (int) Math.ceil(filtrados.size() / (double) tam));
+        r.put("paginas", (int) Math.ceil(total / (double) tam));
         // Lo cobrado de verdad en lo filtrado: solo los pagados.
-        r.put("cobrado", centavos(total(filtrados.stream().filter(p -> Pedido.ESTADO_PAGADO.equals(p.getEstado())).toList())));
+        r.put("cobrado", cobrado(criterios));
         return r;
     }
 
-    private Predicate<Pedido> filtro(Filtros f) {
-        Predicate<Pedido> pred = p -> true;
+    private Criteria criterios(String gymId, Filtros f) {
+        List<Criteria> y = new ArrayList<>();
+        y.add(Criteria.where("gymId").is(gymId));
         if (vacio(f.metodo()) != null) {
             String proveedor = METODOS.get(f.metodo().trim().toLowerCase());
             if (proveedor == null) throw new TiendaException(HttpStatus.BAD_REQUEST, "Método no válido (tarjeta, paynet, paypal o efectivo).");
-            pred = pred.and(p -> proveedor.equals(p.getProveedorPago()));
+            y.add(Criteria.where("proveedorPago").is(proveedor));
         }
         if (vacio(f.estado()) != null) {
             String estado = f.estado().trim().toLowerCase();
             if (!ESTADOS.contains(estado)) throw new TiendaException(HttpStatus.BAD_REQUEST, "Estado no válido.");
-            pred = pred.and(p -> estado.equals(p.getEstado()));
+            y.add(Criteria.where("estado").is(estado));
         }
         if (vacio(f.canal()) != null) {
             String canal = f.canal().trim().toLowerCase();
             if (!CANALES.contains(canal)) throw new TiendaException(HttpStatus.BAD_REQUEST, "Canal no válido (web, app o mostrador).");
-            pred = pred.and(p -> canal.equals(p.getCanal()));
+            y.add(Criteria.where("canal").is(canal));
         }
-        if (f.desde() != null) pred = pred.and(p -> !fechaDeCreacion(p).isBefore(f.desde()));
-        if (f.hasta() != null) pred = pred.and(p -> !fechaDeCreacion(p).isAfter(f.hasta()));
+        // Días completos en la hora de México.
+        if (f.desde() != null) y.add(Criteria.where("creadoEn").gte(f.desde().atStartOfDay(ZONA_MX).toInstant()));
+        if (f.hasta() != null) y.add(Criteria.where("creadoEn").lt(f.hasta().plusDays(1).atStartOfDay(ZONA_MX).toInstant()));
         String buscar = vacio(f.buscar());
         if (buscar != null) {
             String texto = EscaparateService.normalizar(buscar.replace("#", "").trim());
-            pred = pred.and(p -> (p.getFolio() != null && String.valueOf(p.getFolio()).equals(texto))
-                    || (p.getCliente() != null && EscaparateService.normalizar(p.getCliente()).contains(texto))
-                    || (p.getEmail() != null && p.getEmail().toLowerCase().contains(texto)));
+            List<Criteria> o = new ArrayList<>();
+            if (texto.matches("\\d{1,18}")) o.add(Criteria.where("folio").is(Long.parseLong(texto)));
+            o.add(Criteria.where("cliente").regex(sinAcentos(texto), "i"));
+            o.add(Criteria.where("email").regex(Pattern.quote(texto), "i"));
+            y.add(new Criteria().orOperator(o.toArray(new Criteria[0])));
         }
-        return pred;
+        return new Criteria().andOperator(y.toArray(new Criteria[0]));
+    }
+
+    private double cobrado(Criteria criterios) {
+        Document r = mongo.getCollection("pedidos").aggregate(List.of(
+                new Document("$match", new Document("$and", List.of(
+                        Query.query(criterios).getQueryObject(),
+                        new Document("estado", Pedido.ESTADO_PAGADO)))),
+                grupoSuma(null))).first();
+        return r == null ? 0.0 : centavos(numero(r.get("total")).doubleValue());
+    }
+
+    // "jose" también encuentra "José": cada vocal (y la ñ) acepta sus acentos.
+    static String sinAcentos(String texto) {
+        StringBuilder re = new StringBuilder();
+        for (char c : texto.toCharArray()) {
+            switch (c) {
+                case 'a' -> re.append("[aáàäâ]");
+                case 'e' -> re.append("[eéèëê]");
+                case 'i' -> re.append("[iíìïî]");
+                case 'o' -> re.append("[oóòöô]");
+                case 'u' -> re.append("[uúùüû]");
+                case 'n' -> re.append("[nñ]");
+                default -> re.append(Pattern.quote(String.valueOf(c)));
+            }
+        }
+        return re.toString();
     }
 
     private Map<String, Object> fila(Pedido p, Map<String, User> miembros) {
@@ -399,19 +434,6 @@ public class VentasService {
         return p.getEmail();
     }
 
-    private LocalDate fechaDeVenta(Pedido p) {
-        Instant cuando = p.getPagadoEn() != null ? p.getPagadoEn() : p.getCreadoEn();
-        return LocalDate.ofInstant(cuando == null ? Instant.now() : cuando, ZONA_MX);
-    }
-
-    private static LocalDate fechaDeCreacion(Pedido p) {
-        return LocalDate.ofInstant(p.getCreadoEn() == null ? Instant.now() : p.getCreadoEn(), ZONA_MX);
-    }
-
-    private static boolean entre(LocalDate d, LocalDate desde, LocalDate hasta) {
-        return !d.isBefore(desde) && !d.isAfter(hasta);
-    }
-
     private static void validarPeriodo(LocalDate desde, LocalDate hasta) {
         if (desde.isAfter(hasta)) {
             throw new TiendaException(HttpStatus.BAD_REQUEST, "La fecha inicial va después de la final.");
@@ -419,10 +441,6 @@ public class VentasService {
         if (ChronoUnit.DAYS.between(desde, hasta) >= MAX_DIAS) {
             throw new TiendaException(HttpStatus.BAD_REQUEST, "El periodo puede ser de hasta un año.");
         }
-    }
-
-    private static double total(List<Pedido> lista) {
-        return lista.stream().mapToDouble(p -> p.getTotal() == null ? 0 : p.getTotal()).sum();
     }
 
     private static double centavos(double n) {
