@@ -2,11 +2,16 @@ package com.gymtrack.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.gymtrack.model.Gym;
+import com.gymtrack.model.Producto;
 import com.gymtrack.model.TiendaGym;
+import com.gymtrack.repository.ProductoRepository;
+import com.gymtrack.util.Ids;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.text.Normalizer;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -17,6 +22,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.stream.StreamSupport;
 
 import static com.gymtrack.service.MedusaClient.q;
@@ -26,131 +32,106 @@ import static com.gymtrack.service.TiendaGymService.TIPO_MEMBRESIA;
 import static com.gymtrack.service.TiendaGymService.TIPO_PRODUCTO;
 
 // Lo que el dueño vende: productos (con variantes, precio y stock) y planes de
-// membresía. Todo vive en Medusa; aquí se traduce entre el formato sencillo que
-// usa el panel (y la app) y el de la Admin API.
+// membresía, con el formato sencillo que usan el panel y la app.
 //
-// Cómo se guarda en Medusa:
-//  - Producto de tipo "producto" o "membresia", en el canal de venta del gimnasio.
-//  - Una sola opción, "Variante", cuyo valor es la etiqueta de cada variante
-//    ("Bote 1 kg · Vainilla"). La presentación y el sabor van por separado en
-//    el metadata de la variante para que la tienda pueda armar sus selectores.
-//  - Precio en MXN con IVA incluido (la región México es tax-inclusive).
-//  - Stock en el almacén del gimnasio. "No controlar inventario" (scoops,
-//    planes) = manage_inventory false: nunca se agota.
+// Los productos viven en MongoDB (colección productos): cada uno con sus
+// variantes adentro, precio en MXN con IVA incluido y su stock. "No controlar
+// inventario" (scoops) = la variante nunca se agota.
+//
+// Los planes todavía se guardan en Medusa: un producto de tipo "membresia" con
+// una sola variante "Plan" y su duración en el metadata.
 @Service
 public class CatalogoService {
 
     static final String OPCION = "Variante";
     private static final String VARIANTE_PLAN = "Plan";
     private static final int MAX_VARIANTES = 30;
+    private static final int MAX_REINTENTOS = 3;
 
-    // Campos que se piden a Medusa para armar la vista de un producto o plan.
+    // Campos que se piden a Medusa para armar la vista de un plan.
     private static final String CAMPOS = String.join(",",
             "id", "title", "description", "status", "thumbnail", "metadata", "type_id", "created_at",
             "categories.id", "categories.handle", "categories.name",
             "sales_channels.id",
             "options.id", "options.title", "options.values.id", "options.values.value",
             "variants.id", "variants.title", "variants.manage_inventory", "variants.metadata",
-            "variants.created_at", "variants.variant_rank", "variants.prices.amount", "variants.prices.currency_code",
-            "variants.inventory_items.inventory_item_id",
-            "variants.inventory_items.inventory.location_levels.location_id",
-            "variants.inventory_items.inventory.location_levels.stocked_quantity",
-            "variants.inventory_items.inventory.location_levels.reserved_quantity",
-            "variants.inventory_items.inventory.location_levels.available_quantity");
+            "variants.created_at", "variants.variant_rank", "variants.prices.amount", "variants.prices.currency_code");
 
     private final MedusaClient medusa;
     private final TiendaGymService tiendas;
+    private final ProductoRepository productos;
 
-    public CatalogoService(MedusaClient medusa, TiendaGymService tiendas) {
+    public CatalogoService(MedusaClient medusa, TiendaGymService tiendas, ProductoRepository productos) {
         this.medusa = medusa;
         this.tiendas = tiendas;
+        this.productos = productos;
     }
 
     // ═══════════════════════════ PRODUCTOS ═══════════════════════════
 
     public List<Map<String, Object>> listarProductos(String gymId) {
-        TiendaGym t = tiendas.asegurar(gymId);
-        return listar(gymId, TIPO_PRODUCTO).stream().map(p -> vistaProducto(p, t)).toList();
+        tiendas.exigirGimnasio(gymId);
+        return productos.findByGymIdAndTipo(gymId, TIPO_PRODUCTO).stream()
+                .sorted(POR_ORDEN_Y_NOMBRE)
+                .map(CatalogoService::vistaProducto)
+                .toList();
     }
 
     public Map<String, Object> obtenerProducto(String gymId, String productoId) {
-        TiendaGym t = tiendas.asegurar(gymId);
-        return vistaProducto(exigirDelGimnasio(productoId, t, TIPO_PRODUCTO), t);
+        return vistaProducto(exigirDelGimnasio(gymId, productoId, TIPO_PRODUCTO));
     }
 
     public Map<String, Object> crearProducto(String gymId, ProductoRequest r) {
         List<VarianteLimpia> variantes = validar(r);
-        TiendaGym t = tiendas.asegurar(gymId);
-        TiendaGymService.Base base = tiendas.base();
+        String categoria = categoriaDeProducto(r.getCategoria());
+        tiendas.exigirGimnasio(gymId);
 
-        Map<String, Object> cuerpo = datosDelProducto(r.getNombre(), r.getDescripcion(), r.getImagen(),
-                r.getActivo(), categoriaDeProducto(r.getCategoria(), base), Map.of("gymId", gymId));
-        cuerpo.put("handle", handleUnico(r.getNombre()));
-        cuerpo.put("type_id", base.tipoId(TIPO_PRODUCTO));
-        cuerpo.put("sales_channels", List.of(Map.of("id", t.getSalesChannelId())));
-        cuerpo.put("shipping_profile_id", base.perfilDeEnvioId());
-        cuerpo.put("options", List.of(Map.of("title", OPCION, "values", variantes.stream().map(VarianteLimpia::etiqueta).toList())));
-        cuerpo.put("variants", variantes.stream().map(v -> datosDeVariante(v, null, variantes.indexOf(v))).toList());
-
-        JsonNode creado = medusa.adminPost("/admin/products" + q("fields", "id"), cuerpo).path("product");
-        String id = creado.path("id").asText();
-        ajustarExistencias(producto(id), variantes, t.getStockLocationId());
-        return vistaProducto(producto(id), t);
+        Producto p = new Producto();
+        p.setId(Ids.nuevo("prod"));
+        p.setGymId(gymId);
+        p.setTipo(TIPO_PRODUCTO);
+        p.setCreadoEn(Instant.now());
+        datosGenerales(p, r, categoria);
+        List<Producto.Variante> nuevas = new ArrayList<>();
+        for (int i = 0; i < variantes.size(); i++) nuevas.add(nuevaVariante(variantes.get(i), i));
+        p.setVariantes(nuevas);
+        return vistaProducto(productos.insert(p));
     }
 
+    // Las variantes que traen id se actualizan, las nuevas se crean y las que ya
+    // no vienen se borran (los pedidos viejos conservan su copia). Las piezas
+    // apartadas en pedidos se respetan: disponible = existencias - apartadas.
     public Map<String, Object> actualizarProducto(String gymId, String productoId, ProductoRequest r) {
         List<VarianteLimpia> variantes = validar(r);
-        TiendaGym t = tiendas.asegurar(gymId);
-        TiendaGymService.Base base = tiendas.base();
-        JsonNode actual = exigirDelGimnasio(productoId, t, TIPO_PRODUCTO);
-
-        // 1. Las etiquetas nuevas se agregan como valores de la opción "Variante".
-        JsonNode opcion = actual.path("options").path(0);
-        Set<String> valoresExistentes = new HashSet<>();
-        opcion.path("values").forEach(v -> valoresExistentes.add(v.path("value").asText()));
-        List<Map<String, String>> nuevos = variantes.stream()
-                .map(VarianteLimpia::etiqueta)
-                .filter(e -> !valoresExistentes.contains(e))
-                .map(e -> Map.of("value", e))
-                .toList();
-        if (!nuevos.isEmpty()) {
-            medusa.adminPost("/admin/products/" + productoId + "/options/batch" + q("fields", "id"),
-                    Map.of("update", List.of(Map.of("product_option_id", opcion.path("id").asText(), "add", nuevos))));
-        }
-
-        // 2. Variantes: las que traen id se actualizan, las nuevas se crean y las
-        //    que ya no vienen se borran (los pedidos viejos conservan su copia).
-        Set<String> idsExistentes = new HashSet<>();
-        actual.path("variants").forEach(v -> idsExistentes.add(v.path("id").asText()));
-        List<Map<String, Object>> crear = new ArrayList<>();
-        List<Map<String, Object>> actualizar = new ArrayList<>();
-        Set<String> conservadas = new HashSet<>();
-        for (VarianteLimpia v : variantes) {
-            if (v.id() != null && idsExistentes.contains(v.id())) {
-                actualizar.add(datosDeVariante(v, v.id(), variantes.indexOf(v)));
-                conservadas.add(v.id());
-            } else {
-                crear.add(datosDeVariante(v, null, variantes.indexOf(v)));
+        String categoria = categoriaDeProducto(r.getCategoria());
+        return vistaProducto(conReintentos(() -> {
+            Producto p = exigirDelGimnasio(gymId, productoId, TIPO_PRODUCTO);
+            datosGenerales(p, r, categoria);
+            Map<String, Producto.Variante> actuales = new HashMap<>();
+            p.getVariantes().forEach(v -> actuales.put(v.getId(), v));
+            List<Producto.Variante> nuevas = new ArrayList<>();
+            for (int i = 0; i < variantes.size(); i++) {
+                VarianteLimpia limpia = variantes.get(i);
+                Producto.Variante actual = limpia.id() == null ? null : actuales.get(limpia.id());
+                if (actual == null) {
+                    nuevas.add(nuevaVariante(limpia, i));
+                    continue;
+                }
+                actual.setPresentacion(limpia.presentacion());
+                actual.setSabor(limpia.sabor());
+                actual.setPrecio(limpia.precio());
+                actual.setOrden(i);
+                fijarExistencias(actual, limpia);
+                nuevas.add(actual);
             }
-        }
-        List<String> borrar = idsExistentes.stream().filter(id -> !conservadas.contains(id)).toList();
-        medusa.adminPost("/admin/products/" + productoId + "/variants/batch",
-                Map.of("create", crear, "update", actualizar, "delete", borrar));
-
-        // 3. Datos generales del producto.
-        medusa.adminPost("/admin/products/" + productoId + q("fields", "id"),
-                datosDelProducto(r.getNombre(), r.getDescripcion(), r.getImagen(), r.getActivo(),
-                        categoriaDeProducto(r.getCategoria(), base), Map.of("gymId", gymId)));
-
-        // 4. Existencias en el almacén del gimnasio.
-        ajustarExistencias(producto(productoId), variantes, t.getStockLocationId());
-        return vistaProducto(producto(productoId), t);
+            p.setVariantes(nuevas);
+            p.setActualizadoEn(Instant.now());
+            return productos.save(p);
+        }));
     }
 
     public void eliminarProducto(String gymId, String productoId) {
-        TiendaGym t = tiendas.asegurar(gymId);
-        exigirDelGimnasio(productoId, t, TIPO_PRODUCTO);
-        medusa.adminDelete("/admin/products/" + productoId);
+        productos.delete(exigirDelGimnasio(gymId, productoId, TIPO_PRODUCTO));
     }
 
     // ═══════════════════════════ PLANES ═══════════════════════════
@@ -185,7 +166,7 @@ public class CatalogoService {
         validar(r);
         TiendaGym t = tiendas.asegurar(gymId);
         TiendaGymService.Base base = tiendas.base();
-        JsonNode actual = exigirDelGimnasio(planId, t, TIPO_MEMBRESIA);
+        JsonNode actual = exigirPlanEnMedusa(planId, t);
 
         medusa.adminPost("/admin/products/" + planId + q("fields", "id"),
                 datosDelProducto(r.getNombre(), r.getDescripcion(), null, r.getActivo(),
@@ -198,14 +179,14 @@ public class CatalogoService {
 
     public void eliminarPlan(String gymId, String planId) {
         TiendaGym t = tiendas.asegurar(gymId);
-        exigirDelGimnasio(planId, t, TIPO_MEMBRESIA);
+        exigirPlanEnMedusa(planId, t);
         medusa.adminDelete("/admin/products/" + planId);
     }
 
     // Plan con el que se registra un pago a mano desde el panel.
     public PlanPagado planParaPago(String gymId, String planId) {
         TiendaGym t = tiendas.asegurar(gymId);
-        return leerPlan(exigirDelGimnasio(planId, t, TIPO_MEMBRESIA))
+        return leerPlan(exigirPlanEnMedusa(planId, t))
                 .orElseThrow(() -> new TiendaException(HttpStatus.BAD_REQUEST,
                         "Ese concepto es de pago único: no extiende la membresía."));
     }
@@ -247,34 +228,30 @@ public class CatalogoService {
     // ═══════════════════════════ VISTAS ═══════════════════════════
 
     // Forma en que el panel (y la app) reciben un producto.
-    Map<String, Object> vistaProducto(JsonNode p, TiendaGym t) {
+    static Map<String, Object> vistaProducto(Producto p) {
         Map<String, Object> v = new LinkedHashMap<>();
-        v.put("id", p.path("id").asText());
-        v.put("nombre", p.path("title").asText());
-        v.put("descripcion", texto(p.path("description")));
-        v.put("imagen", texto(p.path("thumbnail")));
-        v.put("activo", "published".equals(p.path("status").asText()));
-        JsonNode categoria = p.path("categories").path(0);
-        v.put("categoria", categoria.isMissingNode() ? null : Map.of(
-                "handle", categoria.path("handle").asText(), "nombre", categoria.path("name").asText()));
+        v.put("id", p.getId());
+        v.put("nombre", p.getNombre());
+        v.put("descripcion", vacio(p.getDescripcion()));
+        v.put("imagen", vacio(p.getImagen()));
+        v.put("activo", p.isActivo());
+        v.put("categoria", vistaCategoria(p.getCategoria()));
 
         List<Map<String, Object>> variantes = new ArrayList<>();
         Double desde = null;
-        for (JsonNode var : ordenadas(p.path("variants"))) {
+        for (Producto.Variante var : enOrden(p.getVariantes())) {
+            boolean controlar = var.isControlarInventario();
             Map<String, Object> x = new LinkedHashMap<>();
-            Double precio = precio(var);
-            boolean controlar = var.path("manage_inventory").asBoolean(false);
-            x.put("id", var.path("id").asText());
-            x.put("nombre", var.path("title").asText());
-            x.put("presentacion", var.path("metadata").path("presentacion").asText(var.path("title").asText()));
-            x.put("sabor", texto(var.path("metadata").path("sabor")));
-            x.put("precio", precio);
+            x.put("id", var.getId());
+            x.put("nombre", var.etiqueta());
+            x.put("presentacion", var.getPresentacion());
+            x.put("sabor", vacio(var.getSabor()));
+            x.put("precio", var.getPrecio());
             x.put("controlarInventario", controlar);
-            JsonNode nivel = nivelEnAlmacen(var, t.getStockLocationId());
-            x.put("existencias", controlar ? nivel.path("stocked_quantity").asInt(0) : null);
-            x.put("disponible", controlar ? nivel.path("available_quantity").asInt(0) : null);
+            x.put("existencias", controlar ? var.getExistencias() : null);
+            x.put("disponible", controlar ? Math.max(0, var.getDisponible()) : null);
             variantes.add(x);
-            if (precio != null && (desde == null || precio < desde)) desde = precio;
+            if (desde == null || var.getPrecio() < desde) desde = var.getPrecio();
         }
         v.put("variantes", variantes);
         v.put("precioDesde", desde);
@@ -313,7 +290,90 @@ public class CatalogoService {
         };
     }
 
+    static Map<String, Object> vistaCategoria(String handle) {
+        if (handle == null) return null;
+        String nombre = CATEGORIAS_FIJAS.getOrDefault(handle, handle);
+        return Map.of("handle", handle, "nombre", nombre);
+    }
+
+    private static final Map<String, String> CATEGORIAS_FIJAS = Map.of(
+            "suplementos", "Suplementos", "bebidas", "Bebidas", "snacks", "Snacks",
+            "accesorios", "Accesorios", CATEGORIA_MEMBRESIAS, "Membresías");
+
     // ═══════════════════════════ AYUDANTES ═══════════════════════════
+
+    // Primero el orden que puso el dueño y luego por nombre, sin importar
+    // mayúsculas ni acentos.
+    static final Comparator<Producto> POR_ORDEN_Y_NOMBRE = Comparator
+            .comparingInt(Producto::getOrden)
+            .thenComparing(p -> EscaparateService.normalizar(p.getNombre()));
+
+    // Orden en que el dueño capturó las presentaciones.
+    static List<Producto.Variante> enOrden(List<Producto.Variante> variantes) {
+        return variantes.stream().sorted(Comparator.comparingInt(Producto.Variante::getOrden)).toList();
+    }
+
+    // Un producto de otro gimnasio responde igual que uno que no existe.
+    private Producto exigirDelGimnasio(String gymId, String productoId, String tipo) {
+        return productos.findByIdAndGymId(productoId, gymId)
+                .filter(p -> tipo.equals(p.getTipo()))
+                .orElseThrow(() -> noEncontrado(tipo));
+    }
+
+    private TiendaException noEncontrado(String tipo) {
+        return new TiendaException(HttpStatus.NOT_FOUND,
+                TIPO_MEMBRESIA.equals(tipo) ? "Plan no encontrado en tu gimnasio." : "Producto no encontrado en tu gimnasio.");
+    }
+
+    // Dos ediciones del mismo producto a la vez (o una edición y una venta, que
+    // también cambia su versión): la segunda se repite con lo más reciente.
+    private static Producto conReintentos(Supplier<Producto> cambio) {
+        for (int intento = 1; ; intento++) {
+            try {
+                return cambio.get();
+            } catch (OptimisticLockingFailureException e) {
+                if (intento >= MAX_REINTENTOS) {
+                    throw new TiendaException(HttpStatus.CONFLICT, "El producto cambió mientras lo guardabas. Intenta de nuevo.");
+                }
+            }
+        }
+    }
+
+    private static void datosGenerales(Producto p, ProductoRequest r, String categoria) {
+        p.setNombre(r.getNombre().trim());
+        p.setDescripcion(r.getDescripcion() == null || r.getDescripcion().isBlank() ? null : r.getDescripcion().trim());
+        p.setImagen(r.getImagen() == null || r.getImagen().isBlank() ? null : r.getImagen());
+        p.setActivo(!Boolean.FALSE.equals(r.getActivo()));
+        p.setCategoria(categoria);
+    }
+
+    private static Producto.Variante nuevaVariante(VarianteLimpia limpia, int orden) {
+        Producto.Variante v = new Producto.Variante();
+        v.setId(Ids.nuevo("variant"));
+        v.setPresentacion(limpia.presentacion());
+        v.setSabor(limpia.sabor());
+        v.setPrecio(limpia.precio());
+        v.setOrden(orden);
+        fijarExistencias(v, limpia);
+        return v;
+    }
+
+    // El dueño captura las piezas que tiene; lo apartado en pedidos se respeta.
+    // Una variante que deja de llevar inventario olvida lo apartado: ya no hay
+    // existencias que cuidar.
+    private static void fijarExistencias(Producto.Variante v, VarianteLimpia limpia) {
+        if (!limpia.controlar()) {
+            v.setControlarInventario(false);
+            v.setExistencias(0);
+            v.setApartadas(0);
+            v.setDisponible(0);
+            return;
+        }
+        if (!v.isControlarInventario()) v.setApartadas(0);
+        v.setControlarInventario(true);
+        v.setExistencias(limpia.existencias());
+        v.setDisponible(limpia.existencias() - v.getApartadas());
+    }
 
     private List<JsonNode> listar(String gymId, String tipo) {
         TiendaGym t = tiendas.asegurar(gymId);
@@ -330,26 +390,21 @@ public class CatalogoService {
         return medusa.adminGet("/admin/products/" + id + q("fields", CAMPOS)).path("product");
     }
 
-    // Un producto de otro gimnasio responde igual que uno que no existe.
-    private JsonNode exigirDelGimnasio(String productoId, TiendaGym t, String tipo) {
+    // Un plan de otro gimnasio responde igual que uno que no existe.
+    private JsonNode exigirPlanEnMedusa(String planId, TiendaGym t) {
         JsonNode p;
         try {
-            p = producto(productoId);
+            p = producto(planId);
         } catch (TiendaException e) {
-            if (e.getStatus() == HttpStatus.NOT_FOUND) throw noEncontrado(tipo);
+            if (e.getStatus() == HttpStatus.NOT_FOUND) throw noEncontrado(TIPO_MEMBRESIA);
             throw e;
         }
         boolean delGimnasio = StreamSupport.stream(p.path("sales_channels").spliterator(), false)
                 .anyMatch(sc -> t.getSalesChannelId().equals(sc.path("id").asText()));
-        if (!delGimnasio || !tiendas.base().tipoId(tipo).equals(p.path("type_id").asText())) {
-            throw noEncontrado(tipo);
+        if (!delGimnasio || !tiendas.base().tipoId(TIPO_MEMBRESIA).equals(p.path("type_id").asText())) {
+            throw noEncontrado(TIPO_MEMBRESIA);
         }
         return p;
-    }
-
-    private TiendaException noEncontrado(String tipo) {
-        return new TiendaException(HttpStatus.NOT_FOUND,
-                TIPO_MEMBRESIA.equals(tipo) ? "Plan no encontrado en tu gimnasio." : "Producto no encontrado en tu gimnasio.");
     }
 
     private Map<String, Object> datosDelProducto(String nombre, String descripcion, String imagen, Boolean activo,
@@ -377,24 +432,6 @@ public class CatalogoService {
         return (base.isEmpty() ? "producto" : base) + "-" + UUID.randomUUID().toString().substring(0, 8);
     }
 
-    // rango = posición en la que el dueño capturó la presentación: así la tienda
-    // y el mostrador las muestran en ese orden (500 ml, 1 L, 2 L) y no en el
-    // orden en que se fueron creando.
-    private Map<String, Object> datosDeVariante(VarianteLimpia v, String id, int rango) {
-        Map<String, Object> d = new HashMap<>();
-        if (id != null) d.put("id", id);
-        d.put("title", v.etiqueta());
-        d.put("variant_rank", rango);
-        d.put("manage_inventory", v.controlar());
-        d.put("options", Map.of(OPCION, v.etiqueta()));
-        d.put("prices", List.of(Map.of("currency_code", MONEDA, "amount", v.precio())));
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("presentacion", v.presentacion());
-        metadata.put("sabor", v.sabor() == null ? "" : v.sabor());
-        d.put("metadata", metadata);
-        return d;
-    }
-
     private Map<String, Object> metadataDelPlan(String gymId, PlanRequest r) {
         boolean pagoUnico = Boolean.TRUE.equals(r.getPagoUnico());
         Map<String, Object> m = new HashMap<>();
@@ -409,46 +446,6 @@ public class CatalogoService {
         return m;
     }
 
-    // Fija las existencias de cada variante con inventario en el almacén del gimnasio.
-    private void ajustarExistencias(JsonNode producto, List<VarianteLimpia> pedidas, String almacenId) {
-        Map<String, VarianteLimpia> porEtiqueta = new HashMap<>();
-        pedidas.forEach(v -> porEtiqueta.put(v.etiqueta(), v));
-        List<Map<String, Object>> crear = new ArrayList<>();
-        List<Map<String, Object>> actualizar = new ArrayList<>();
-
-        for (JsonNode var : producto.path("variants")) {
-            VarianteLimpia pedida = porEtiqueta.get(var.path("title").asText());
-            if (pedida == null || !pedida.controlar()) continue;
-            String inventarioId = var.path("inventory_items").path(0).path("inventory_item_id").asText(null);
-            if (inventarioId == null) {
-                // Variante que antes no controlaba inventario: Medusa no le creó uno.
-                inventarioId = crearInventario(producto.path("id").asText(), var);
-            }
-            Map<String, Object> nivel = Map.of("inventory_item_id", inventarioId, "location_id", almacenId,
-                    "stocked_quantity", pedida.existencias());
-            if (nivelEnAlmacen(var, almacenId).isMissingNode()) crear.add(nivel);
-            else actualizar.add(nivel);
-        }
-        if (!crear.isEmpty() || !actualizar.isEmpty()) {
-            medusa.adminPost("/admin/inventory-items/location-levels/batch", Map.of("create", crear, "update", actualizar));
-        }
-    }
-
-    private String crearInventario(String productoId, JsonNode variante) {
-        String id = medusa.adminPost("/admin/inventory-items" + q("fields", "id"),
-                Map.of("title", variante.path("title").asText())).path("inventory_item").path("id").asText();
-        medusa.adminPost("/admin/products/" + productoId + "/variants/" + variante.path("id").asText() + "/inventory-items"
-                + q("fields", "id"), Map.of("inventory_item_id", id, "required_quantity", 1));
-        return id;
-    }
-
-    private static JsonNode nivelEnAlmacen(JsonNode variante, String almacenId) {
-        for (JsonNode nivel : variante.path("inventory_items").path(0).path("inventory").path("location_levels")) {
-            if (almacenId.equals(nivel.path("location_id").asText())) return nivel;
-        }
-        return com.fasterxml.jackson.databind.node.MissingNode.getInstance();
-    }
-
     private static Double precio(JsonNode variante) {
         for (JsonNode p : variante.path("prices")) {
             if (MONEDA.equals(p.path("currency_code").asText())) return p.path("amount").asDouble();
@@ -456,14 +453,8 @@ public class CatalogoService {
         return null;
     }
 
-    private static List<JsonNode> ordenadas(JsonNode variantes) {
-        return StreamSupport.stream(variantes.spliterator(), false)
-                .sorted(EN_ORDEN)
-                .toList();
-    }
-
-    // Orden en que el dueño capturó las presentaciones; las de antes de guardar
-    // ese orden (todas con rango 0) quedan por fecha de creación.
+    // Orden de las variantes leídas de Medusa (lo usa la tienda mientras siga ahí):
+    // el que capturó el dueño y, las de antes de guardar ese orden, por fecha.
     static final Comparator<JsonNode> EN_ORDEN = Comparator
             .comparingInt((JsonNode v) -> v.path("variant_rank").asInt(0))
             .thenComparing(v -> v.path("created_at").asText(""));
@@ -472,12 +463,15 @@ public class CatalogoService {
         return n.isMissingNode() || n.isNull() || n.asText().isBlank() ? null : n.asText();
     }
 
-    private TiendaGymService.Categoria categoriaDeProducto(String handle, TiendaGymService.Base base) {
-        TiendaGymService.Categoria c = handle == null ? null : base.categorias().get(handle);
-        if (c == null || CATEGORIA_MEMBRESIAS.equals(handle)) {
+    private static String vacio(String s) {
+        return s == null || s.isBlank() ? null : s;
+    }
+
+    private String categoriaDeProducto(String handle) {
+        if (handle == null || CATEGORIA_MEMBRESIAS.equals(handle) || tiendas.categoria(handle).isEmpty()) {
             throw new TiendaException(HttpStatus.BAD_REQUEST, "Elige la categoría del producto.");
         }
-        return c;
+        return handle;
     }
 
     private static Map<String, Object> preset(String nombre, String unidad, Integer cantidad, Double precio,
