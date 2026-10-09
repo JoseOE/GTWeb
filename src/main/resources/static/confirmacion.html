@@ -71,7 +71,7 @@
                         <span class="estado-pedido ${Tienda.escapar(p.estado)} mt-2">${Tienda.escapar(p.estadoTexto)}</span>
                     </div>
                     ${conPlan && p.estado === 'pagado' && cuenta && cuenta.fechaProximoPago
-                        ? '<div class="aviso-despertando mt-4" role="status"><i class="bx bx-check-circle fs-4 text-success" aria-hidden="true"></i><span>Tu membresía quedó activa hasta el <strong>' + Tienda.fecha(cuenta.fechaProximoPago + 'T12:00:00') + '</strong>.</span></div>'
+                        ? '<div class="aviso-tienda mt-4" role="status"><i class="bx bx-check-circle fs-4 text-success" aria-hidden="true"></i><span>Tu membresía quedó activa hasta el <strong>' + Tienda.fecha(cuenta.fechaProximoPago + 'T12:00:00') + '</strong>.</span></div>'
                         : ''}
                     <section class="paso mt-4">
                         <div class="d-flex justify-content-between gap-3 small text-body-secondary mb-2">

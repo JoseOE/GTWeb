@@ -742,8 +742,8 @@ body.con-barra-carrito {
 .estado-pedido.cancelado,
 .estado-pedido.reembolsado { background: #e8e6dc; color: var(--muted); }
 
-/* ─── Aviso de Medusa despertando ─── */
-.aviso-despertando {
+/* ─── Aviso dentro de la página (p. ej. la membresía ya activa) ─── */
+.aviso-tienda {
     display: flex;
     align-items: center;
     gap: 10px;

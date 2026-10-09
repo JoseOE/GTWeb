@@ -3,7 +3,7 @@
    confirmación y mis pedidos.
    ───────────────────────────────────────
    - Sesión: la que guarda login.html (userId, userName, role, gymId).
-   - Llamadas a la API con X-User-Id y reintento solo mientras Medusa despierta.
+   - Llamadas a la API con X-User-Id.
    - Barra superior, mini-carrito (offcanvas), barra inferior con el total en
      celular y la notificación de "Agregado".
    El carrito vive en el servidor (es el mismo en cualquier dispositivo);
@@ -46,22 +46,15 @@ const Tienda = (() => {
         return sesion;
     }
 
-    // Llamada a la API. Si Medusa está despertando (503 + despertando), muestra
-    // el aviso y reintenta cada 5 s hasta un minuto. Los errores llevan
-    // .status y .datos (el cuerpo completo: avisos, carrito...).
-    function api(url, opts, intentos) {
+    // Llamada a la API. Los errores llevan .status y .datos (el cuerpo
+    // completo: avisos, carrito...).
+    function api(url, opts) {
         opts = opts || {};
-        intentos = intentos == null ? 12 : intentos;
         const headers = { 'X-User-Id': sesion.userId };
         if (opts.body) headers['Content-Type'] = 'application/json';
         return fetch(url, { ...opts, headers })
             .catch(() => { const e = new Error('Sin conexión. Revisa tu internet e intenta de nuevo.'); e.status = 0; throw e; })
             .then(res => res.json().catch(() => ({})).then(body => {
-                if (res.status === 503 && body.despertando && intentos > 0) {
-                    despertando(true);
-                    return new Promise(r => setTimeout(r, 5000)).then(() => api(url, opts, intentos - 1));
-                }
-                despertando(false);
                 if (!res.ok) {
                     const e = new Error(body.error || 'No se pudo completar. Intenta de nuevo.');
                     e.status = res.status;
@@ -70,11 +63,6 @@ const Tienda = (() => {
                 }
                 return body;
             }));
-    }
-
-    function despertando(visible) {
-        const el = document.getElementById('aviso-despertando');
-        if (el) el.classList.toggle('d-none', !visible);
     }
 
     // Estado vigente de la cuenta: gimnasio actual, membresía y si puede comprar.
@@ -132,11 +120,7 @@ const Tienda = (() => {
                         </ul>
                     </div>
                 </div>
-            </nav>
-            <div class="container-tienda"><div id="aviso-despertando" class="aviso-despertando mt-3 d-none" role="status">
-                <span class="spinner-border spinner-border-sm text-secondary" aria-hidden="true"></span>
-                <span>Despertando la tienda… La primera vez puede tardar hasta un minuto.</span>
-            </div></div>`;
+            </nav>`;
 
         document.body.insertAdjacentHTML('beforeend', `
             <div class="offcanvas offcanvas-end" tabindex="-1" id="minicarrito" aria-labelledby="minicarrito-titulo">
