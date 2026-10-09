@@ -1,6 +1,8 @@
 package com.gymtrack.model;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -18,6 +20,14 @@ import java.util.Map;
 // Se escribe al completar el checkout y se vuelve a sincronizar con cada aviso
 // de Medusa (PedidoService.sincronizar), así que siempre refleja el último estado.
 @Document(collection = "pedidos")
+@CompoundIndexes({
+        // Lista de ventas del panel: los pedidos de un gimnasio, del más nuevo al más viejo.
+        @CompoundIndex(name = "gimnasio_creado", def = "{'gymId': 1, 'creadoEn': -1}"),
+        // Resumen de ventas: lo pagado de un gimnasio por fecha de pago.
+        @CompoundIndex(name = "gimnasio_estado_pagado", def = "{'gymId': 1, 'estado': 1, 'pagadoEn': -1}"),
+        // Fichas Paynet pendientes (las revisa el cancelador de vencidas).
+        @CompoundIndex(name = "estado_proveedor", def = "{'estado': 1, 'proveedorPago': 1}")
+})
 public class Pedido {
 
     public static final String ESTADO_PENDIENTE_PAGO = "pendiente_pago";
@@ -36,7 +46,6 @@ public class Pedido {
     private String orderId;
     // Folio corto que ve el cliente (#12).
     private Long folio;
-    @Indexed
     private String gymId;
     // null en ventas de mostrador a "Público en general".
     @Indexed(sparse = true)
@@ -64,11 +73,53 @@ public class Pedido {
     // true cuando ya se extendió la membresía por el plan de este pedido.
     private boolean planAplicado;
     private Instant sincronizadoEn;
+    // Piezas que este pedido tomó del inventario y cómo. Con esto se regresan,
+    // una sola vez, si se cancela, vence o se reembolsa (InventarioService).
+    private Inventario inventario;
 
     public Pedido() {}
 
     public boolean incluyePlan() {
         return partidas.stream().anyMatch(Partida::esPlan);
+    }
+
+    public static class Inventario {
+        // Tienda y app: vendidas o por pagar (Paynet), todavía sin entregar.
+        public static final String APARTADO = "apartado";
+        // Mostrador: entregadas en el acto.
+        public static final String DESCONTADO = "descontado";
+        // Ya regresaron al inventario (cancelado, vencido o reembolsado).
+        public static final String DEVUELTO = "devuelto";
+        // Nada que mover: solo llevaba variantes sin inventario (scoops, planes).
+        public static final String SIN_PIEZAS = "sin_piezas";
+
+        private String estado;
+        private List<Pieza> piezas = new ArrayList<>();
+        private Instant devueltoEn;
+
+        public String getEstado() { return estado; }
+        public void setEstado(String estado) { this.estado = estado; }
+
+        public List<Pieza> getPiezas() { return piezas; }
+        public void setPiezas(List<Pieza> piezas) { this.piezas = piezas; }
+
+        public Instant getDevueltoEn() { return devueltoEn; }
+        public void setDevueltoEn(Instant devueltoEn) { this.devueltoEn = devueltoEn; }
+    }
+
+    public static class Pieza {
+        private String productoId;
+        private String varianteId;
+        private int cantidad;
+
+        public String getProductoId() { return productoId; }
+        public void setProductoId(String productoId) { this.productoId = productoId; }
+
+        public String getVarianteId() { return varianteId; }
+        public void setVarianteId(String varianteId) { this.varianteId = varianteId; }
+
+        public int getCantidad() { return cantidad; }
+        public void setCantidad(int cantidad) { this.cantidad = cantidad; }
     }
 
     public static class Partida {
@@ -173,4 +224,7 @@ public class Pedido {
 
     public Instant getSincronizadoEn() { return sincronizadoEn; }
     public void setSincronizadoEn(Instant sincronizadoEn) { this.sincronizadoEn = sincronizadoEn; }
+
+    public Inventario getInventario() { return inventario; }
+    public void setInventario(Inventario inventario) { this.inventario = inventario; }
 }
