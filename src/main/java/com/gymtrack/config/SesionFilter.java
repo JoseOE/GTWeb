@@ -61,9 +61,9 @@ public class SesionFilter extends OncePerRequestFilter {
         return new Regla(metodo, patron);
     }
 
-    // Sin sesión: crear cuenta, entrar, verificar, recuperar, el catálogo, la
-    // tienda que despierta, el webhook firmado de Medusa, las imágenes y el
-    // simulador de PayPal (su id de orden es la llave).
+    // Sin sesión: crear cuenta, entrar, verificar, recuperar, el catálogo, el
+    // estado de la tienda, las imágenes y el simulador de PayPal (su id de
+    // orden es la llave).
     private static final List<Regla> PUBLICAS = List.of(
             regla("POST", "/api/users/register"),
             regla("POST", "/api/users/login"),
@@ -78,7 +78,6 @@ public class SesionFilter extends OncePerRequestFilter {
             regla("GET", "/api/servicios/*"),
             regla("GET", "/api/tienda/estado"),
             regla("GET", "/api/tienda/categorias"),
-            regla("POST", "/api/tienda/webhooks/medusa"),
             regla("GET", "/api/imagenes/*"),
             regla("GET", "/api/simuladores/paypal/ordenes/*"),
             regla("POST", "/api/simuladores/paypal/ordenes/*/aprobar"),

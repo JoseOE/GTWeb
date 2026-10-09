@@ -30,9 +30,9 @@ import java.util.Map;
 //   - mensualidad registrada a mano → recibo de membresía.
 //
 // Corren en segundo plano: generar el PDF y hablar con Brevo no debe frenar
-// el checkout ni el aviso de Medusa. Cada correo automático se aparta antes de
+// el checkout ni el cobro en el mostrador. Cada correo automático se aparta antes de
 // enviarse (colección correos_enviados), así que sale una sola vez aunque el
-// pedido se sincronice varias veces. Solo se escribe a miembros: en una venta
+// pedido se confirme varias veces. Solo se escribe a miembros: en una venta
 // de mostrador al público en general no hay a quién.
 @Service
 public class AvisosPedidoService {
@@ -58,10 +58,10 @@ public class AvisosPedidoService {
         this.enviados = enviados;
     }
 
-    // Lo llama PedidoService cada vez que sincroniza un pedido. vista es la
-    // forma del pedido que ve el comprador (PedidoService.vista).
+    // Lo llama PedidoService cada vez que un pedido cambia de estado (se crea,
+    // se paga una ficha). vista es la forma del pedido que ve el comprador.
     @Async
-    public void alSincronizar(Pedido p, Map<String, Object> vista) {
+    public void alActualizar(Pedido p, Map<String, Object> vista) {
         try {
             User comprador = comprador(p);
             if (comprador == null) return;

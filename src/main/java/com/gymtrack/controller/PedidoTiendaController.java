@@ -33,27 +33,14 @@ public class PedidoTiendaController {
         return pedidoRepository.findByUserIdOrderByCreadoEnDesc(id).stream().map(pedidoService::vista).toList();
     }
 
-    // Un pedido pendiente se vuelve a leer de Medusa: si el aviso de pago se
-    // perdió (Spring dormido, red), aquí se recupera.
+    // El pedido vive en MongoDB con su estado al día: no hay nada que volver a leer.
     @GetMapping("/{orderId}")
     public Map<String, Object> ver(@PathVariable String orderId,
                                    @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
         acceso.exigirUsuario(userId);
-        Pedido pedido = pedidoRepository.findByOrderId(orderId).orElse(null);
-        if (pedido != null) {
-            acceso.exigirAccesoAPedido(pedido, userId);
-            if (Pedido.ESTADO_PENDIENTE_PAGO.equals(pedido.getEstado())) {
-                pedido = pedidoService.sincronizar(orderId);
-            }
-        } else {
-            try {
-                pedido = pedidoService.sincronizar(orderId);
-            } catch (TiendaException e) {
-                if (e.getStatus() == HttpStatus.NOT_FOUND) throw new TiendaException(HttpStatus.NOT_FOUND, "Pedido no encontrado.");
-                throw e;
-            }
-            acceso.exigirAccesoAPedido(pedido, userId);
-        }
+        Pedido pedido = pedidoRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new TiendaException(HttpStatus.NOT_FOUND, "Pedido no encontrado."));
+        acceso.exigirAccesoAPedido(pedido, userId);
         return pedidoService.vista(pedido);
     }
 }

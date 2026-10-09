@@ -174,7 +174,7 @@ public class PedidoService {
         log.info("Pedido #{} creado ({}, {}, {}).", p.getFolio(), MetodosPago.nombre(p.getProveedorPago()), p.getCanal(), p.getEstado());
 
         if (Pedido.ESTADO_PAGADO.equals(p.getEstado())) confirmarPago(p);
-        else avisos.alSincronizar(p, vista(p));
+        else avisos.alActualizar(p, vista(p));
         return p;
     }
 
@@ -186,7 +186,7 @@ public class PedidoService {
         if (Pedido.ESTADO_PAGADO.equals(p.getEstado()) && !p.isPlanAplicado() && p.incluyePlan()) {
             aplicarPlan(p);
         }
-        avisos.alSincronizar(p, vista(p));
+        avisos.alActualizar(p, vista(p));
     }
 
     private void aplicarPlan(Pedido p) {
@@ -253,7 +253,7 @@ public class PedidoService {
             aplicarPlan(p, o);
         }
         // Correos y push del pedido (en segundo plano; cada uno sale una sola vez).
-        avisos.alSincronizar(p, vista(p));
+        avisos.alActualizar(p, vista(p));
         return p;
     }
 
