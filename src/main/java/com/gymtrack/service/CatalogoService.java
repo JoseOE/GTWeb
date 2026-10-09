@@ -284,7 +284,11 @@ public class CatalogoService {
     static Map<String, Object> vistaCategoria(String handle) {
         if (handle == null) return null;
         String nombre = CATEGORIAS_FIJAS.getOrDefault(handle, handle);
-        return Map.of("handle", handle, "nombre", nombre);
+        // En este orden, como lo daba Medusa.
+        Map<String, Object> v = new LinkedHashMap<>();
+        v.put("handle", handle);
+        v.put("nombre", nombre);
+        return v;
     }
 
     private static final Map<String, String> CATEGORIAS_FIJAS = Map.of(
