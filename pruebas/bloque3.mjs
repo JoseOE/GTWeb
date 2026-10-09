@@ -1,4 +1,4 @@
-// Prueba del bloque 3 (simulador Stripe y mostrador) contra Spring y Medusa locales.
+// Prueba del bloque 3 (simulador Stripe y mostrador) contra Spring y MongoDB locales.
 import fs from 'node:fs';
 import { API, ESTADO } from './entorno.mjs';
 

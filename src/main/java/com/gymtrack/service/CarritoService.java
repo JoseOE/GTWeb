@@ -44,9 +44,9 @@ import java.util.function.Supplier;
 public class CarritoService {
 
     // Canales del carrito del miembro. El mostrador no guarda carrito: su ticket
-    // vive en el navegador del panel y llega completo al cobrar.
+    // vive en el navegador del panel y llega completo al cobrar (MostradorService).
     public static final Set<String> CANALES = Set.of(Pedido.CANAL_WEB, Pedido.CANAL_APP);
-    private static final int MAX_POR_PARTIDA = 20;
+    static final int MAX_POR_PARTIDA = 20;
 
     private final CarritoRepository carritos;
     private final ProductoRepository productos;
@@ -66,9 +66,9 @@ public class CarritoService {
     }
 
     // Lo publicado en la tienda de un gimnasio, por id de variante: una sola consulta.
-    private record Elegible(Producto producto, Producto.Variante variante) {}
+    record Elegible(Producto producto, Producto.Variante variante) {}
 
-    private Map<String, Elegible> catalogo(String gymId) {
+    Map<String, Elegible> catalogo(String gymId) {
         Map<String, Elegible> m = new HashMap<>();
         for (Producto p : productos.findByGymIdAndActivoTrue(gymId)) {
             for (Producto.Variante v : p.getVariantes()) m.put(v.getId(), new Elegible(p, v));
@@ -250,103 +250,6 @@ public class CarritoService {
         return pedido;
     }
 
-    // Una partida del ticket del mostrador, tal como la manda el panel.
-    public record PartidaTicket(String varianteId, Integer cantidad) {}
-
-    public record VentaMostrador(Pedido pedido, Double cambio) {}
-
-    // Venta en el mostrador del panel: la cobra el dueño, en efectivo o con la
-    // tarjeta (el simulador de Stripe hace de terminal), a un miembro o al
-    // público en general, y se entrega en el acto (descuenta existencias).
-    public VentaMostrador cobrarMostrador(User dueno, String gymId, User cliente, List<PartidaTicket> partidas,
-                                          String metodo, Double recibido, Map<String, Object> datos, Double totalVisto) {
-        if (!"efectivo".equals(metodo) && !"tarjeta".equals(metodo)) {
-            throw new TiendaException(HttpStatus.BAD_REQUEST, "Elige cobrar en efectivo o con tarjeta.");
-        }
-        List<PedidoService.Linea> lineas = revisarTicket(catalogo(gymId), partidas, totalVisto);
-        double total = PedidoService.centavos(lineas.stream().mapToDouble(l -> l.precioUnitario() * l.cantidad()).sum());
-        if ("efectivo".equals(metodo) && (recibido == null || recibido + 0.009 < total)) {
-            throw new TiendaException(HttpStatus.BAD_REQUEST, "El efectivo recibido no alcanza para " + dinero(total) + ".");
-        }
-        String proveedor;
-        Double cambio = null;
-        Map<String, Object> extras = null;
-        if ("efectivo".equals(metodo)) {
-            proveedor = MetodosPago.EFECTIVO;
-            cambio = PedidoService.centavos(recibido - total);
-            extras = Map.of("recibido", recibido, "cambio", cambio);
-            datos = Map.of();
-        } else {
-            proveedor = MetodosPago.STRIPE;
-            datos = stripe.consumir(dueno.getId(), datos);
-        }
-        // En una venta al público el correo del pedido es el del dueño y no se
-        // manda ningún aviso.
-        Pedido pedido = pedidos.cobrar(new PedidoService.Venta(gymId, Pedido.CANAL_MOSTRADOR,
-                cliente == null ? null : cliente.getId(),
-                cliente == null ? dueno.getEmail() : cliente.getEmail(),
-                cliente == null ? "Público en general" : cliente.getNombre(),
-                dueno.getId(), lineas, proveedor, datos, true, extras));
-        return new VentaMostrador(pedido, cambio);
-    }
-
-    // Revisa el ticket del mostrador contra lo que hoy está a la venta: solo lo
-    // publicado, nunca más piezas de las disponibles y un solo plan que
-    // extienda la membresía. Si algo cambió, se avisa y no se cobra.
-    private List<PedidoService.Linea> revisarTicket(Map<String, Elegible> cat, List<PartidaTicket> partidas, Double totalVisto) {
-        if (partidas == null || partidas.isEmpty()) {
-            throw new TiendaException(HttpStatus.BAD_REQUEST, "El ticket está vacío.");
-        }
-        // Una sola partida por presentación, en el orden en que se agregaron.
-        Map<String, Integer> cantidades = new LinkedHashMap<>();
-        for (PartidaTicket p : partidas) {
-            if (p == null || p.varianteId() == null || p.varianteId().isBlank()) {
-                throw new TiendaException(HttpStatus.BAD_REQUEST, "Hay una partida sin presentación en el ticket.");
-            }
-            cantidades.merge(p.varianteId(), p.cantidad() == null ? 1 : p.cantidad(), Integer::sum);
-        }
-        List<PedidoService.Linea> lineas = new ArrayList<>();
-        List<String> avisos = new ArrayList<>();
-        String plan = null;
-        for (Map.Entry<String, Integer> en : cantidades.entrySet()) {
-            Elegible e = cat.get(en.getKey());
-            int cantidad = en.getValue();
-            if (e == null) {
-                avisos.add("Un producto del ticket ya no está a la venta.");
-                continue;
-            }
-            String titulo = e.producto().getNombre();
-            if (cantidad < 1 || cantidad > MAX_POR_PARTIDA) {
-                throw new TiendaException(HttpStatus.BAD_REQUEST, "De «" + titulo + "» se venden de 1 a " + MAX_POR_PARTIDA + " piezas.");
-            }
-            Optional<PlanPagado> duracion = Optional.empty();
-            if (e.producto().esPlan()) {
-                if (cantidad > 1) throw new TiendaException(HttpStatus.BAD_REQUEST, "Los planes se venden de uno en uno.");
-                duracion = CatalogoService.plan(e.producto());
-                if (duracion.isPresent()) {
-                    if (plan != null) {
-                        throw new TiendaException(HttpStatus.BAD_REQUEST, "Solo puede ir un plan por venta: «" + plan + "» y «" + titulo + "».");
-                    }
-                    plan = titulo;
-                }
-            }
-            Integer disponible = disponible(e.variante());
-            if (disponible != null && cantidad > disponible) {
-                avisos.add(disponible <= 0 ? "«" + titulo + "» se agotó." : "Solo quedan " + disponible + " de «" + titulo + "».");
-                continue;
-            }
-            lineas.add(linea(e, cantidad, duracion.orElse(null)));
-        }
-        if (!avisos.isEmpty()) {
-            throw new TiendaException(HttpStatus.CONFLICT, "El ticket cambió. Revísalo antes de cobrar.", Map.of("avisos", avisos));
-        }
-        double total = PedidoService.centavos(lineas.stream().mapToDouble(l -> l.precioUnitario() * l.cantidad()).sum());
-        if (totalVisto == null || Math.abs(total - totalVisto) > 0.009) {
-            throw new TiendaException(HttpStatus.CONFLICT, "El total cambió a " + dinero(total) + ". Revisa el ticket antes de cobrar.");
-        }
-        return lineas;
-    }
-
     // Revisión final antes de cobrar: lo que cambió se corrige, se avisa y no se cobra.
     private void revisarParaCobrar(Carrito c, Map<String, Elegible> cat, Double totalVisto) {
         if (c.getCartId() == null || c.getItems().isEmpty()) {
@@ -376,7 +279,7 @@ public class CarritoService {
         return lineas;
     }
 
-    private static PedidoService.Linea linea(Elegible e, int cantidad, PlanPagado plan) {
+    static PedidoService.Linea linea(Elegible e, int cantidad, PlanPagado plan) {
         Producto p = e.producto();
         Producto.Variante v = e.variante();
         return new PedidoService.Linea(p.getId(), v.getId(), p.getNombre(),
@@ -429,7 +332,7 @@ public class CarritoService {
     }
 
     // null = no controla inventario (nunca se agota).
-    private static Integer disponible(Producto.Variante v) {
+    static Integer disponible(Producto.Variante v) {
         return v.isControlarInventario() ? Math.max(0, v.getDisponible()) : null;
     }
 
@@ -562,7 +465,7 @@ public class CarritoService {
     // Plan que extiende la membresía (la inscripción de pago único no cuenta).
     private static Carrito.Partida planEnCarrito(Carrito c) {
         return c.getItems().stream()
-                .filter(p -> p.isEsPlan() && PlanPagado.UNIDADES.contains(p.getDuracionUnidad()))
+                .filter(p -> p.isEsPlan() && PlanPagado.esUnidad(p.getDuracionUnidad()))
                 .findFirst().orElse(null);
     }
 
@@ -634,13 +537,13 @@ public class CarritoService {
     }
 
     private static String textoDelPlan(Carrito.Partida p) {
-        if (!PlanPagado.UNIDADES.contains(p.getDuracionUnidad()) || p.getDuracionCantidad() == null || p.getDuracionCantidad() < 1) {
+        if (!PlanPagado.esUnidad(p.getDuracionUnidad()) || p.getDuracionCantidad() == null || p.getDuracionCantidad() < 1) {
             return "Pago único";
         }
         return CatalogoService.duracionTexto(new PlanPagado(null, null, p.getDuracionUnidad(), p.getDuracionCantidad()));
     }
 
-    private static String dinero(double monto) {
+    static String dinero(double monto) {
         return String.format(java.util.Locale.forLanguageTag("es-MX"), "$%,.2f", monto);
     }
 }

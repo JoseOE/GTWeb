@@ -1,7 +1,8 @@
 # Revisión de cada PR antes de mezclarlo a main (y de cada cambio en main):
-# compila Spring Boot, compila la tienda de Medusa y revisa la sintaxis de las
-# pruebas de punta a punta. Si algo no compila, el PR lo muestra en rojo antes
-# de que llegue a Render.
+# compila Spring Boot y corre las pruebas de punta a punta contra Spring y un
+# MongoDB de prueba. La tienda vive en Spring y MongoDB, así que no hace falta
+# levantar nada más. Si algo falla, el PR lo muestra en rojo antes de que
+# llegue a Render.
 name: Revisión
 
 on:
@@ -39,40 +40,59 @@ jobs:
       - name: Compilar y empaquetar
         run: mvn -B -ntp package
 
-  medusa:
-    name: Tienda (Medusa)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: medusa
-    steps:
-      - name: Descargar el repositorio
-        uses: actions/checkout@v4
-
-      - name: Node 24 (la misma versión que en Render)
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: medusa/package-lock.json
-
-      - name: Instalar dependencias
-        run: npm ci
-
-      - name: Compilar
-        run: npm run build
-
   pruebas:
-    name: Sintaxis de las pruebas
+    name: Pruebas de punta a punta
     runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+    env:
+      MONGODB_URI: mongodb://localhost:27017/gymtrackdb
+      SPRING_LOG: ${{ github.workspace }}/pruebas/spring.log
     steps:
       - name: Descargar el repositorio
         uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
 
       - name: Node 24
         uses: actions/setup-node@v4
         with:
           node-version: "24"
+          cache: npm
+          cache-dependency-path: pruebas/package-lock.json
 
-      - name: Revisar los scripts
+      - name: Revisar la sintaxis de los scripts
         run: for f in pruebas/*.mjs; do node --check "$f"; done
+
+      - name: Empaquetar Spring
+        run: mvn -B -ntp -DskipTests package
+
+      # Los códigos de verificación salen en el log de Spring (no hay correo).
+      - name: Levantar Spring
+        run: |
+          java -jar target/gymtrack-web-0.0.1-SNAPSHOT.jar > "$SPRING_LOG" 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8080/api/tienda/estado > /dev/null && exit 0
+            sleep 2
+          done
+          echo "Spring no arrancó"; tail -50 "$SPRING_LOG"; exit 1
+
+      - name: Instalar dependencias de las pruebas
+        working-directory: pruebas
+        run: npm ci
+
+      - name: Correr las pruebas
+        working-directory: pruebas
+        run: node correr-todas.mjs
+
+      - name: Log de Spring si algo falló
+        if: failure()
+        run: tail -200 "$SPRING_LOG"

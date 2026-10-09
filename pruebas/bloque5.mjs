@@ -1,4 +1,4 @@
-// Prueba del bloque 5 (simulador de PayPal y dashboard de ventas) contra Spring y Medusa locales.
+// Prueba del bloque 5 (simulador de PayPal y dashboard de ventas) contra Spring y MongoDB locales.
 import fs from 'node:fs';
 import { API, ESTADO } from './entorno.mjs';
 
