@@ -1,6 +1,5 @@
 package com.gymtrack.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.gymtrack.model.Pedido;
 import com.gymtrack.model.User;
 import com.gymtrack.repository.PedidoRepository;
@@ -31,12 +30,9 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
-import static com.gymtrack.service.MedusaClient.q;
-
 // Dashboard de ventas del panel (pestaña Ventas). Todo sale de la colección
 // "pedidos": el resumen es una sola agregación de MongoDB (no se traen los
 // pedidos a memoria) y los índices por gimnasio y fecha la mantienen rápida.
-// Solo las acciones (reembolsar, cancelar) pasan por Medusa.
 //
 // Una venta es un pedido pagado; cuenta el día en que se pagó, en la hora de
 // México. Los reembolsados y cancelados no suman.
@@ -60,16 +56,14 @@ public class VentasService {
     private final PedidoRepository pedidoRepository;
     private final PedidoService pedidos;
     private final UserRepository userRepository;
-    private final MedusaClient medusa;
     private final BillingService billing;
     private final MongoTemplate mongo;
 
     public VentasService(PedidoRepository pedidoRepository, PedidoService pedidos, UserRepository userRepository,
-                         MedusaClient medusa, BillingService billing, MongoTemplate mongo) {
+                         BillingService billing, MongoTemplate mongo) {
         this.pedidoRepository = pedidoRepository;
         this.pedidos = pedidos;
         this.userRepository = userRepository;
-        this.medusa = medusa;
         this.billing = billing;
         this.mongo = mongo;
     }
@@ -358,29 +352,16 @@ public class VentasService {
         return d;
     }
 
-    // Reembolso simulado de un pedido pagado: Medusa devuelve todo lo cobrado
-    // (los simuladores no mueven dinero real) y el pedido queda "Reembolsado".
-    // Lo vendido no regresa al inventario: el producto ya se entregó. Si el
-    // pedido había extendido una membresía, se revierte (ver BillingService).
+    // Reembolso simulado de un pedido pagado: se devuelve todo lo cobrado (los
+    // simuladores no mueven dinero real), el pedido queda "Reembolsado" y lo
+    // vendido regresa al inventario. Si el pedido había extendido una
+    // membresía, se revierte (ver BillingService).
     public Map<String, Object> reembolsar(String gymId, String orderId) {
         Pedido p = exigirPedido(gymId, orderId);
         if (!Pedido.ESTADO_PAGADO.equals(p.getEstado())) {
             throw new TiendaException(HttpStatus.CONFLICT, "Solo se reembolsan pedidos pagados.");
         }
-        JsonNode orden = medusa.adminGet("/admin/orders/" + orderId + q("fields",
-                "id,payment_collections.payments.id,payment_collections.payments.amount,"
-                        + "payment_collections.payments.captured_at,payment_collections.payments.refunds.amount")).path("order");
-        for (JsonNode pago : orden.path("payment_collections").path(0).path("payments")) {
-            if (pago.path("captured_at").isNull() || pago.path("captured_at").isMissingNode()) continue;
-            double reembolsado = 0;
-            for (JsonNode r : pago.path("refunds")) reembolsado += r.path("amount").asDouble();
-            double pendiente = centavos(pago.path("amount").asDouble() - reembolsado);
-            if (pendiente > 0) {
-                medusa.adminPost("/admin/payments/" + pago.path("id").asText() + "/refund" + q("fields", "id"),
-                        Map.of("amount", pendiente, "note", "Reembolso simulado desde el panel de GymTrack"));
-            }
-        }
-        Pedido actualizado = pedidos.sincronizar(orderId);
+        Pedido actualizado = pedidos.reembolsar(p);
         log.info("Pedido #{} reembolsado desde el panel.", p.getFolio());
 
         Map<String, Object> r = detalle(actualizado);
@@ -396,8 +377,8 @@ public class VentasService {
         return r;
     }
 
-    // Cancela un pedido que todavía no se paga (una ficha Paynet): Medusa
-    // libera lo apartado. Uno pagado se reembolsa en lugar de cancelarse.
+    // Cancela un pedido que todavía no se paga (una ficha Paynet) y regresa lo
+    // apartado. Uno pagado se reembolsa en lugar de cancelarse.
     public Map<String, Object> cancelar(String gymId, String orderId) {
         Pedido p = exigirPedido(gymId, orderId);
         if (!Pedido.ESTADO_PENDIENTE_PAGO.equals(p.getEstado())) {
@@ -405,9 +386,9 @@ public class VentasService {
                     ? "Ese pedido ya se pagó: reembólsalo en lugar de cancelarlo."
                     : "Ese pedido ya no está pendiente.");
         }
-        medusa.adminPost("/admin/orders/" + orderId + "/cancel" + q("fields", "id"), Map.of());
+        Pedido cancelado = pedidos.cancelar(p);
         log.info("Pedido #{} cancelado desde el panel.", p.getFolio());
-        return detalle(pedidos.sincronizar(orderId));
+        return detalle(cancelado);
     }
 
     // ═══════════════════════════ AYUDANTES ═══════════════════════════
