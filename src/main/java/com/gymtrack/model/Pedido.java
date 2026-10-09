@@ -1,6 +1,8 @@
 package com.gymtrack.model;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -18,6 +20,14 @@ import java.util.Map;
 // Se escribe al completar el checkout y se vuelve a sincronizar con cada aviso
 // de Medusa (PedidoService.sincronizar), así que siempre refleja el último estado.
 @Document(collection = "pedidos")
+@CompoundIndexes({
+        // Lista de ventas del panel: los pedidos de un gimnasio, del más nuevo al más viejo.
+        @CompoundIndex(name = "gimnasio_creado", def = "{'gymId': 1, 'creadoEn': -1}"),
+        // Resumen de ventas: lo pagado de un gimnasio por fecha de pago.
+        @CompoundIndex(name = "gimnasio_estado_pagado", def = "{'gymId': 1, 'estado': 1, 'pagadoEn': -1}"),
+        // Fichas Paynet pendientes (las revisa el cancelador de vencidas).
+        @CompoundIndex(name = "estado_proveedor", def = "{'estado': 1, 'proveedorPago': 1}")
+})
 public class Pedido {
 
     public static final String ESTADO_PENDIENTE_PAGO = "pendiente_pago";
@@ -36,7 +46,6 @@ public class Pedido {
     private String orderId;
     // Folio corto que ve el cliente (#12).
     private Long folio;
-    @Indexed
     private String gymId;
     // null en ventas de mostrador a "Público en general".
     @Indexed(sparse = true)
