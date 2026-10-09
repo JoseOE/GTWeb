@@ -15,6 +15,11 @@ import com.gymtrack.util.MetodosPago;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -69,11 +74,12 @@ public class PedidoService {
     private final SimuladorPagoService simuladores;
     private final FolioService folios;
     private final ProductoRepository productoRepository;
+    private final MongoTemplate mongo;
 
     public PedidoService(MedusaClient medusa, PedidoRepository pedidoRepository, GymRepository gymRepository,
                          UserRepository userRepository, BillingService billingService, ObjectMapper json,
                          AvisosPedidoService avisos, InventarioService inventario, SimuladorPagoService simuladores,
-                         FolioService folios, ProductoRepository productoRepository) {
+                         FolioService folios, ProductoRepository productoRepository, MongoTemplate mongo) {
         this.medusa = medusa;
         this.pedidoRepository = pedidoRepository;
         this.gymRepository = gymRepository;
@@ -85,6 +91,7 @@ public class PedidoService {
         this.simuladores = simuladores;
         this.folios = folios;
         this.productoRepository = productoRepository;
+        this.mongo = mongo;
     }
 
     // ═══════════════════════════ COBRAR ═══════════════════════════
@@ -231,6 +238,52 @@ public class PedidoService {
         }
         if (x.getProductoId() == null) return Optional.empty();
         return productoRepository.findById(x.getProductoId()).flatMap(CatalogoService::plan);
+    }
+
+    // ═══════════════════════════ CAMBIOS DE ESTADO ═══════════════════════════
+    // Cada cambio es una actualización condicionada al estado anterior: si dos
+    // llegan a la vez (dos clics en "Simular pago", el vencimiento y una
+    // cancelación), solo uno gana y el otro recibe 409.
+
+    // La ficha Paynet se pagó en la tienda: el pedido queda pagado (las piezas
+    // siguen apartadas hasta entregarse), se activa el plan y sale el recibo.
+    public Pedido pagarFicha(Pedido p) {
+        Instant ahora = Instant.now();
+        Pedido pagado = cambiarEstado(p, Pedido.ESTADO_PENDIENTE_PAGO, new Update()
+                .set("estado", Pedido.ESTADO_PAGADO)
+                .set("pagadoEn", ahora)
+                .set("datosPago.estado", "capturado")
+                .set("datosPago.capturadoEn", ahora.toString()));
+        if (pagado == null) {
+            throw new TiendaException(HttpStatus.CONFLICT, "La ficha ya no está pendiente.");
+        }
+        log.info("Ficha Paynet del pedido #{} pagada en tienda.", pagado.getFolio());
+        confirmarPago(pagado);
+        return pagado;
+    }
+
+    // Cancela un pedido que todavía no se paga (una ficha Paynet) y regresa lo
+    // que tenía apartado.
+    public Pedido cancelar(Pedido p) {
+        Instant ahora = Instant.now();
+        Pedido cancelado = cambiarEstado(p, Pedido.ESTADO_PENDIENTE_PAGO, new Update()
+                .set("estado", Pedido.ESTADO_CANCELADO)
+                .set("canceladoEn", ahora)
+                .set("datosPago.estado", "cancelado")
+                .set("datosPago.canceladoEn", ahora.toString()));
+        if (cancelado == null) {
+            throw new TiendaException(HttpStatus.CONFLICT, "Ese pedido ya no está pendiente.");
+        }
+        inventario.devolverDePedido(cancelado);
+        log.info("Pedido #{} cancelado; se regresó lo apartado.", cancelado.getFolio());
+        return cancelado;
+    }
+
+    // Aplica el cambio solo si el pedido sigue en el estado esperado. null = ya no estaba.
+    private Pedido cambiarEstado(Pedido p, String estadoEsperado, Update cambio) {
+        return mongo.findAndModify(
+                Query.query(Criteria.where("_id").is(p.getId()).and("estado").is(estadoEsperado)),
+                cambio, FindAndModifyOptions.options().returnNew(true), Pedido.class);
     }
 
     static double centavos(double n) {
