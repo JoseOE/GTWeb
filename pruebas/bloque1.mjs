@@ -1,9 +1,6 @@
-// Prueba de punta a punta del bloque 1 contra Spring (8080) y Medusa (9000) locales.
+// Prueba de punta a punta del bloque 1 contra Spring (8080) y MongoDB locales.
 import fs from 'node:fs';
-import crypto from 'node:crypto';
-import { API, ESTADO, LOG, MEDUSA, SECRETO_WEBHOOK, adminMedusa } from './entorno.mjs';
-
-const ADMIN = adminMedusa();
+import { API, ESTADO, LOG } from './entorno.mjs';
 
 let fallos = 0;
 const TOKENS = {};
@@ -15,13 +12,6 @@ async function api(metodo, ruta, cuerpo, userId) {
   const r = await fetch(API + ruta, { method: metodo, headers: { 'Content-Type': 'application/json', ...cabeceras(userId) }, body: cuerpo ? JSON.stringify(cuerpo) : undefined });
   let body = null; try { body = await r.json(); } catch {}
   return { status: r.status, body };
-}
-async function medusa(metodo, ruta, cuerpo, llave) {
-  const headers = { 'Content-Type': 'application/json', ...(llave ? { 'x-publishable-api-key': llave } : { Authorization: ADMIN }) };
-  const r = await fetch(MEDUSA + ruta, { method: metodo, headers, body: cuerpo ? JSON.stringify(cuerpo) : undefined });
-  const body = await r.json().catch(() => null);
-  if (!r.ok) throw new Error(`${metodo} ${ruta} → ${r.status} ${JSON.stringify(body)}`);
-  return body;
 }
 
 const sufijo = Date.now().toString(36);
@@ -60,8 +50,8 @@ for (const n of ['Visita', 'Mensual', 'Trimestral', 'Inscripción']) {
   planes[n] = c.body;
 }
 r = await api('GET', `/api/gyms/${gymId}/gyms`, null, owner.id);
-const gymDoc = (await api('GET', `/api/gyms/${gymId}`, null, owner.id)).body;
-ok(gymDoc.tienda && gymDoc.tienda.lista, 'tienda del gimnasio inicializada en Medusa', Object.keys(gymDoc.tienda || {}));
+r = await api('GET', '/api/tienda/estado');
+ok(r.status === 200 && r.body.lista === true, 'la tienda está lista sin servicio aparte', r.body);
 const edit = await api('PUT', `/api/gyms/${gymId}/planes/${planes.Mensual.id}`, { ...planes.Mensual, precio: 480, beneficios: ['Acceso total', 'App'] }, owner.id);
 ok(edit.status === 200 && edit.body.precio === 480, 'editar precio del plan Mensual', edit.body.precio);
 
@@ -100,66 +90,56 @@ r = await api('GET', `/api/gyms/${gymId}/productos`, null, owner.id);
 ok(r.status === 200 && r.body.length === 2, 'listado de productos del gimnasio', r.body.map(p => p.nombre));
 
 console.log('\n5. Compra con tarjeta (sim-stripe): plan Mensual + 2 botes');
-const llave = gymDoc.tienda.publishableKey;
-const region = (await medusa('GET', '/admin/regions?fields=id&currency_code=mxn')).regions[0].id;
-async function comprar(items, proveedor, data) {
-  const cart = (await medusa('POST', '/store/carts', { region_id: region, email: member.email, metadata: { userId: member.id, gymId, canal: 'web' } }, llave)).cart;
-  for (const it of items) await medusa('POST', `/store/carts/${cart.id}/line-items`, it, llave);
-  await medusa('POST', `/store/carts/${cart.id}/shipping-methods`, { option_id: gymDoc.tienda.shippingOptionId }, llave);
-  const pc = (await medusa('POST', '/store/payment-collections', { cart_id: cart.id }, llave)).payment_collection;
-  await medusa('POST', `/store/payment-collections/${pc.id}/payment-sessions`, { provider_id: proveedor, data }, llave);
-  const res = await medusa('POST', `/store/carts/${cart.id}/complete`, {}, llave);
-  return res.order;
+// Lo mismo que hace la tienda: carrito en el servidor, token de la tarjeta y cobro.
+async function comprar(items, metodo, numero) {
+  await api('DELETE', '/api/tienda/carrito', null, member.id);
+  let carrito;
+  for (const it of items) carrito = (await api('POST', '/api/tienda/carrito/items', it, member.id)).body;
+  let datos = {};
+  if (numero) {
+    datos = { token: (await api('POST', '/api/simuladores/stripe/tokens', { numero, titular: 'Miembro Prueba', mes: '12', anio: '30', cvc: '123' }, member.id)).body.token };
+  }
+  return api('POST', '/api/tienda/carrito/checkout', { metodo, datos, totalVisto: carrito.total }, member.id);
 }
 const antes = (await api('GET', `/api/users/${member.id}/me`)).body;
-const varPlan = planes.Mensual.varianteId;
-const orden1 = await comprar([
-  { variant_id: varPlan, quantity: 1, metadata: { duracionUnidad: 'mes', duracionCantidad: 1 } },
-  { variant_id: bote.id, quantity: 2 },
-], 'pp_sim-stripe_default', { token: 'tok_sim_prueba', resultado: 'aprobada', marca: 'visa', ultimos4: '4242' });
-ok(!!orden1, 'pedido creado en Medusa', orden1.display_id);
-await espera(2500);
+r = await comprar([{ varianteId: planes.Mensual.varianteId }, { varianteId: bote.id, cantidad: 2 }], 'stripe', '4242424242424242');
+const orden1 = r.body;
+ok(r.status === 200 && orden1.estado === 'pagado' && /^order_/.test(orden1.orderId), 'pedido pagado', { folio: orden1.folio, estado: orden1.estado });
 let yo = (await api('GET', `/api/users/${member.id}/me`)).body;
-ok(yo.planActual === 'Mensual' && yo.fechaProximoPago, 'membresía extendida por el aviso order.placed', { antes: antes.fechaProximoPago, despues: yo.fechaProximoPago, dia: yo.diaDePago });
+ok(yo.planActual === 'Mensual' && yo.fechaProximoPago, 'membresía extendida al pagar', { antes: antes.fechaProximoPago, despues: yo.fechaProximoPago, dia: yo.diaDePago });
 let pagos = (await api('GET', `/api/gyms/${gymId}/members/${member.id}/payments`, null, owner.id)).body;
-ok(pagos.length === 1 && pagos[0].orderId === orden1.id, 'un Payment con orderId', pagos.map(p => [p.plan, p.metodo, p.monto, p.cubreHasta]));
+ok(pagos.length === 1 && pagos[0].orderId === orden1.orderId, 'un Payment con orderId', pagos.map(p => [p.plan, p.metodo, p.monto, p.cubreHasta]));
 r = await api('GET', `/api/gyms/${gymId}/productos/${prod.id}`, null, owner.id);
 ok(r.body.variantes.find(v => v.id === bote.id).disponible === 6, 'stock disponible bajó de 8 a 6', r.body.variantes.find(v => v.id === bote.id));
 
-console.log('\n6. Aviso repetido');
-async function avisar(evento, orderId, paymentId, secreto = SECRETO_WEBHOOK, desfase = 0) {
-  const cuerpo = JSON.stringify({ id: crypto.randomUUID(), evento, orderId, paymentId, enviadoEn: new Date().toISOString() });
-  const t = Math.floor(Date.now() / 1000) - desfase;
-  const firma = crypto.createHmac('sha256', secreto).update(`${t}.${cuerpo}`).digest('hex');
-  const res = await fetch(API + '/api/tienda/webhooks/medusa', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-GymTrack-Firma': `t=${t},v1=${firma}` }, body: cuerpo });
-  return { status: res.status, body: await res.json() };
-}
-r = await avisar('order.placed', orden1.id);
-ok(r.status === 200 && r.body.message === 'Aviso ya procesado.', 'el mismo aviso se reconoce como procesado', r.body);
-r = await avisar('order.canceled', orden1.id, undefined, 'otra-clave');
-ok(r.status === 401, 'firma con otra clave → 401', r.body);
-r = await avisar('order.placed', orden1.id, undefined, SECRETO_WEBHOOK, 600);
-ok(r.status === 401, 'firma de hace 10 minutos → 401', r.body);
-await fetch(MEDUSA + '/admin/orders/' + orden1.id, { headers: { Authorization: ADMIN } });
-// Aunque llegue con otro id de evento (payment.captured), no extiende dos veces.
-r = await avisar('payment.captured', orden1.id, 'pay_inventado');
+console.log('\n6. Consultas repetidas del pedido');
+// Ya no hay webhook: leer el pedido o su recibo las veces que sea no vuelve a
+// aplicar el plan.
+r = await fetch(API + '/api/tienda/webhooks/medusa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+ok(r.status === 404, 'el aviso de Medusa ya no existe', r.status);
+for (let k = 0; k < 3; k++) await api('GET', `/api/tienda/pedidos/${orden1.orderId}`, null, member.id);
+r = await fetch(API + `/api/recibos/pedidos/${orden1.orderId}.pdf`, { headers: cabeceras(member.id) });
+ok(r.status === 200 && r.headers.get('content-type') === 'application/pdf', 'el recibo abre', r.status);
 yo = (await api('GET', `/api/users/${member.id}/me`)).body;
 pagos = (await api('GET', `/api/gyms/${gymId}/members/${member.id}/payments`, null, owner.id)).body;
-ok(pagos.length === 1, 'otro evento del mismo pedido no crea otro pago ni extiende', { pagos: pagos.length, vence: yo.fechaProximoPago });
+ok(pagos.length === 1, 'consultar el pedido no crea otro pago ni extiende', { pagos: pagos.length, vence: yo.fechaProximoPago });
 
-console.log('\n7. Paynet: pendiente no activa; al capturar sí');
+console.log('\n7. Paynet: pendiente no activa; al pagar en tienda sí');
 const venceAntes = yo.fechaProximoPago;
-const orden2 = await comprar([{ variant_id: planes.Visita.varianteId, quantity: 1, metadata: { duracionUnidad: 'dia', duracionCantidad: 1 } }], 'pp_sim-paynet_default', {});
-await espera(2500);
+r = await comprar([{ varianteId: planes.Visita.varianteId }], 'paynet');
+const orden2 = r.body;
+ok(r.status === 200 && orden2.estado === 'pendiente_pago', 'ficha Paynet pendiente', orden2.paynet && orden2.paynet.referencia);
 yo = (await api('GET', `/api/users/${member.id}/me`)).body;
 ok(yo.fechaProximoPago === venceAntes, 'pedido Paynet pendiente no mueve la fecha', yo.fechaProximoPago);
-const pagoMedusa = (await medusa('GET', `/admin/orders/${orden2.id}?fields=payment_collections.payments.id,payment_status`)).order;
-ok(pagoMedusa.payment_status === 'authorized', 'Medusa: pago autorizado sin capturar', pagoMedusa.payment_status);
-await medusa('POST', `/admin/payments/${pagoMedusa.payment_collections[0].payments[0].id}/capture`, {});
-await espera(3000);
+r = await api('POST', `/api/simuladores/paynet/${orden2.orderId}/pagar`, null, owner.id);
+ok(r.status === 200 && r.body.estado === 'pagado', 'simular pago en tienda', r.body.estado);
 yo = (await api('GET', `/api/users/${member.id}/me`)).body;
 const esperado = new Date(venceAntes + 'T12:00:00'); esperado.setDate(esperado.getDate() + 1);
-ok(yo.fechaProximoPago === esperado.toISOString().slice(0, 10) && yo.planActual === 'Visita', 'al capturar (payment.captured) la Visita suma 1 día', { antes: venceAntes, despues: yo.fechaProximoPago });
+ok(yo.fechaProximoPago === esperado.toISOString().slice(0, 10) && yo.planActual === 'Visita', 'al pagarse la Visita suma 1 día', { antes: venceAntes, despues: yo.fechaProximoPago });
+r = await api('POST', `/api/simuladores/paynet/${orden2.orderId}/pagar`, null, owner.id);
+const venceTrasFicha = yo.fechaProximoPago;
+yo = (await api('GET', `/api/users/${member.id}/me`)).body;
+ok(r.status === 409 && yo.fechaProximoPago === venceTrasFicha, 'pagar la misma ficha otra vez → 409 y no extiende', r.body.error);
 
 console.log('\n8. Pago manual con plan Trimestral');
 r = await api('POST', `/api/gyms/${gymId}/members/${member.id}/payments`, { monto: 1215, metodo: 'Efectivo', planId: planes.Trimestral.id }, owner.id);

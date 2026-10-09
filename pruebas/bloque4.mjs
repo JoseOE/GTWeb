@@ -1,4 +1,4 @@
-// Prueba del bloque 4 (Paynet, recibos iText y correos) contra Spring y Medusa locales.
+// Prueba del bloque 4 (Paynet, recibos iText y correos) contra Spring y MongoDB locales.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { API, ESTADO, LOG, MONGO } from './entorno.mjs';

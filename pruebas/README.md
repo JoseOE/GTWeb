@@ -1,14 +1,14 @@
 # Pruebas de punta a punta
 
-Scripts de Node que recorren los flujos reales de GymTrack contra el entorno local: Spring, Medusa y MongoDB. Cada uno imprime ✔ o ✘ por comprobación y termina con código 1 si algo falló.
+Scripts de Node que recorren los flujos reales de GymTrack contra el entorno local: Spring y MongoDB. Cada uno imprime ✔ o ✘ por comprobación y termina con código 1 si algo falló.
 
-> **Solo en local.** Las pruebas crean cuentas, gimnasios, productos y pedidos, y `bloque4` cambia un pedido directo en MongoDB. `entorno.mjs` se niega a correr si la API, Medusa o la base no apuntan a `localhost`.
+> **Solo en local.** Las pruebas crean cuentas, gimnasios, productos y pedidos, y `bloque4` cambia un pedido directo en MongoDB. `entorno.mjs` se niega a correr si la API o la base no apuntan a `localhost`.
 
 ## Qué cubre cada una
 
 | Prueba | Qué revisa |
 |---|---|
-| `bloque1` | Registro y verificación del dueño, gimnasio, miembro, productos, planes y la primera compra en la tienda. Deja `ultima-prueba.json` para las demás. |
+| `bloque1` | Registro y verificación del dueño, gimnasio, miembro, productos, planes, la primera compra con tarjeta y una ficha Paynet que activa la membresía una sola vez. Deja `ultima-prueba.json` para las demás. |
 | `bloque2` | Carrito: existencias, cambios de precio y total visto antes de pagar. |
 | `bloque3` | Simulador de tarjeta (tokens, rechazos, un solo uso) y cobro en mostrador. |
 | `bloque4` | Paynet (ficha, pago y vencidas), recibos en PDF y correos. |
@@ -19,7 +19,7 @@ Scripts de Node que recorren los flujos reales de GymTrack contra el entorno loc
 
 ## Cómo correrlas
 
-1. Levanta MongoDB, Medusa (`cd medusa && npm run dev`) y Spring. Guarda la salida de Spring en un archivo, porque ahí se leen los códigos de verificación (en local no hay correo):
+1. Levanta MongoDB y Spring. Guarda la salida de Spring en un archivo, porque ahí se leen los códigos de verificación (en local no hay correo):
 
    ```bash
    mvn -q -DskipTests package
@@ -49,8 +49,6 @@ Todo sale de variables de entorno o del `.env` de la raíz, con estos valores po
 | Variable | Por defecto | Para qué |
 |---|---|---|
 | `GYMTRACK_API` | `http://localhost:8080` | Spring |
-| `MEDUSA_URL` | `http://localhost:9000` | Medusa (el bloque 1 prepara la tienda con su API de admin) |
-| `MEDUSA_ADMIN_TOKEN` | del `.env` | Llave secreta de admin de Medusa |
 | `MONGODB_URI` | del `.env` | Base que usa Spring (solo `bloque4` la toca directo) |
 | `SPRING_LOG` | `pruebas/spring.log` | Salida de Spring, para leer los códigos de verificación |
 
@@ -58,4 +56,4 @@ Todo sale de variables de entorno o del `.env` de la raíz, con estos valores po
 
 ## En GitHub
 
-El flujo `.github/workflows/ci.yml` corre en cada PR. Compila Spring y la tienda de Medusa y revisa que estos scripts no tengan errores de sintaxis. Las pruebas de punta a punta necesitan las tres piezas levantadas, así que se corren en local antes de pedir la mezcla.
+El flujo `.github/workflows/ci.yml` corre en cada PR a `main`: compila Spring, lo levanta junto a un MongoDB de prueba y corre todas estas pruebas. Conviene correrlas también en local antes de pedir la mezcla.
