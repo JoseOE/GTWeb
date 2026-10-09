@@ -1,7 +1,7 @@
 // Prueba de la sesión con token y de los permisos (SesionFilter) contra Spring local.
 // Necesita el log de Spring para leer los códigos de verificación (sin correo configurado).
 import fs from 'node:fs';
-import { API, LOG } from './entorno.mjs';
+import { API, leerLog } from './entorno.mjs';
 
 let fallos = 0;
 const ok = (cond, msg, extra) => { console.log((cond ? '  ✔ ' : '  ✘ ') + msg + (extra !== undefined ? ' → ' + JSON.stringify(extra) : '')); if (!cond) fallos++; };
@@ -21,7 +21,7 @@ async function duenoNuevo(nombre) {
   const correo = `seg-${nombre}-${sufijo}@prueba.mx`;
   await api('POST', '/api/users/register', { nombre: 'Dueño ' + nombre, email: correo, password: 'Clave#2026' });
   await espera(400);
-  const codigo = [...fs.readFileSync(LOG, 'latin1').matchAll(new RegExp(`verificación de ${correo.replace(/\./g, '\\.')} es (\\d{6})`, 'g'))].pop()?.[1];
+  const codigo = [...leerLog().matchAll(new RegExp(`verificación de ${correo.replace(/\./g, '\\.')} es (\\d{6})`, 'g'))].pop()?.[1];
   const v = await api('POST', '/api/cuenta/verificar', { email: correo, codigo });
   return { correo, ...v.body };
 }

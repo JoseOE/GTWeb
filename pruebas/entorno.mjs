@@ -23,6 +23,15 @@ export const MONGO = valor('MONGODB_URI', 'mongodb://127.0.0.1:27017/gymtrackdb'
 // Log de Spring (su salida estándar): las pruebas leen ahí los códigos de
 // verificación, porque en local no hay correo configurado.
 export const LOG = process.env.SPRING_LOG || new URL('./spring.log', import.meta.url);
+
+// Java escribe el log en la codificación del sistema: Windows-1252 en Windows
+// y UTF-8 en Linux (la CI). Se lee como UTF-8 y, si no lo es, como Latin-1.
+export function leerLog() {
+  const bytes = fs.readFileSync(LOG);
+  const texto = bytes.toString('utf8');
+  return texto.includes('�') ? bytes.toString('latin1') : texto;
+}
+
 // Lo que deja el bloque 1 (gimnasio, dueño, miembro, planes) para los demás.
 export const ESTADO = new URL('./ultima-prueba.json', import.meta.url);
 

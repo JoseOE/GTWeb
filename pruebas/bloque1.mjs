@@ -1,6 +1,6 @@
 // Prueba de punta a punta del bloque 1 contra Spring (8080) y MongoDB locales.
 import fs from 'node:fs';
-import { API, ESTADO, LOG } from './entorno.mjs';
+import { API, ESTADO, leerLog } from './entorno.mjs';
 
 let fallos = 0;
 const TOKENS = {};
@@ -20,7 +20,7 @@ const correoDueno = `dueno-${sufijo}@prueba.mx`;
 let r = await api('POST', '/api/users/register', { nombre: 'Dueña Prueba', email: correoDueno, password: 'Clave#2026' });
 ok(r.status === 200, 'registro del dueño', r.status);
 await espera(500);
-const codigo = [...fs.readFileSync(LOG, 'latin1').matchAll(new RegExp(`verificación de ${correoDueno.replace('.', '\\.')} es (\\d{6})`, 'g'))].pop()?.[1];
+const codigo = [...leerLog().matchAll(new RegExp(`verificación de ${correoDueno.replace('.', '\\.')} es (\\d{6})`, 'g'))].pop()?.[1];
 r = await api('POST', '/api/cuenta/verificar', { email: correoDueno, codigo });
 ok(r.status === 200, 'verificación con el código de la consola', codigo);
 r = await api('POST', '/api/users/login', { email: correoDueno, password: 'Clave#2026' });
