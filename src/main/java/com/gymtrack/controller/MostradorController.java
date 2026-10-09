@@ -3,7 +3,7 @@ package com.gymtrack.controller;
 import com.gymtrack.model.User;
 import com.gymtrack.repository.UserRepository;
 import com.gymtrack.service.AccesoService;
-import com.gymtrack.service.CarritoService;
+import com.gymtrack.service.MostradorService;
 import com.gymtrack.service.PedidoService;
 import com.gymtrack.service.TiendaException;
 import org.springframework.http.HttpStatus;
@@ -13,23 +13,20 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-// Venta en mostrador desde el panel. El ticket se arma en el navegador, así
-// que agregar y quitar productos no espera al servidor (en el plan gratis de
-// Render cada viaje a Medusa tarda segundos). Al cobrar llega completo: Spring
-// lo revisa otra vez y crea el carrito en Medusa de una sola vez. El cliente se
+// Venta en mostrador desde el panel (ver MostradorService). El cliente se
 // elige al cobrar: un miembro del gimnasio o el público en general.
 @RestController
 @RequestMapping("/api/gyms/{gymId}/mostrador")
 public class MostradorController {
 
-    private final CarritoService carritos;
+    private final MostradorService mostrador;
     private final PedidoService pedidos;
     private final AccesoService acceso;
     private final UserRepository userRepository;
 
-    public MostradorController(CarritoService carritos, PedidoService pedidos, AccesoService acceso,
+    public MostradorController(MostradorService mostrador, PedidoService pedidos, AccesoService acceso,
                                UserRepository userRepository) {
-        this.carritos = carritos;
+        this.mostrador = mostrador;
         this.pedidos = pedidos;
         this.acceso = acceso;
         this.userRepository = userRepository;
@@ -54,7 +51,7 @@ public class MostradorController {
                     .filter(u -> "member".equals(u.getRole()) && gymId.equals(u.getGymId()))
                     .orElseThrow(() -> new TiendaException(HttpStatus.BAD_REQUEST, "Ese cliente no es miembro de tu gimnasio."));
         }
-        CarritoService.VentaMostrador venta = carritos.cobrarMostrador(dueno, gymId, cliente, request.getPartidas(),
+        MostradorService.VentaMostrador venta = mostrador.cobrar(dueno, gymId, cliente, request.getPartidas(),
                 request.getMetodo(), request.getRecibido(), request.getDatos(), request.getTotalVisto());
         Map<String, Object> respuesta = new LinkedHashMap<>();
         respuesta.put("pedido", pedidos.vista(venta.pedido()));
@@ -76,15 +73,15 @@ public class MostradorController {
     }
 
     public static class CobroRequest {
-        private List<CarritoService.PartidaTicket> partidas;
+        private List<MostradorService.PartidaTicket> partidas;
         private String clienteId;
         private String metodo;
         private Double recibido;
         private Map<String, Object> datos;
         private Double totalVisto;
 
-        public List<CarritoService.PartidaTicket> getPartidas() { return partidas; }
-        public void setPartidas(List<CarritoService.PartidaTicket> partidas) { this.partidas = partidas; }
+        public List<MostradorService.PartidaTicket> getPartidas() { return partidas; }
+        public void setPartidas(List<MostradorService.PartidaTicket> partidas) { this.partidas = partidas; }
 
         public String getClienteId() { return clienteId; }
         public void setClienteId(String clienteId) { this.clienteId = clienteId; }
