@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static com.gymtrack.service.MedusaClient.q;
@@ -28,6 +29,10 @@ import static com.gymtrack.service.MedusaClient.q;
 //
 // Lo que comparten todos (región México, tipos y categorías) lo crea el seed de
 // medusa/ y aquí solo se busca una vez y se guarda en memoria.
+//
+// La tienda nativa (MongoDB) solo usa categorias(), categoria() y
+// exigirGimnasio(), que no pasan por Medusa. base() y asegurar() quedan para lo
+// que todavía no se pasa a MongoDB y se van junto con MedusaClient.
 @Service
 public class TiendaGymService {
 
@@ -36,6 +41,15 @@ public class TiendaGymService {
     public static final String TIPO_PRODUCTO = "producto";
     public static final String TIPO_MEMBRESIA = "membresia";
     public static final String CATEGORIA_MEMBRESIAS = "membresias";
+
+    // Categorías de la tienda, iguales para todos los gimnasios y en el orden en
+    // que se muestran. El id es el mismo handle: ya no hay ids de Medusa.
+    private static final List<Categoria> CATEGORIAS = List.of(
+            new Categoria("suplementos", "suplementos", "Suplementos"),
+            new Categoria("bebidas", "bebidas", "Bebidas"),
+            new Categoria("snacks", "snacks", "Snacks"),
+            new Categoria("accesorios", "accesorios", "Accesorios"),
+            new Categoria(CATEGORIA_MEMBRESIAS, CATEGORIA_MEMBRESIAS, "Membresías"));
 
     private final MedusaClient medusa;
     private final GymRepository gymRepository;
@@ -55,6 +69,25 @@ public class TiendaGymService {
     }
 
     public record Categoria(String id, String handle, String nombre) {}
+
+    // ─── Tienda nativa (sin Medusa) ───
+
+    public List<Categoria> categorias() {
+        return CATEGORIAS;
+    }
+
+    public Optional<Categoria> categoria(String handle) {
+        return CATEGORIAS.stream().filter(c -> c.handle().equals(handle)).findFirst();
+    }
+
+    // El gimnasio de la tienda. Ya no hay nada que preparar la primera vez:
+    // sus productos y pedidos se guardan con su gymId.
+    public Gym exigirGimnasio(String gymId) {
+        return gymRepository.findById(gymId)
+                .orElseThrow(() -> new TiendaException(HttpStatus.NOT_FOUND, "Gimnasio no encontrado."));
+    }
+
+    // ─── Medusa (hasta quitarla) ───
 
     public Base base() {
         Base actual = base;
