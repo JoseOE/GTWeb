@@ -437,9 +437,6 @@
                         <p class="text-body-secondary mb-0">Vende en recepción: toca los productos, elige al cliente y cobra en efectivo o con tarjeta.</p>
                     </div>
                 </div>
-                <div class="alert alert-info d-none small py-2 tienda-despertando" role="status">
-                    <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span> Despertando la tienda… La primera vez puede tardar hasta un minuto.
-                </div>
                 <div class="row g-4">
                     <div class="col-lg-7">
                         <input type="search" id="mostrador-buscar" class="form-control mb-3" placeholder="Buscar producto o plan" aria-label="Buscar producto o plan">
@@ -545,9 +542,6 @@
                     <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="ventas-actualizar">
                         <i class='bx bx-refresh'></i> Actualizar
                     </button>
-                </div>
-                <div class="alert alert-info d-none small py-2 tienda-despertando" role="status">
-                    <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span> Despertando la tienda… esto puede tardar un minuto.
                 </div>
 
                 <div class="row g-3 mb-4" id="ventas-kpis"></div>
@@ -701,9 +695,6 @@
                         </button>
                     </div>
                 </div>
-                <div class="alert alert-info d-none small py-2 tienda-despertando" role="status">
-                    <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span> Despertando la tienda… La primera vez puede tardar hasta un minuto.
-                </div>
                 <div class="d-flex flex-wrap gap-2 mb-3">
                     <input type="search" id="productos-buscar" class="form-control" style="max-width:280px" placeholder="Buscar producto" aria-label="Buscar producto">
                     <select id="productos-categoria" class="form-select" style="max-width:200px" aria-label="Filtrar por categoría">
@@ -795,9 +786,6 @@
                     <button type="button" class="btn btn-primary rounded-pill px-4" id="plan-nuevo-btn" disabled>
                         <i class='bx bx-plus'></i> Nuevo plan
                     </button>
-                </div>
-                <div class="alert alert-info d-none small py-2 tienda-despertando" role="status">
-                    <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span> Despertando la tienda… La primera vez puede tardar hasta un minuto.
                 </div>
                 <div class="dash-empty text-start mb-4">
                     <h4 class="fw-bold fs-6 mb-1"><i class='bx bx-bolt-circle text-primary me-1'></i> Agregar rápido</h4>
@@ -1160,9 +1148,8 @@
 
         /* ═══════════════════════════════════════
            RESUMEN — primeros pasos, ingresos y pendientes
-           Miembros, máquinas, ventas y pagos salen de la base (rápido). Planes y
-           productos vienen de la tienda: se usan los que ya cargaron sus
-           pestañas, porque Medusa puede tardar si está despertando.
+           Miembros, máquinas, ventas y pagos salen de la base. Planes y
+           productos se toman de lo que ya cargaron sus pestañas.
         ═══════════════════════════════════════ */
         const PASOS_INICIO = [
             { clave: 'gimnasio', titulo: 'Configura tu gimnasio', texto: 'Nombre, horario y cuota mensual. Con eso tus miembros te encuentran en la app.', boton: 'Configurar', destino: 'gimnasio' },
@@ -2254,21 +2241,14 @@
         let presetsCache = [];
 
         // Llamada a la tienda: manda el usuario en X-User-Id (el servidor comprueba
-        // que sea el dueño del gimnasio) y, si Medusa está despertando en Render,
-        // avisa y reintenta sola cada 5 segundos durante un minuto.
-        function apiTienda(url, opciones, intentos) {
+        // que sea el dueño del gimnasio).
+        function apiTienda(url, opciones) {
             opciones = opciones || {};
-            intentos = intentos == null ? 12 : intentos;
             const headers = { 'X-User-Id': localStorage.getItem('userId') || '' };
             if (opciones.body) headers['Content-Type'] = 'application/json';
             return fetch(url, { ...opciones, headers })
                 .catch(() => { throw new Error('Error de conexión con el servidor.'); })
                 .then(res => res.json().catch(() => ({})).then(body => {
-                    if (res.status === 503 && body.despertando && intentos > 0) {
-                        mostrarDespertando(true);
-                        return new Promise(r => setTimeout(r, 5000)).then(() => apiTienda(url, opciones, intentos - 1));
-                    }
-                    mostrarDespertando(false);
                     if (!res.ok) {
                         // .datos lleva el cuerpo completo (p. ej. el carrito ya corregido en un 409).
                         const error = new Error(body.error || 'No se pudo completar la operación.');
@@ -2278,10 +2258,6 @@
                     }
                     return body;
                 }));
-        }
-
-        function mostrarDespertando(visible) {
-            document.querySelectorAll('.tienda-despertando').forEach(el => el.classList.toggle('d-none', !visible));
         }
 
         function dinero(n) {
@@ -2327,9 +2303,8 @@
         /* ═══════════════════════════════════════
            VENTAS — /api/gyms/{id}/ventas
            KPIs, gráficas, la lista de pedidos con filtros y el detalle con sus
-           acciones. Los datos salen de la copia local de los pedidos, así que
-           abrir la pestaña no despierta a Medusa; solo las acciones (simular el
-           pago Paynet, reembolsar, cancelar) pasan por ella.
+           acciones (simular el pago Paynet, reembolsar, cancelar). Todo sale de
+           la colección de pedidos.
         ═══════════════════════════════════════ */
         const COLORES_VENTAS = ['#f45124', '#20221f', '#8a8c82', '#f2a541', '#5b8def'];
         const CANALES_VENTAS = { web: 'Página web', app: 'App', mostrador: 'Mostrador' };
