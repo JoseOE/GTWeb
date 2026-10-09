@@ -3,14 +3,12 @@ package com.gymtrack.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.gymtrack.model.Gym;
 import com.gymtrack.model.Producto;
-import com.gymtrack.model.TiendaGym;
 import com.gymtrack.repository.ProductoRepository;
 import com.gymtrack.util.Ids;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
-import java.text.Normalizer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -21,48 +19,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Supplier;
-import java.util.stream.StreamSupport;
 
-import static com.gymtrack.service.MedusaClient.q;
 import static com.gymtrack.service.TiendaGymService.CATEGORIA_MEMBRESIAS;
-import static com.gymtrack.service.TiendaGymService.MONEDA;
 import static com.gymtrack.service.TiendaGymService.TIPO_MEMBRESIA;
 import static com.gymtrack.service.TiendaGymService.TIPO_PRODUCTO;
 
 // Lo que el dueño vende: productos (con variantes, precio y stock) y planes de
 // membresía, con el formato sencillo que usan el panel y la app.
 //
-// Los productos viven en MongoDB (colección productos): cada uno con sus
-// variantes adentro, precio en MXN con IVA incluido y su stock. "No controlar
-// inventario" (scoops) = la variante nunca se agota.
-//
-// Los planes todavía se guardan en Medusa: un producto de tipo "membresia" con
-// una sola variante "Plan" y su duración en el metadata.
+// Todo vive en MongoDB (colección productos), cada producto con sus variantes
+// adentro y el precio en MXN con IVA incluido:
+//  - "No controlar inventario" (scoops) = la variante nunca se agota.
+//  - Un plan es un producto de tipo "membresia" con una sola variante "Plan",
+//    sin inventario, y su duración y beneficios en Producto.plan.
 @Service
 public class CatalogoService {
 
-    static final String OPCION = "Variante";
-    private static final String VARIANTE_PLAN = "Plan";
+    // Nombre de la única variante de un plan (los recibos lo ocultan).
+    static final String VARIANTE_PLAN = "Plan";
     private static final int MAX_VARIANTES = 30;
     private static final int MAX_REINTENTOS = 3;
 
-    // Campos que se piden a Medusa para armar la vista de un plan.
-    private static final String CAMPOS = String.join(",",
-            "id", "title", "description", "status", "thumbnail", "metadata", "type_id", "created_at",
-            "categories.id", "categories.handle", "categories.name",
-            "sales_channels.id",
-            "options.id", "options.title", "options.values.id", "options.values.value",
-            "variants.id", "variants.title", "variants.manage_inventory", "variants.metadata",
-            "variants.created_at", "variants.variant_rank", "variants.prices.amount", "variants.prices.currency_code");
-
-    private final MedusaClient medusa;
     private final TiendaGymService tiendas;
     private final ProductoRepository productos;
 
-    public CatalogoService(MedusaClient medusa, TiendaGymService tiendas, ProductoRepository productos) {
-        this.medusa = medusa;
+    public CatalogoService(TiendaGymService tiendas, ProductoRepository productos) {
         this.tiendas = tiendas;
         this.productos = productos;
     }
@@ -137,62 +119,73 @@ public class CatalogoService {
     // ═══════════════════════════ PLANES ═══════════════════════════
 
     public List<Map<String, Object>> listarPlanes(String gymId) {
-        return listar(gymId, TIPO_MEMBRESIA).stream().map(this::vistaPlan).toList();
+        tiendas.exigirGimnasio(gymId);
+        return productos.findByGymIdAndTipo(gymId, TIPO_MEMBRESIA).stream()
+                .sorted(POR_ORDEN_Y_NOMBRE)
+                .map(CatalogoService::vistaPlan)
+                .toList();
     }
 
     public Map<String, Object> crearPlan(String gymId, PlanRequest r) {
         validar(r);
-        TiendaGym t = tiendas.asegurar(gymId);
-        TiendaGymService.Base base = tiendas.base();
+        tiendas.exigirGimnasio(gymId);
 
-        Map<String, Object> cuerpo = datosDelProducto(r.getNombre(), r.getDescripcion(), null, r.getActivo(),
-                base.categorias().get(CATEGORIA_MEMBRESIAS), metadataDelPlan(gymId, r));
-        cuerpo.put("handle", handleUnico(r.getNombre()));
-        cuerpo.put("type_id", base.tipoId(TIPO_MEMBRESIA));
-        cuerpo.put("sales_channels", List.of(Map.of("id", t.getSalesChannelId())));
-        cuerpo.put("shipping_profile_id", base.perfilDeEnvioId());
-        cuerpo.put("options", List.of(Map.of("title", OPCION, "values", List.of(VARIANTE_PLAN))));
-        cuerpo.put("variants", List.of(Map.of(
-                "title", VARIANTE_PLAN,
-                "manage_inventory", false,
-                "options", Map.of(OPCION, VARIANTE_PLAN),
-                "prices", List.of(Map.of("currency_code", MONEDA, "amount", r.getPrecio())))));
-
-        String id = medusa.adminPost("/admin/products" + q("fields", "id"), cuerpo).path("product").path("id").asText();
-        return vistaPlan(producto(id));
+        Producto p = new Producto();
+        p.setId(Ids.nuevo("prod"));
+        p.setGymId(gymId);
+        p.setTipo(TIPO_MEMBRESIA);
+        p.setCategoria(CATEGORIA_MEMBRESIAS);
+        p.setCreadoEn(Instant.now());
+        datosDelPlan(p, r);
+        Producto.Variante v = new Producto.Variante();
+        v.setId(Ids.nuevo("variant"));
+        v.setPresentacion(VARIANTE_PLAN);
+        v.setPrecio(r.getPrecio());
+        v.setControlarInventario(false);
+        p.setVariantes(new ArrayList<>(List.of(v)));
+        return vistaPlan(productos.insert(p));
     }
 
     public Map<String, Object> actualizarPlan(String gymId, String planId, PlanRequest r) {
         validar(r);
-        TiendaGym t = tiendas.asegurar(gymId);
-        TiendaGymService.Base base = tiendas.base();
-        JsonNode actual = exigirPlanEnMedusa(planId, t);
-
-        medusa.adminPost("/admin/products/" + planId + q("fields", "id"),
-                datosDelProducto(r.getNombre(), r.getDescripcion(), null, r.getActivo(),
-                        base.categorias().get(CATEGORIA_MEMBRESIAS), metadataDelPlan(gymId, r)));
-        String varianteId = actual.path("variants").path(0).path("id").asText();
-        medusa.adminPost("/admin/products/" + planId + "/variants/" + varianteId + q("fields", "id"),
-                Map.of("prices", List.of(Map.of("currency_code", MONEDA, "amount", r.getPrecio()))));
-        return vistaPlan(producto(planId));
+        return vistaPlan(conReintentos(() -> {
+            Producto p = exigirDelGimnasio(gymId, planId, TIPO_MEMBRESIA);
+            datosDelPlan(p, r);
+            if (p.getVariantes().isEmpty()) {
+                Producto.Variante v = new Producto.Variante();
+                v.setId(Ids.nuevo("variant"));
+                v.setPresentacion(VARIANTE_PLAN);
+                p.getVariantes().add(v);
+            }
+            p.getVariantes().get(0).setPrecio(r.getPrecio());
+            p.setActualizadoEn(Instant.now());
+            return productos.save(p);
+        }));
     }
 
     public void eliminarPlan(String gymId, String planId) {
-        TiendaGym t = tiendas.asegurar(gymId);
-        exigirPlanEnMedusa(planId, t);
-        medusa.adminDelete("/admin/products/" + planId);
+        productos.delete(exigirDelGimnasio(gymId, planId, TIPO_MEMBRESIA));
     }
 
     // Plan con el que se registra un pago a mano desde el panel.
     public PlanPagado planParaPago(String gymId, String planId) {
-        TiendaGym t = tiendas.asegurar(gymId);
-        return leerPlan(exigirPlanEnMedusa(planId, t))
+        return plan(exigirDelGimnasio(gymId, planId, TIPO_MEMBRESIA))
                 .orElseThrow(() -> new TiendaException(HttpStatus.BAD_REQUEST,
                         "Ese concepto es de pago único: no extiende la membresía."));
     }
 
-    // Duración de un producto "membresia" ya leído de Medusa. Vacío si es de
-    // pago único (inscripción) o si no tiene una duración válida.
+    // Duración de un plan. Vacío si no es un plan, si es de pago único
+    // (inscripción) o si no tiene una duración válida.
+    public static Optional<PlanPagado> plan(Producto p) {
+        Producto.Plan m = p.getPlan();
+        if (!p.esPlan() || m == null || m.isPagoUnico() || !PlanPagado.UNIDADES.contains(m.getDuracionUnidad())
+                || m.getDuracionCantidad() == null || m.getDuracionCantidad() < 1) {
+            return Optional.empty();
+        }
+        return Optional.of(new PlanPagado(p.getId(), p.getNombre(), m.getDuracionUnidad(), m.getDuracionCantidad()));
+    }
+
+    // Lo mismo para un producto leído de Medusa (lo usa la tienda mientras siga ahí).
     public static Optional<PlanPagado> leerPlan(JsonNode producto) {
         JsonNode m = producto.path("metadata");
         String unidad = m.path("duracionUnidad").asText("");
@@ -258,25 +251,23 @@ public class CatalogoService {
         return v;
     }
 
-    Map<String, Object> vistaPlan(JsonNode p) {
-        JsonNode m = p.path("metadata");
-        JsonNode variante = p.path("variants").path(0);
-        Optional<PlanPagado> plan = leerPlan(p);
+    static Map<String, Object> vistaPlan(Producto p) {
+        Producto.Plan m = p.getPlan() == null ? new Producto.Plan() : p.getPlan();
+        Producto.Variante variante = p.getVariantes().isEmpty() ? null : p.getVariantes().get(0);
+        Optional<PlanPagado> plan = plan(p);
         Map<String, Object> v = new LinkedHashMap<>();
-        v.put("id", p.path("id").asText());
-        v.put("varianteId", variante.path("id").asText(null));
-        v.put("nombre", p.path("title").asText());
-        v.put("descripcion", texto(p.path("description")));
-        v.put("precio", precio(variante));
-        v.put("pagoUnico", m.path("pagoUnico").asBoolean(false));
+        v.put("id", p.getId());
+        v.put("varianteId", variante == null ? null : variante.getId());
+        v.put("nombre", p.getNombre());
+        v.put("descripcion", vacio(p.getDescripcion()));
+        v.put("precio", variante == null ? null : variante.getPrecio());
+        v.put("pagoUnico", m.isPagoUnico());
         v.put("duracionUnidad", plan.map(PlanPagado::unidad).orElse(null));
         v.put("duracionCantidad", plan.map(PlanPagado::cantidad).orElse(null));
         v.put("duracionTexto", plan.map(CatalogoService::duracionTexto).orElse("Pago único"));
-        List<String> beneficios = new ArrayList<>();
-        m.path("beneficios").forEach(b -> beneficios.add(b.asText()));
-        v.put("beneficios", beneficios);
-        v.put("destacado", m.path("destacado").asBoolean(false));
-        v.put("activo", "published".equals(p.path("status").asText()));
+        v.put("beneficios", m.getBeneficios() == null ? List.of() : m.getBeneficios());
+        v.put("destacado", m.isDestacado());
+        v.put("activo", p.isActivo());
         return v;
     }
 
@@ -375,82 +366,19 @@ public class CatalogoService {
         v.setDisponible(limpia.existencias() - v.getApartadas());
     }
 
-    private List<JsonNode> listar(String gymId, String tipo) {
-        TiendaGym t = tiendas.asegurar(gymId);
-        JsonNode lista = medusa.adminGet("/admin/products" + q(
-                "fields", CAMPOS,
-                "sales_channel_id[]", List.of(t.getSalesChannelId()),
-                "type_id[]", List.of(tiendas.base().tipoId(tipo)),
-                "order", "title",
-                "limit", 500)).path("products");
-        return StreamSupport.stream(lista.spliterator(), false).toList();
-    }
-
-    JsonNode producto(String id) {
-        return medusa.adminGet("/admin/products/" + id + q("fields", CAMPOS)).path("product");
-    }
-
-    // Un plan de otro gimnasio responde igual que uno que no existe.
-    private JsonNode exigirPlanEnMedusa(String planId, TiendaGym t) {
-        JsonNode p;
-        try {
-            p = producto(planId);
-        } catch (TiendaException e) {
-            if (e.getStatus() == HttpStatus.NOT_FOUND) throw noEncontrado(TIPO_MEMBRESIA);
-            throw e;
-        }
-        boolean delGimnasio = StreamSupport.stream(p.path("sales_channels").spliterator(), false)
-                .anyMatch(sc -> t.getSalesChannelId().equals(sc.path("id").asText()));
-        if (!delGimnasio || !tiendas.base().tipoId(TIPO_MEMBRESIA).equals(p.path("type_id").asText())) {
-            throw noEncontrado(TIPO_MEMBRESIA);
-        }
-        return p;
-    }
-
-    private Map<String, Object> datosDelProducto(String nombre, String descripcion, String imagen, Boolean activo,
-                                                 TiendaGymService.Categoria categoria, Map<String, Object> metadata) {
-        Map<String, Object> d = new HashMap<>();
-        d.put("title", nombre.trim());
-        d.put("description", descripcion == null ? "" : descripcion.trim());
-        d.put("status", Boolean.FALSE.equals(activo) ? "draft" : "published");
-        d.put("categories", List.of(Map.of("id", categoria.id())));
-        d.put("metadata", metadata);
-        boolean conImagen = imagen != null && !imagen.isBlank();
-        d.put("thumbnail", conImagen ? imagen : null);
-        d.put("images", conImagen ? List.of(Map.of("url", imagen)) : List.of());
-        return d;
-    }
-
-    // El handle es único en todo Medusa, no por canal: sin el sufijo, el segundo
-    // gimnasio que creara un plan "Mensual" chocaría con el del primero.
-    private static String handleUnico(String nombre) {
-        String base = Normalizer.normalize(nombre.trim().toLowerCase(), Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "")
-                .replaceAll("[^a-z0-9]+", "-")
-                .replaceAll("(^-|-$)", "");
-        if (base.length() > 60) base = base.substring(0, 60);
-        return (base.isEmpty() ? "producto" : base) + "-" + UUID.randomUUID().toString().substring(0, 8);
-    }
-
-    private Map<String, Object> metadataDelPlan(String gymId, PlanRequest r) {
+    private static void datosDelPlan(Producto p, PlanRequest r) {
         boolean pagoUnico = Boolean.TRUE.equals(r.getPagoUnico());
-        Map<String, Object> m = new HashMap<>();
-        m.put("gymId", gymId);
-        m.put("pagoUnico", pagoUnico);
-        // Se mandan siempre todas las llaves para que un plan que pasa a ser de
-        // pago único no conserve su duración anterior.
-        m.put("duracionUnidad", pagoUnico ? "" : r.getDuracionUnidad());
-        m.put("duracionCantidad", pagoUnico ? 0 : r.getDuracionCantidad());
-        m.put("beneficios", limpiarBeneficios(r.getBeneficios()));
-        m.put("destacado", Boolean.TRUE.equals(r.getDestacado()));
-        return m;
-    }
-
-    private static Double precio(JsonNode variante) {
-        for (JsonNode p : variante.path("prices")) {
-            if (MONEDA.equals(p.path("currency_code").asText())) return p.path("amount").asDouble();
-        }
-        return null;
+        p.setNombre(r.getNombre().trim());
+        p.setDescripcion(r.getDescripcion() == null || r.getDescripcion().isBlank() ? null : r.getDescripcion().trim());
+        p.setActivo(!Boolean.FALSE.equals(r.getActivo()));
+        Producto.Plan m = new Producto.Plan();
+        m.setPagoUnico(pagoUnico);
+        // Un plan que pasa a ser de pago único no conserva su duración anterior.
+        m.setDuracionUnidad(pagoUnico ? null : r.getDuracionUnidad());
+        m.setDuracionCantidad(pagoUnico ? null : r.getDuracionCantidad());
+        m.setBeneficios(limpiarBeneficios(r.getBeneficios()));
+        m.setDestacado(Boolean.TRUE.equals(r.getDestacado()));
+        p.setPlan(m);
     }
 
     // Orden de las variantes leídas de Medusa (lo usa la tienda mientras siga ahí):
@@ -458,10 +386,6 @@ public class CatalogoService {
     static final Comparator<JsonNode> EN_ORDEN = Comparator
             .comparingInt((JsonNode v) -> v.path("variant_rank").asInt(0))
             .thenComparing(v -> v.path("created_at").asText(""));
-
-    private static String texto(JsonNode n) {
-        return n.isMissingNode() || n.isNull() || n.asText().isBlank() ? null : n.asText();
-    }
 
     private static String vacio(String s) {
         return s == null || s.isBlank() ? null : s;
