@@ -8,7 +8,9 @@ import com.gymtrack.model.Pedido;
 import com.gymtrack.model.User;
 import com.gymtrack.repository.GymRepository;
 import com.gymtrack.repository.PedidoRepository;
+import com.gymtrack.repository.ProductoRepository;
 import com.gymtrack.repository.UserRepository;
+import com.gymtrack.util.Ids;
 import com.gymtrack.util.MetodosPago;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,10 +65,15 @@ public class PedidoService {
     private final BillingService billingService;
     private final ObjectMapper json;
     private final AvisosPedidoService avisos;
+    private final InventarioService inventario;
+    private final SimuladorPagoService simuladores;
+    private final FolioService folios;
+    private final ProductoRepository productoRepository;
 
     public PedidoService(MedusaClient medusa, PedidoRepository pedidoRepository, GymRepository gymRepository,
                          UserRepository userRepository, BillingService billingService, ObjectMapper json,
-                         AvisosPedidoService avisos) {
+                         AvisosPedidoService avisos, InventarioService inventario, SimuladorPagoService simuladores,
+                         FolioService folios, ProductoRepository productoRepository) {
         this.medusa = medusa;
         this.pedidoRepository = pedidoRepository;
         this.gymRepository = gymRepository;
@@ -74,7 +81,163 @@ public class PedidoService {
         this.billingService = billingService;
         this.json = json;
         this.avisos = avisos;
+        this.inventario = inventario;
+        this.simuladores = simuladores;
+        this.folios = folios;
+        this.productoRepository = productoRepository;
     }
+
+    // ═══════════════════════════ COBRAR ═══════════════════════════
+
+    // Una partida de lo que se va a cobrar, ya revisada contra el catálogo.
+    public record Linea(String productoId, String varianteId, String titulo, String variante, String tipo,
+                        int cantidad, double precioUnitario, boolean controlarInventario,
+                        String duracionUnidad, Integer duracionCantidad) {}
+
+    // Todo lo que hace falta para cobrar una venta. entregaInmediata = el
+    // mostrador, que entrega en el acto; la tienda y la app dejan lo vendido
+    // apartado. extrasPago se agrega a datosPago (lo recibido y el cambio).
+    public record Venta(String gymId, String canal, String userId, String email, String cliente, String vendedorId,
+                        List<Linea> lineas, String proveedor, Map<String, Object> datos,
+                        boolean entregaInmediata, Map<String, Object> extrasPago) {}
+
+    // Cobra una venta y guarda su pedido:
+    //  1. toma las piezas del inventario (todo o nada, atómico);
+    //  2. cobra con el simulador del método; si lo rechaza, las piezas regresan
+    //     y no queda ningún pedido (402 con su mensaje);
+    //  3. guarda el pedido con sus partidas congeladas, folio y totales;
+    //  4. si quedó pagado, extiende la membresía y manda los avisos; si es una
+    //     ficha Paynet, manda la ficha.
+    public Pedido cobrar(Venta v) {
+        double total = centavos(v.lineas().stream().mapToDouble(l -> l.precioUnitario() * l.cantidad()).sum());
+        List<InventarioService.Solicitud> solicitudes = v.lineas().stream()
+                .filter(Linea::controlarInventario)
+                .map(l -> new InventarioService.Solicitud(l.productoId(), l.varianteId(), l.cantidad(), l.titulo()))
+                .toList();
+        List<Pedido.Pieza> piezas = v.entregaInmediata() ? inventario.descontar(solicitudes) : inventario.apartar(solicitudes);
+        Pedido.Inventario registro = InventarioService.registro(
+                v.entregaInmediata() ? Pedido.Inventario.DESCONTADO : Pedido.Inventario.APARTADO, piezas);
+
+        SimuladorPagoService.Resultado pago;
+        try {
+            pago = simuladores.autorizar(v.proveedor(), v.datos(), total);
+        } catch (RuntimeException e) {
+            inventario.devolver(registro);
+            throw e;
+        }
+
+        Instant ahora = Instant.now();
+        Pedido p = new Pedido();
+        p.setOrderId(Ids.nuevo("order"));
+        p.setFolio(folios.siguiente());
+        p.setGymId(v.gymId());
+        p.setUserId(v.userId());
+        p.setEmail(v.email());
+        p.setCanal(v.canal());
+        p.setCliente(v.cliente());
+        p.setVendedorId(v.vendedorId());
+        p.setProveedorPago(v.proveedor());
+        Map<String, Object> datosPago = new LinkedHashMap<>(pago.datos());
+        if (v.extrasPago() != null) datosPago.putAll(v.extrasPago());
+        p.setDatosPago(datosPago);
+        // Precios con IVA incluido: el IVA se desglosa del total.
+        double iva = centavos(total - total / 1.16);
+        p.setTotal(total);
+        p.setIva(iva);
+        p.setSubtotal(centavos(total - iva));
+        List<Pedido.Partida> partidas = new ArrayList<>();
+        for (Linea l : v.lineas()) {
+            Pedido.Partida x = new Pedido.Partida();
+            x.setProductoId(l.productoId());
+            x.setVarianteId(l.varianteId());
+            x.setTitulo(l.titulo());
+            x.setVariante(l.variante());
+            x.setTipo(l.tipo());
+            x.setCantidad(l.cantidad());
+            x.setPrecioUnitario(l.precioUnitario());
+            x.setTotal(centavos(l.precioUnitario() * l.cantidad()));
+            x.setDuracionUnidad(l.duracionUnidad());
+            x.setDuracionCantidad(l.duracionCantidad());
+            partidas.add(x);
+        }
+        p.setPartidas(partidas);
+        p.setCreadoEn(ahora);
+        p.setEstado(pago.capturado() ? Pedido.ESTADO_PAGADO : Pedido.ESTADO_PENDIENTE_PAGO);
+        if (pago.capturado()) p.setPagadoEn(ahora);
+        p.setInventario(registro);
+        try {
+            p = pedidoRepository.insert(p);
+        } catch (RuntimeException e) {
+            inventario.devolver(registro);
+            throw e;
+        }
+        log.info("Pedido #{} creado ({}, {}, {}).", p.getFolio(), MetodosPago.nombre(p.getProveedorPago()), p.getCanal(), p.getEstado());
+
+        if (Pedido.ESTADO_PAGADO.equals(p.getEstado())) confirmarPago(p);
+        else avisos.alSincronizar(p, vista(p));
+        return p;
+    }
+
+    // Un pedido acaba de quedar pagado (en el acto, o una ficha Paynet que se
+    // pagó en tienda): extiende la membresía si lleva un plan y manda el
+    // recibo. Es idempotente: el plan se aplica una sola vez (Payment.orderId
+    // es único) y cada correo se aparta antes de salir.
+    public void confirmarPago(Pedido p) {
+        if (Pedido.ESTADO_PAGADO.equals(p.getEstado()) && !p.isPlanAplicado() && p.incluyePlan()) {
+            aplicarPlan(p);
+        }
+        avisos.alSincronizar(p, vista(p));
+    }
+
+    private void aplicarPlan(Pedido p) {
+        Pedido.Partida partidaPlan = null;
+        PlanPagado plan = null;
+        for (Pedido.Partida x : p.getPartidas()) {
+            if (!x.esPlan()) continue;
+            Optional<PlanPagado> duracion = duracionDe(x);
+            if (duracion.isPresent()) {
+                partidaPlan = x;
+                plan = duracion.get();
+                break;
+            }
+        }
+        User member = p.getUserId() == null ? null : userRepository.findById(p.getUserId()).orElse(null);
+        if (plan == null) {
+            // Solo había conceptos de pago único (inscripción): nada que extender.
+            marcarAplicado(p);
+            return;
+        }
+        if (member == null || !"member".equals(member.getRole()) || !Objects.equals(p.getGymId(), member.getGymId())) {
+            // Venta de mostrador a "Público en general", o alguien que salió del
+            // gimnasio entre la compra y el pago: no hay membresía que extender.
+            log.warn("El pedido #{} incluye el plan {} pero no tiene un miembro de ese gimnasio; no se extendió ninguna membresía.",
+                    p.getFolio(), plan.nombre());
+            marcarAplicado(p);
+            return;
+        }
+        LocalDate fecha = LocalDate.ofInstant(p.getPagadoEn() != null ? p.getPagadoEn() : Instant.now(), ZONA_MX);
+        billingService.registrarPago(member, p.getGymId(), partidaPlan.getTotal(),
+                MetodosPago.nombre(p.getProveedorPago()), fecha,
+                "Compra en la tienda · pedido #" + p.getFolio(), plan, p.getOrderId());
+        marcarAplicado(p);
+        log.info("Pedido #{}: plan {} aplicado a {}.", p.getFolio(), plan.nombre(), member.getEmail());
+    }
+
+    // La duración viaja congelada en la partida. Si no viene (pedidos traídos
+    // de Medusa), se lee del plan, si todavía existe.
+    private Optional<PlanPagado> duracionDe(Pedido.Partida x) {
+        if (PlanPagado.UNIDADES.contains(x.getDuracionUnidad()) && x.getDuracionCantidad() != null && x.getDuracionCantidad() > 0) {
+            return Optional.of(new PlanPagado(x.getProductoId(), x.getTitulo(), x.getDuracionUnidad(), x.getDuracionCantidad()));
+        }
+        if (x.getProductoId() == null) return Optional.empty();
+        return productoRepository.findById(x.getProductoId()).flatMap(CatalogoService::plan);
+    }
+
+    static double centavos(double n) {
+        return Math.round(n * 100) / 100.0;
+    }
+
+    // ═══════════════════════════ MEDUSA (hasta quitarla) ═══════════════════════════
 
     public Pedido sincronizar(String orderId) {
         JsonNode o = medusa.adminGet("/admin/orders/" + orderId + q("fields", CAMPOS)).path("order");

@@ -122,20 +122,32 @@ public class Pedido {
         public void setCantidad(int cantidad) { this.cantidad = cantidad; }
     }
 
+    // Lo que se vendió, congelado al momento de comprar: nombre, variante y
+    // precio no cambian aunque el producto se edite o se borre después.
     public static class Partida {
         private String productoId;
         private String varianteId;
         private String titulo;
         private String variante;
-        // "producto" o "membresia" (tipo de producto en Medusa).
+        // "producto" o "membresia".
         private String tipo;
         private Integer cantidad;
         private Double precioUnitario;
         private Double total;
+        // Duración del plan al venderlo (dia | semana | mes): con esto se
+        // extiende la membresía aunque el plan cambie o se borre.
+        private String duracionUnidad;
+        private Integer duracionCantidad;
 
         public boolean esPlan() {
             return "membresia".equals(tipo);
         }
+
+        public String getDuracionUnidad() { return duracionUnidad; }
+        public void setDuracionUnidad(String duracionUnidad) { this.duracionUnidad = duracionUnidad; }
+
+        public Integer getDuracionCantidad() { return duracionCantidad; }
+        public void setDuracionCantidad(Integer duracionCantidad) { this.duracionCantidad = duracionCantidad; }
 
         public String getProductoId() { return productoId; }
         public void setProductoId(String productoId) { this.productoId = productoId; }
