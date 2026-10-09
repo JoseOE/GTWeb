@@ -12,13 +12,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-// Copia local de un pedido de la tienda. El pedido de verdad vive en Medusa;
-// aquí queda lo que Spring necesita sin preguntarle a Medusa cada vez: de quién
-// es (para no enseñarle a nadie pedidos ajenos), de qué gimnasio, su estado y
-// las partidas para los recibos y el dashboard de ventas.
+// Un pedido de la tienda, la app o el mostrador: de quién es (para no
+// enseñarle a nadie pedidos ajenos), de qué gimnasio, su estado, el pago y las
+// partidas congeladas al cobrar, para los recibos y el dashboard de ventas.
 //
-// Se escribe al completar el checkout y se vuelve a sincronizar con cada aviso
-// de Medusa (PedidoService.sincronizar), así que siempre refleja el último estado.
+// Se crea al cobrar (PedidoService.cobrar) y cambia de estado con
+// actualizaciones condicionadas al estado anterior (pagar una ficha, cancelar,
+// reembolsar).
 @Document(collection = "pedidos")
 @CompoundIndexes({
         // Lista de ventas del panel: los pedidos de un gimnasio, del más nuevo al más viejo.
@@ -41,7 +41,7 @@ public class Pedido {
 
     @Id
     private String id;
-    // Id del pedido en Medusa (order_...).
+    // Id público del pedido (order_...), con el mismo formato que usaba Medusa.
     @Indexed(unique = true)
     private String orderId;
     // Folio corto que ve el cliente (#12).
@@ -53,7 +53,7 @@ public class Pedido {
     private String email;
     private String canal;
     private String estado;
-    // Proveedor de pago de Medusa (pp_sim-stripe_default, pp_system_default...).
+    // Proveedor de pago (pp_sim-stripe_default, pp_system_default...).
     private String proveedorPago;
     // Lo que cada simulador guardó del pago, sin nada sensible: marca y últimos 4
     // de la tarjeta, lo recibido y el cambio en efectivo, la referencia Paynet...

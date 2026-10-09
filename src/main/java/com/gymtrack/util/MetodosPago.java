@@ -2,14 +2,15 @@ package com.gymtrack.util;
 
 import java.util.Map;
 
-// Proveedores de pago registrados en Medusa (medusa/medusa-config.ts) y el
-// nombre con el que se muestran en el panel, los recibos y el historial de pagos.
+// Proveedores de pago (los mismos ids que usaba Medusa, para que los pedidos
+// migrados se lean igual) y el nombre con el que se muestran en el panel, los
+// recibos y el historial de pagos.
 public final class MetodosPago {
 
     public static final String STRIPE = "pp_sim-stripe_default";
     public static final String PAYNET = "pp_sim-paynet_default";
     public static final String PAYPAL = "pp_sim-paypal_default";
-    // Proveedor manual de Medusa: el efectivo del mostrador.
+    // El efectivo del mostrador.
     public static final String EFECTIVO = "pp_system_default";
 
     private static final Map<String, String> NOMBRES = Map.of(

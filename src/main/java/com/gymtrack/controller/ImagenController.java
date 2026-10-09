@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
 
 // Imágenes de los productos. El panel las reduce en el navegador (como el
 // logo) y las manda como data URI; aquí se guardan en Mongo y se sirven con
-// una URL fija que es la que se le da a Medusa como imagen del producto.
+// una URL fija que es la que se guarda como imagen del producto.
 @RestController
 public class ImagenController {
 

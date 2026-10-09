@@ -6,8 +6,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 
 // Imagen de un producto de la tienda. Se guarda en Mongo y no en disco porque
-// el disco de Render se borra en cada despliegue; Medusa solo guarda la URL
-// pública (/api/imagenes/{id}). El panel la redimensiona antes de subirla,
+// el disco de Render se borra en cada despliegue; el producto solo guarda la
+// URL pública (/api/imagenes/{id}). El panel la redimensiona antes de subirla,
 // igual que el logo del gimnasio, así que cada una pesa unos cuantos KB.
 @Document(collection = "imagenes")
 public class Imagen {

@@ -7,8 +7,7 @@ import java.time.Instant;
 
 // Correo automático ya enviado. El id es "tipo:referencia" (p. ej.
 // "compra:order_..."): insertarlo es lo que "aparta" el envío, así que aunque
-// el checkout y el aviso de Medusa sincronicen el mismo pedido a la vez, el
-// correo sale una sola vez.
+// dos peticiones confirmen el mismo pedido a la vez, el correo sale una sola vez.
 @Document(collection = "correos_enviados")
 public class CorreoEnviado {
 
