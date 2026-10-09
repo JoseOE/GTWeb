@@ -104,6 +104,7 @@ public class SesionFilter extends OncePerRequestFilter {
             regla(null, "/api/gyms/*/imagenes"),
             regla(null, "/api/gyms/*/mostrador/**"),
             regla(null, "/api/gyms/*/ventas/**"),
+            regla("POST", "/api/gyms/*/tienda/migrar-medusa"),
             regla(null, "/api/simuladores/paynet/**"));
 
     public static final String ATRIBUTO_USUARIO = "gymtrack.sesion.usuario";
