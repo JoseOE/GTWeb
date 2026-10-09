@@ -25,14 +25,14 @@ public class Payment {
     private String nota;
 
     // ─── Plan ───
-    // Producto "membresia" de Medusa que se pagó (null en los pagos anteriores a la tienda,
+    // Plan (producto "membresia") que se pagó (null en los pagos anteriores a la tienda,
     // que siempre fueron de un mes).
     private String planId;
     private String plan;
     private String duracionUnidad;
     private Integer duracionCantidad;
     // Pedido de la tienda que originó el pago. Único: es lo que impide que un
-    // aviso repetido de Medusa extienda la membresía dos veces.
+    // pedido confirmado dos veces extienda la membresía dos veces.
     @Indexed(unique = true, sparse = true)
     private String orderId;
     // Fecha de corte que tenía el miembro justo antes de este pago (null si no

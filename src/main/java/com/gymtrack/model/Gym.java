@@ -38,10 +38,6 @@ public class Gym {
     // Cuota mensual sugerida, para prellenar el registro de pagos.
     private Double cuotaMensual;
 
-    // ─── Tienda ───
-    // Ids de lo que este gimnasio tiene en Medusa. null hasta que usa la tienda.
-    private TiendaGym tienda;
-
     public Gym() {}
 
     public String getId() { return id; }
@@ -83,6 +79,4 @@ public class Gym {
     public Double getCuotaMensual() { return cuotaMensual; }
     public void setCuotaMensual(Double cuotaMensual) { this.cuotaMensual = cuotaMensual; }
 
-    public TiendaGym getTienda() { return tienda; }
-    public void setTienda(TiendaGym tienda) { this.tienda = tienda; }
 }

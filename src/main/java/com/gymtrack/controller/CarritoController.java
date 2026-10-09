@@ -37,7 +37,7 @@ public class CarritoController {
         return carritos.ver(user, user.getGymId(), canal(canal));
     }
 
-    // POST → abre el carrito en Medusa si todavía no existe (no es obligatorio:
+    // POST → abre el carrito si todavía no existe (no es obligatorio:
     // agregar el primer producto también lo abre).
     @PostMapping
     public Map<String, Object> asegurar(@RequestParam(required = false) String canal,

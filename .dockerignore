@@ -7,6 +7,3 @@ target/
 .idea/
 *.iml
 .vscode/
-
-# La tienda (Medusa) se despliega como servicio aparte en Render.
-medusa/

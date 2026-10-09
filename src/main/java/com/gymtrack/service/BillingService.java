@@ -59,9 +59,8 @@ public class BillingService {
     //
     // Con orderId (compra pagada en la tienda) es idempotente: el pago se
     // inserta primero y el índice único de orderId hace que, si el mismo pedido
-    // llega dos veces (aviso repetido de Medusa, o el aviso y el checkout a la
-    // vez), solo el primero extienda la membresía. El segundo recibe el pago
-    // que ya existía.
+    // se confirma dos veces (dos peticiones a la vez), solo la primera extiende
+    // la membresía. La segunda recibe el pago que ya existía.
     public Payment registrarPago(User member, String gymId, Double monto, String metodo,
                                  LocalDate fechaPago, String nota, PlanPagado plan, String orderId) {
         LocalDate pago = fechaPago == null ? LocalDate.now() : fechaPago;
