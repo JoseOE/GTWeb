@@ -1,8 +1,12 @@
 package com.gymtrack.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gymtrack.model.Pedido;
 import com.gymtrack.model.Producto;
+import com.gymtrack.repository.PaymentRepository;
+import com.gymtrack.repository.PedidoRepository;
 import com.gymtrack.repository.ProductoRepository;
 import org.bson.Document;
 import org.slf4j.Logger;
@@ -26,40 +30,58 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static com.gymtrack.model.Producto.TIPO_MEMBRESIA;
 import static com.gymtrack.model.Producto.TIPO_PRODUCTO;
 
 // Migración de un solo uso: trae a MongoDB lo que un gimnasio tenía en Medusa
-// (productos, planes y su stock), conservando sus ids, para poder apagar
+// (productos, planes, stock y pedidos), conservando sus ids, para poder apagar
 // Medusa y su base en Neon.
 //
 //  - La URL y la llave de admin de Medusa llegan en la petición y no se
 //    guardan: después de migrar no hacen falta.
-//  - No duplica: un producto que ya está en MongoDB se queda como está.
-//    Correrla dos veces no cambia nada la segunda.
-//  - El stock de cada variante queda como en Medusa: existencias y lo que
-//    tenía reservado (apartadas).
+//  - No duplica: un producto o pedido que ya está en MongoDB se queda como
+//    está. Correrla dos veces no cambia nada la segunda.
+//  - Los pedidos ya tenían su copia en MongoDB (la escribía el aviso de
+//    Medusa), así que sus recibos siguen saliendo; aquí se agregan los que
+//    falten y se les anota qué piezas tomaron del inventario.
+//  - El stock de cada variante queda: existencias = las de Medusa;
+//    apartadas = lo de pedidos pagados o por pagar que no se entregaron.
 @Service
 public class MigracionMedusaService {
 
     private static final Logger log = LoggerFactory.getLogger(MigracionMedusaService.class);
     private static final int POR_PAGINA = 100;
+    private static final Set<String> PAGOS_COBRADOS = Set.of("captured", "partially_refunded");
+
     private static final String CAMPOS_PRODUCTO = String.join(",",
             "id", "title", "description", "status", "thumbnail", "metadata", "type_id", "created_at",
             "categories.handle", "sales_channels.id",
             "variants.id", "variants.title", "variants.manage_inventory", "variants.metadata",
             "variants.created_at", "variants.variant_rank", "variants.prices.amount", "variants.prices.currency_code",
             "variants.inventory_items.inventory.location_levels.location_id",
-            "variants.inventory_items.inventory.location_levels.stocked_quantity",
-            "variants.inventory_items.inventory.location_levels.reserved_quantity");
+            "variants.inventory_items.inventory.location_levels.stocked_quantity");
+
+    private static final String CAMPOS_PEDIDO = String.join(",",
+            "id", "display_id", "status", "payment_status", "email", "metadata", "sales_channel_id",
+            "created_at", "canceled_at", "total", "original_total", "subtotal", "tax_total",
+            "items.id", "items.title", "items.variant_title", "items.product_id", "items.variant_id",
+            "items.product_type", "items.quantity", "items.unit_price", "items.total", "items.metadata",
+            "payment_collections.payments.provider_id", "payment_collections.payments.captured_at",
+            "payment_collections.payments.data");
 
     private final ProductoRepository productos;
+    private final PedidoRepository pedidos;
+    private final PaymentRepository pagos;
     private final MongoTemplate mongo;
     private final ObjectMapper json;
 
-    public MigracionMedusaService(ProductoRepository productos, MongoTemplate mongo, ObjectMapper json) {
+    public MigracionMedusaService(ProductoRepository productos, PedidoRepository pedidos, PaymentRepository pagos,
+                                  MongoTemplate mongo, ObjectMapper json) {
         this.productos = productos;
+        this.pedidos = pedidos;
+        this.pagos = pagos;
         this.mongo = mongo;
         this.json = json;
     }
@@ -67,27 +89,79 @@ public class MigracionMedusaService {
     public Map<String, Object> migrar(String gymId, String url, String llaveAdmin) {
         Medusa medusa = new Medusa(url, llaveAdmin);
         String canal = canalDeVenta(gymId);
+        List<String> avisos = new ArrayList<>();
 
         // ─── Productos y planes ───
         Map<String, String> tipos = new HashMap<>();
         medusa.get("/admin/product-types?fields=id,value&limit=100").path("product_types")
                 .forEach(t -> tipos.put(t.path("id").asText(), t.path("value").asText()));
         Map<String, Integer> conteo = new LinkedHashMap<>(Map.of("productosNuevos", 0, "planesNuevos", 0,
-                "productosYaEstaban", 0));
+                "productosYaEstaban", 0, "pedidosNuevos", 0, "pedidosCompletados", 0, "pedidosYaEstaban", 0));
+        Map<String, Producto> nuevos = new LinkedHashMap<>();
+        Map<String, Producto.Variante> variantes = new HashMap<>();
         for (JsonNode p : medusa.todos("/admin/products", CAMPOS_PRODUCTO, "products")) {
             if (!delGimnasio(p.path("metadata"), p.path("sales_channels"), null, gymId, canal)) continue;
             Producto existente = productos.findById(p.path("id").asText()).orElse(null);
             if (existente != null) {
                 conteo.merge("productosYaEstaban", 1, Integer::sum);
+                existente.getVariantes().forEach(v -> variantes.put(v.getId(), v));
                 continue;
             }
             Producto nuevo = producto(p, gymId, tipos);
-            productos.insert(nuevo);
+            nuevos.put(nuevo.getId(), nuevo);
+            nuevo.getVariantes().forEach(v -> variantes.put(v.getId(), v));
             conteo.merge(nuevo.esPlan() ? "planesNuevos" : "productosNuevos", 1, Integer::sum);
         }
 
+        // ─── Pedidos ───
+        for (JsonNode o : medusa.todos("/admin/orders", CAMPOS_PEDIDO, "orders")) {
+            if (!delGimnasio(o.path("metadata"), null, o.path("sales_channel_id").asText(""), gymId, canal)) continue;
+            Pedido actual = pedidos.findByOrderId(o.path("id").asText()).orElse(null);
+            if (actual == null) {
+                Pedido p = pedido(o, gymId);
+                p.setInventario(inventarioDe(p, variantes));
+                if (Pedido.ESTADO_PAGADO.equals(p.getEstado()) && p.incluyePlan()) {
+                    // No se aplica un plan viejo de golpe: si su pago no quedó
+                    // registrado, el dueño lo revisa en Membresías y Pagos.
+                    p.setPlanAplicado(true);
+                    if (pagos.findByOrderId(p.getOrderId()).isEmpty()) {
+                        avisos.add("El pedido #" + p.getFolio() + " incluía un plan que nunca se aplicó: revisa la membresía de su comprador.");
+                    }
+                }
+                pedidos.save(p);
+                conteo.merge("pedidosNuevos", 1, Integer::sum);
+            } else if (actual.getInventario() == null) {
+                actual.setInventario(inventarioDe(actual, variantes));
+                pedidos.save(actual);
+                conteo.merge("pedidosCompletados", 1, Integer::sum);
+            } else {
+                conteo.merge("pedidosYaEstaban", 1, Integer::sum);
+            }
+        }
+
+        // ─── Stock apartado de los productos nuevos ───
+        Map<String, Integer> apartadas = new HashMap<>();
+        for (Pedido p : pedidos.findByGymIdOrderByCreadoEnDesc(gymId)) {
+            if (p.getInventario() == null || !Pedido.Inventario.APARTADO.equals(p.getInventario().getEstado())) continue;
+            p.getInventario().getPiezas().forEach(x -> apartadas.merge(x.getVarianteId(), x.getCantidad(), Integer::sum));
+        }
+        for (Producto p : nuevos.values()) {
+            for (Producto.Variante v : p.getVariantes()) {
+                if (!v.isControlarInventario()) continue;
+                v.setApartadas(apartadas.getOrDefault(v.getId(), 0));
+                v.setDisponible(v.getExistencias() - v.getApartadas());
+            }
+            productos.insert(p);
+        }
+
+        // Los folios nuevos siguen después del más alto que ya existe.
+        pedidos.findAll().stream().map(Pedido::getFolio).filter(f -> f != null).max(Long::compare)
+                .ifPresent(max -> mongo.getCollection("contadores").updateOne(new Document("_id", "folio"),
+                        new Document("$max", new Document("valor", max)),
+                        new com.mongodb.client.model.UpdateOptions().upsert(true)));
+
         Map<String, Object> r = new LinkedHashMap<>(conteo);
-        r.put("avisos", List.of());
+        r.put("avisos", avisos);
         log.info("Migración desde Medusa del gimnasio {}: {}", gymId, conteo);
         return r;
     }
@@ -139,19 +213,113 @@ public class MigracionMedusaService {
             y.setControlarInventario(controlar);
             if (controlar) {
                 int existencias = 0;
-                int reservadas = 0;
                 for (JsonNode nivel : v.path("inventory_items").path(0).path("inventory").path("location_levels")) {
                     existencias += nivel.path("stocked_quantity").asInt(0);
-                    reservadas += nivel.path("reserved_quantity").asInt(0);
                 }
                 y.setExistencias(existencias);
-                y.setApartadas(reservadas);
-                y.setDisponible(existencias - reservadas);
+                y.setDisponible(existencias);
             }
             lista.add(y);
         }
         x.setVariantes(lista);
         return x;
+    }
+
+    // ═══════════════════════════ PEDIDOS ═══════════════════════════
+
+    // Lo mismo que hacía la copia del aviso de Medusa (PedidoService.sincronizar).
+    private Pedido pedido(JsonNode o, String gymId) {
+        JsonNode metadata = o.path("metadata");
+        Pedido p = new Pedido();
+        p.setOrderId(o.path("id").asText());
+        p.setFolio(o.path("display_id").asLong());
+        p.setEmail(texto(o.path("email")));
+        p.setCanal(metadata.path("canal").asText(Pedido.CANAL_WEB));
+        p.setUserId(texto(metadata.path("userId")));
+        p.setGymId(gymId);
+        boolean reembolsado = o.path("payment_status").asText().contains("refunded");
+        p.setTotal(o.path(reembolsado ? "original_total" : "total").asDouble());
+        p.setSubtotal(o.path("subtotal").asDouble());
+        p.setIva(o.path("tax_total").asDouble());
+        p.setCreadoEn(instante(o.path("created_at")));
+
+        JsonNode pago = o.path("payment_collections").path(0).path("payments").path(0);
+        p.setProveedorPago(texto(pago.path("provider_id")));
+        p.setCliente(texto(metadata.path("cliente")));
+        p.setVendedorId(texto(metadata.path("vendedorId")));
+        p.setDatosPago(datosPago(pago.path("data"), metadata.path("efectivo")));
+
+        String estado;
+        String pagoEstado = o.path("payment_status").asText();
+        if ("canceled".equals(o.path("status").asText())) estado = Pedido.ESTADO_CANCELADO;
+        else if ("refunded".equals(pagoEstado)) estado = Pedido.ESTADO_REEMBOLSADO;
+        else if (PAGOS_COBRADOS.contains(pagoEstado)) estado = Pedido.ESTADO_PAGADO;
+        else estado = Pedido.ESTADO_PENDIENTE_PAGO;
+        p.setEstado(estado);
+        if (Pedido.ESTADO_PAGADO.equals(estado) || Pedido.ESTADO_REEMBOLSADO.equals(estado)) {
+            Instant capturado = instante(pago.path("captured_at"));
+            p.setPagadoEn(capturado != null ? capturado : p.getCreadoEn());
+        }
+        if (Pedido.ESTADO_CANCELADO.equals(estado)) {
+            Instant cancelado = instante(o.path("canceled_at"));
+            p.setCanceladoEn(cancelado != null ? cancelado : p.getCreadoEn());
+        }
+
+        List<Pedido.Partida> partidas = new ArrayList<>();
+        for (JsonNode item : o.path("items")) {
+            Pedido.Partida x = new Pedido.Partida();
+            x.setProductoId(texto(item.path("product_id")));
+            x.setVarianteId(texto(item.path("variant_id")));
+            x.setTitulo(item.path("title").asText());
+            x.setVariante(texto(item.path("variant_title")));
+            x.setTipo(item.path("product_type").asText(TIPO_PRODUCTO));
+            x.setCantidad(item.path("quantity").asInt());
+            x.setPrecioUnitario(item.path("unit_price").asDouble());
+            x.setTotal(item.path("total").asDouble());
+            partidas.add(x);
+        }
+        p.setPartidas(partidas);
+        p.setSincronizadoEn(Instant.now());
+        return p;
+    }
+
+    // Qué tomó el pedido del inventario: el mostrador entrega en el acto; la
+    // tienda y la app dejan lo vendido (o por pagar) apartado. Lo cancelado o
+    // reembolsado ya no tiene nada.
+    private static Pedido.Inventario inventarioDe(Pedido p, Map<String, Producto.Variante> variantes) {
+        List<Pedido.Pieza> piezas = new ArrayList<>();
+        for (Pedido.Partida x : p.getPartidas()) {
+            Producto.Variante v = x.getVarianteId() == null ? null : variantes.get(x.getVarianteId());
+            if (v == null || !v.isControlarInventario() || x.getCantidad() == null || x.getCantidad() <= 0) continue;
+            Pedido.Pieza pieza = new Pedido.Pieza();
+            pieza.setProductoId(x.getProductoId());
+            pieza.setVarianteId(x.getVarianteId());
+            pieza.setCantidad(x.getCantidad());
+            piezas.add(pieza);
+        }
+        String estado;
+        if (Pedido.ESTADO_CANCELADO.equals(p.getEstado()) || Pedido.ESTADO_REEMBOLSADO.equals(p.getEstado())) {
+            estado = Pedido.Inventario.DEVUELTO;
+        } else if (Pedido.CANAL_MOSTRADOR.equals(p.getCanal())) {
+            estado = Pedido.Inventario.DESCONTADO;
+        } else {
+            estado = Pedido.Inventario.APARTADO;
+        }
+        return InventarioService.registro(estado, piezas);
+    }
+
+    private Map<String, Object> datosPago(JsonNode data, JsonNode efectivo) {
+        Map<String, Object> datos = new LinkedHashMap<>();
+        if (data.isObject()) {
+            datos.putAll(json.convertValue(data, new TypeReference<Map<String, Object>>() {}));
+            datos.remove("token");
+            datos.remove("session_id");
+        }
+        if (efectivo.isObject()) {
+            datos.put("recibido", efectivo.path("recibido").asDouble());
+            datos.put("cambio", efectivo.path("cambio").asDouble());
+        }
+        return datos;
     }
 
     // ═══════════════════════════ AYUDANTES ═══════════════════════════
