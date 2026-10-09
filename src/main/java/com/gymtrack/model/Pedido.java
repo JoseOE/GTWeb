@@ -64,11 +64,53 @@ public class Pedido {
     // true cuando ya se extendió la membresía por el plan de este pedido.
     private boolean planAplicado;
     private Instant sincronizadoEn;
+    // Piezas que este pedido tomó del inventario y cómo. Con esto se regresan,
+    // una sola vez, si se cancela, vence o se reembolsa (InventarioService).
+    private Inventario inventario;
 
     public Pedido() {}
 
     public boolean incluyePlan() {
         return partidas.stream().anyMatch(Partida::esPlan);
+    }
+
+    public static class Inventario {
+        // Tienda y app: vendidas o por pagar (Paynet), todavía sin entregar.
+        public static final String APARTADO = "apartado";
+        // Mostrador: entregadas en el acto.
+        public static final String DESCONTADO = "descontado";
+        // Ya regresaron al inventario (cancelado, vencido o reembolsado).
+        public static final String DEVUELTO = "devuelto";
+        // Nada que mover: solo llevaba variantes sin inventario (scoops, planes).
+        public static final String SIN_PIEZAS = "sin_piezas";
+
+        private String estado;
+        private List<Pieza> piezas = new ArrayList<>();
+        private Instant devueltoEn;
+
+        public String getEstado() { return estado; }
+        public void setEstado(String estado) { this.estado = estado; }
+
+        public List<Pieza> getPiezas() { return piezas; }
+        public void setPiezas(List<Pieza> piezas) { this.piezas = piezas; }
+
+        public Instant getDevueltoEn() { return devueltoEn; }
+        public void setDevueltoEn(Instant devueltoEn) { this.devueltoEn = devueltoEn; }
+    }
+
+    public static class Pieza {
+        private String productoId;
+        private String varianteId;
+        private int cantidad;
+
+        public String getProductoId() { return productoId; }
+        public void setProductoId(String productoId) { this.productoId = productoId; }
+
+        public String getVarianteId() { return varianteId; }
+        public void setVarianteId(String varianteId) { this.varianteId = varianteId; }
+
+        public int getCantidad() { return cantidad; }
+        public void setCantidad(int cantidad) { this.cantidad = cantidad; }
     }
 
     public static class Partida {
@@ -173,4 +215,7 @@ public class Pedido {
 
     public Instant getSincronizadoEn() { return sincronizadoEn; }
     public void setSincronizadoEn(Instant sincronizadoEn) { this.sincronizadoEn = sincronizadoEn; }
+
+    public Inventario getInventario() { return inventario; }
+    public void setInventario(Inventario inventario) { this.inventario = inventario; }
 }
