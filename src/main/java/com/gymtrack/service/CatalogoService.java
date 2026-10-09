@@ -1,6 +1,5 @@
 package com.gymtrack.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.gymtrack.model.Gym;
 import com.gymtrack.model.Producto;
 import com.gymtrack.repository.ProductoRepository;
@@ -183,17 +182,6 @@ public class CatalogoService {
             return Optional.empty();
         }
         return Optional.of(new PlanPagado(p.getId(), p.getNombre(), m.getDuracionUnidad(), m.getDuracionCantidad()));
-    }
-
-    // Lo mismo para un producto leído de Medusa (lo usa la tienda mientras siga ahí).
-    public static Optional<PlanPagado> leerPlan(JsonNode producto) {
-        JsonNode m = producto.path("metadata");
-        String unidad = m.path("duracionUnidad").asText("");
-        int cantidad = m.path("duracionCantidad").asInt(0);
-        if (m.path("pagoUnico").asBoolean(false) || !PlanPagado.UNIDADES.contains(unidad) || cantidad < 1) {
-            return Optional.empty();
-        }
-        return Optional.of(new PlanPagado(producto.path("id").asText(), producto.path("title").asText(), unidad, cantidad));
     }
 
     // Planes sugeridos, con el precio calculado desde la cuota mensual del
@@ -384,12 +372,6 @@ public class CatalogoService {
         m.setDestacado(Boolean.TRUE.equals(r.getDestacado()));
         p.setPlan(m);
     }
-
-    // Orden de las variantes leídas de Medusa (lo usa la tienda mientras siga ahí):
-    // el que capturó el dueño y, las de antes de guardar ese orden, por fecha.
-    static final Comparator<JsonNode> EN_ORDEN = Comparator
-            .comparingInt((JsonNode v) -> v.path("variant_rank").asInt(0))
-            .thenComparing(v -> v.path("created_at").asText(""));
 
     private static String vacio(String s) {
         return s == null || s.isBlank() ? null : s;
