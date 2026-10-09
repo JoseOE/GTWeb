@@ -8,6 +8,7 @@ import com.gymtrack.repository.CarritoRepository;
 import com.gymtrack.repository.ProductoRepository;
 import com.gymtrack.util.Ids;
 import com.gymtrack.util.MetodosPago;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -15,7 +16,9 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -76,7 +79,8 @@ public class CarritoService {
         if (c.getCartId() == null) return vistaVacia(gymId, canal(canal));
         Map<String, Elegible> cat = catalogo(gymId);
         List<String> avisos = revisar(c, cat);
-        if (!avisos.isEmpty()) guardar(c);
+        // Mientras se cobra solo se muestra: la corrección se guarda después.
+        if (!avisos.isEmpty() && !cobrando(c)) guardar(c);
         return vista(c, avisos, cat);
     }
 
@@ -103,6 +107,7 @@ public class CarritoService {
         String titulo = e.producto().getNombre();
 
         Carrito c = carrito(user, gymId, canal);
+        exigirLibre(c);
         Carrito.Partida existente = partidaDeVariante(c, varianteId);
         Optional<PlanPagado> plan = e.producto().esPlan() ? CatalogoService.plan(e.producto()) : Optional.empty();
         if (e.producto().esPlan()) {
@@ -154,6 +159,7 @@ public class CarritoService {
             throw new TiendaException(HttpStatus.BAD_REQUEST, "Puedes llevar hasta " + MAX_POR_PARTIDA + " piezas.");
         }
         Carrito c = exigirVigente(user, gymId, canal);
+        exigirLibre(c);
         Carrito.Partida partida = exigirPartida(c, partidaId);
         String titulo = partida.getTitulo();
         if (partida.isEsPlan() && cantidad > 1) {
@@ -175,6 +181,7 @@ public class CarritoService {
 
     public Map<String, Object> quitar(User user, String gymId, String canal, String partidaId) {
         Carrito c = exigirVigente(user, gymId, canal);
+        exigirLibre(c);
         c.getItems().remove(exigirPartida(c, partidaId));
         guardar(c);
         return vista(c, List.of(), catalogo(gymId));
@@ -183,6 +190,7 @@ public class CarritoService {
     // Deja el carrito vacío: el siguiente producto abre uno nuevo.
     public Map<String, Object> vaciar(User user, String gymId, String canal) {
         Carrito c = carrito(user, gymId, canal);
+        exigirLibre(c);
         if (c.getCartId() != null || !c.getItems().isEmpty()) {
             c.setCartId(null);
             c.getItems().clear();
@@ -198,24 +206,31 @@ public class CarritoService {
     public Pedido checkout(User user, String gymId, String canal, String metodo, Map<String, Object> datos, Double totalVisto) {
         String proveedor = proveedorDe(metodo);
         Carrito c = carrito(user, gymId, canal);
+        exigirLibre(c);
         Map<String, Elegible> cat = catalogo(gymId);
         revisarParaCobrar(c, cat, totalVisto);
         double total = total(c);
-        // PayPal llega como la orden que el comprador aprobó en paypal-sim.html:
-        // se cambia por sus datos guardados, igual que el token de la tarjeta.
-        if (MetodosPago.PAYPAL.equals(proveedor)) {
-            datos = paypal.consumir(user.getId(), gymId, c.getCanal(), total, datos);
-        }
-        // La tarjeta llega como token: se cambia por los datos guardados del token
-        // para que el resultado del cobro no se pueda inventar desde el navegador.
-        if (MetodosPago.STRIPE.equals(proveedor)) datos = stripe.consumir(user.getId(), datos);
+        Instant cobro = tomarCobro(c);
+        Pedido pedido;
+        try {
+            // PayPal llega como la orden que el comprador aprobó en paypal-sim.html:
+            // se cambia por sus datos guardados, igual que el token de la tarjeta.
+            if (MetodosPago.PAYPAL.equals(proveedor)) {
+                datos = paypal.consumir(user.getId(), gymId, c.getCanal(), total, datos);
+            }
+            // La tarjeta llega como token: se cambia por los datos guardados del token
+            // para que el resultado del cobro no se pueda inventar desde el navegador.
+            if (MetodosPago.STRIPE.equals(proveedor)) datos = stripe.consumir(user.getId(), datos);
 
-        Pedido pedido = pedidos.cobrar(new PedidoService.Venta(gymId, c.getCanal(), user.getId(), user.getEmail(),
-                null, null, lineas(c, cat), proveedor, datos, false, null));
+            pedido = pedidos.cobrar(new PedidoService.Venta(gymId, c.getCanal(), user.getId(), user.getEmail(),
+                    null, null, lineas(c, cat), proveedor, datos, false, null));
+        } catch (RuntimeException e) {
+            // No se cobró: el carrito queda como estaba para intentar con otro método.
+            soltarCobro(c, cobro, new Update());
+            throw e;
+        }
         // El carrito se pagó: el próximo producto abre uno nuevo.
-        c.setCartId(null);
-        c.getItems().clear();
-        guardar(c);
+        soltarCobro(c, cobro, new Update().set("cartId", null).set("items", List.of()));
         return pedido;
     }
 
@@ -425,6 +440,50 @@ public class CarritoService {
         Carrito c = carrito(user, gymId, canal);
         if (c.getCartId() == null) throw new TiendaException(HttpStatus.NOT_FOUND, "Tu carrito está vacío.");
         return c;
+    }
+
+    // ═══════════════════════════ CANDADO DE COBRO ═══════════════════════════
+    // Un doble clic en "Pagar" o el mismo carrito pagado desde la computadora y
+    // el celular a la vez: solo el primero cobra. Mientras cobra, el carrito no
+    // se cambia. Si el servidor se cae a medio cobro, el candado vence solo.
+
+    private static final Duration COBRO_VENCE = Duration.ofMinutes(2);
+
+    private static boolean cobrando(Carrito c) {
+        return c.getCobrandoDesde() != null && c.getCobrandoDesde().isAfter(Instant.now().minus(COBRO_VENCE));
+    }
+
+    private static void exigirLibre(Carrito c) {
+        if (cobrando(c)) {
+            throw new TiendaException(HttpStatus.CONFLICT, "Tu pago ya se está procesando. Espera unos segundos.");
+        }
+    }
+
+    // Toma el candado solo si el carrito sigue tal como se revisó (misma
+    // versión) y nadie más lo está cobrando. Devuelve la marca del candado.
+    private Instant tomarCobro(Carrito c) {
+        // Al milisegundo, como lo guarda MongoDB: así se reconoce al soltarlo.
+        Instant ahora = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+        Carrito tomado = mongo.findAndModify(
+                Query.query(Criteria.where("_id").is(c.getId()).and("version").is(c.getVersion())
+                        .orOperator(Criteria.where("cobrandoDesde").is(null),
+                                Criteria.where("cobrandoDesde").lt(ahora.minus(COBRO_VENCE)))),
+                new Update().set("cobrandoDesde", ahora).inc("version", 1),
+                FindAndModifyOptions.options().returnNew(true), Carrito.class);
+        if (tomado == null) {
+            Carrito actual = carritos.findById(c.getId()).orElse(c);
+            exigirLibre(actual);
+            throw new TiendaException(HttpStatus.CONFLICT, "Tu carrito cambió en otra sesión. Revísalo antes de cobrar.");
+        }
+        c.setVersion(tomado.getVersion());
+        c.setCobrandoDesde(ahora);
+        return ahora;
+    }
+
+    // Suelta el candado (solo el propio) con el cambio indicado.
+    private void soltarCobro(Carrito c, Instant cobro, Update cambio) {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(c.getId()).and("cobrandoDesde").is(cobro)),
+                cambio.unset("cobrandoDesde").set("actualizadoEn", Instant.now()).inc("version", 1), Carrito.class);
     }
 
     private void guardar(Carrito c) {
