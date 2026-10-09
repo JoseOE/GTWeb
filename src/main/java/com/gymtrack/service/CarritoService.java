@@ -8,6 +8,8 @@ import com.gymtrack.repository.CarritoRepository;
 import com.gymtrack.repository.ProductoRepository;
 import com.gymtrack.util.Ids;
 import com.gymtrack.util.MetodosPago;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -27,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Supplier;
 
 // Carrito del miembro, completo en MongoDB (colección carritos). Aquí se
 // aplican las reglas de GymTrack:
@@ -75,128 +79,140 @@ public class CarritoService {
     // ═══════════════════════════ OPERACIONES ═══════════════════════════
 
     public Map<String, Object> ver(User user, String gymId, String canal) {
-        Carrito c = carrito(user, gymId, canal);
-        if (c.getCartId() == null) return vistaVacia(gymId, canal(canal));
-        Map<String, Elegible> cat = catalogo(gymId);
-        List<String> avisos = revisar(c, cat);
-        // Mientras se cobra solo se muestra: la corrección se guarda después.
-        if (!avisos.isEmpty() && !cobrando(c)) guardar(c);
-        return vista(c, avisos, cat);
+        return conReintentos(() -> {
+            Carrito c = carrito(user, gymId, canal);
+            if (c.getCartId() == null) return vistaVacia(gymId, canal(canal));
+            Map<String, Elegible> cat = catalogo(gymId);
+            List<String> avisos = revisar(c, cat);
+            // Mientras se cobra solo se muestra: la corrección se guarda después.
+            if (!avisos.isEmpty() && !cobrando(c)) guardar(c);
+            return vista(c, avisos, cat);
+        });
     }
 
     public Map<String, Object> asegurar(User user, String gymId, String canal) {
-        Carrito c = carrito(user, gymId, canal);
-        if (c.getCartId() == null) {
-            c.setCartId(Ids.nuevo("cart"));
-            guardar(c);
-        }
-        return vista(c, List.of(), catalogo(gymId));
+        return conReintentos(() -> {
+            Carrito c = carrito(user, gymId, canal);
+            if (c.getCartId() == null) {
+                c.setCartId(Ids.nuevo("cart"));
+                guardar(c);
+            }
+            return vista(c, List.of(), catalogo(gymId));
+        });
     }
 
     public Map<String, Object> agregar(User user, String gymId, String canal, String varianteId, Integer cantidad) {
-        int piezas = cantidad == null ? 1 : cantidad;
-        if (varianteId == null || varianteId.isBlank()) {
-            throw new TiendaException(HttpStatus.BAD_REQUEST, "Elige qué presentación quieres.");
-        }
-        if (piezas < 1 || piezas > MAX_POR_PARTIDA) {
-            throw new TiendaException(HttpStatus.BAD_REQUEST, "Puedes llevar de 1 a " + MAX_POR_PARTIDA + " piezas.");
-        }
-        Map<String, Elegible> cat = catalogo(gymId);
-        Elegible e = cat.get(varianteId);
-        if (e == null) throw new TiendaException(HttpStatus.NOT_FOUND, "Ese producto ya no está a la venta.");
-        String titulo = e.producto().getNombre();
-
-        Carrito c = carrito(user, gymId, canal);
-        exigirLibre(c);
-        Carrito.Partida existente = partidaDeVariante(c, varianteId);
-        Optional<PlanPagado> plan = e.producto().esPlan() ? CatalogoService.plan(e.producto()) : Optional.empty();
-        if (e.producto().esPlan()) {
-            if (existente != null) {
-                throw new TiendaException(HttpStatus.CONFLICT, "«" + titulo + "» ya está en tu carrito.");
+        return conReintentos(() -> {
+            int piezas = cantidad == null ? 1 : cantidad;
+            if (varianteId == null || varianteId.isBlank()) {
+                throw new TiendaException(HttpStatus.BAD_REQUEST, "Elige qué presentación quieres.");
             }
-            piezas = 1;
-            if (plan.isPresent()) {
-                Carrito.Partida otro = planEnCarrito(c);
-                if (otro != null) {
-                    throw new TiendaException(HttpStatus.CONFLICT, "Solo puedes llevar un plan por compra. Quita «"
-                            + otro.getTitulo() + "» para elegir otro.");
+            if (piezas < 1 || piezas > MAX_POR_PARTIDA) {
+                throw new TiendaException(HttpStatus.BAD_REQUEST, "Puedes llevar de 1 a " + MAX_POR_PARTIDA + " piezas.");
+            }
+            Map<String, Elegible> cat = catalogo(gymId);
+            Elegible e = cat.get(varianteId);
+            if (e == null) throw new TiendaException(HttpStatus.NOT_FOUND, "Ese producto ya no está a la venta.");
+            String titulo = e.producto().getNombre();
+
+            Carrito c = carrito(user, gymId, canal);
+            exigirLibre(c);
+            Carrito.Partida existente = partidaDeVariante(c, varianteId);
+            Optional<PlanPagado> plan = e.producto().esPlan() ? CatalogoService.plan(e.producto()) : Optional.empty();
+            if (e.producto().esPlan()) {
+                if (existente != null) {
+                    throw new TiendaException(HttpStatus.CONFLICT, "«" + titulo + "» ya está en tu carrito.");
+                }
+                piezas = 1;
+                if (plan.isPresent()) {
+                    Carrito.Partida otro = planEnCarrito(c);
+                    if (otro != null) {
+                        throw new TiendaException(HttpStatus.CONFLICT, "Solo puedes llevar un plan por compra. Quita «"
+                                + otro.getTitulo() + "» para elegir otro.");
+                    }
                 }
             }
-        }
 
-        int total = piezas + (existente == null ? 0 : existente.getCantidad());
-        validarExistencias(e.variante(), total, titulo);
-        if (existente != null) {
-            existente.setCantidad(total);
-        } else {
-            Carrito.Partida x = new Carrito.Partida();
-            x.setId(Ids.nuevo("cali"));
-            x.setProductoId(e.producto().getId());
-            x.setVarianteId(varianteId);
-            x.setTitulo(titulo);
-            x.setVariante(e.variante().etiqueta());
-            x.setImagen(e.producto().getImagen());
-            x.setEsPlan(e.producto().esPlan());
-            // La duración viaja con la partida: el pedido la usa al activar la
-            // membresía aunque el plan se borre o cambie después.
-            plan.ifPresent(pl -> {
-                x.setDuracionUnidad(pl.unidad());
-                x.setDuracionCantidad(pl.cantidad());
-            });
-            x.setCantidad(piezas);
-            x.setPrecioUnitario(e.variante().getPrecio());
-            x.setAgregadoEn(Instant.now());
-            c.getItems().add(x);
-        }
-        if (c.getCartId() == null) c.setCartId(Ids.nuevo("cart"));
-        guardar(c);
-        return vista(c, List.of(), cat);
+            int total = piezas + (existente == null ? 0 : existente.getCantidad());
+            validarExistencias(e.variante(), total, titulo);
+            if (existente != null) {
+                existente.setCantidad(total);
+            } else {
+                Carrito.Partida x = new Carrito.Partida();
+                x.setId(Ids.nuevo("cali"));
+                x.setProductoId(e.producto().getId());
+                x.setVarianteId(varianteId);
+                x.setTitulo(titulo);
+                x.setVariante(e.variante().etiqueta());
+                x.setImagen(e.producto().getImagen());
+                x.setEsPlan(e.producto().esPlan());
+                // La duración viaja con la partida: el pedido la usa al activar la
+                // membresía aunque el plan se borre o cambie después.
+                plan.ifPresent(pl -> {
+                    x.setDuracionUnidad(pl.unidad());
+                    x.setDuracionCantidad(pl.cantidad());
+                });
+                x.setCantidad(piezas);
+                x.setPrecioUnitario(e.variante().getPrecio());
+                x.setAgregadoEn(Instant.now());
+                c.getItems().add(x);
+            }
+            if (c.getCartId() == null) c.setCartId(Ids.nuevo("cart"));
+            guardar(c);
+            return vista(c, List.of(), cat);
+        });
     }
 
     public Map<String, Object> cambiarCantidad(User user, String gymId, String canal, String partidaId, Integer cantidad) {
-        if (cantidad == null || cantidad <= 0) return quitar(user, gymId, canal, partidaId);
-        if (cantidad > MAX_POR_PARTIDA) {
-            throw new TiendaException(HttpStatus.BAD_REQUEST, "Puedes llevar hasta " + MAX_POR_PARTIDA + " piezas.");
-        }
-        Carrito c = exigirVigente(user, gymId, canal);
-        exigirLibre(c);
-        Carrito.Partida partida = exigirPartida(c, partidaId);
-        String titulo = partida.getTitulo();
-        if (partida.isEsPlan() && cantidad > 1) {
-            throw new TiendaException(HttpStatus.BAD_REQUEST, "Los planes se compran de uno en uno.");
-        }
-        Map<String, Elegible> cat = catalogo(gymId);
-        Elegible e = cat.get(partida.getVarianteId());
-        if (e == null) {
-            c.getItems().remove(partida);
+        return conReintentos(() -> {
+            if (cantidad == null || cantidad <= 0) return quitar(user, gymId, canal, partidaId);
+            if (cantidad > MAX_POR_PARTIDA) {
+                throw new TiendaException(HttpStatus.BAD_REQUEST, "Puedes llevar hasta " + MAX_POR_PARTIDA + " piezas.");
+            }
+            Carrito c = exigirVigente(user, gymId, canal);
+            exigirLibre(c);
+            Carrito.Partida partida = exigirPartida(c, partidaId);
+            String titulo = partida.getTitulo();
+            if (partida.isEsPlan() && cantidad > 1) {
+                throw new TiendaException(HttpStatus.BAD_REQUEST, "Los planes se compran de uno en uno.");
+            }
+            Map<String, Elegible> cat = catalogo(gymId);
+            Elegible e = cat.get(partida.getVarianteId());
+            if (e == null) {
+                c.getItems().remove(partida);
+                guardar(c);
+                throw new TiendaException(HttpStatus.CONFLICT, "Quitamos «" + titulo + "» porque ya no está a la venta.",
+                        Map.of("carrito", vista(c, List.of(), cat)));
+            }
+            validarExistencias(e.variante(), cantidad, titulo);
+            partida.setCantidad(cantidad);
             guardar(c);
-            throw new TiendaException(HttpStatus.CONFLICT, "Quitamos «" + titulo + "» porque ya no está a la venta.",
-                    Map.of("carrito", vista(c, List.of(), cat)));
-        }
-        validarExistencias(e.variante(), cantidad, titulo);
-        partida.setCantidad(cantidad);
-        guardar(c);
-        return vista(c, List.of(), cat);
+            return vista(c, List.of(), cat);
+        });
     }
 
     public Map<String, Object> quitar(User user, String gymId, String canal, String partidaId) {
-        Carrito c = exigirVigente(user, gymId, canal);
-        exigirLibre(c);
-        c.getItems().remove(exigirPartida(c, partidaId));
-        guardar(c);
-        return vista(c, List.of(), catalogo(gymId));
+        return conReintentos(() -> {
+            Carrito c = exigirVigente(user, gymId, canal);
+            exigirLibre(c);
+            c.getItems().remove(exigirPartida(c, partidaId));
+            guardar(c);
+            return vista(c, List.of(), catalogo(gymId));
+        });
     }
 
     // Deja el carrito vacío: el siguiente producto abre uno nuevo.
     public Map<String, Object> vaciar(User user, String gymId, String canal) {
-        Carrito c = carrito(user, gymId, canal);
-        exigirLibre(c);
-        if (c.getCartId() != null || !c.getItems().isEmpty()) {
-            c.setCartId(null);
-            c.getItems().clear();
-            guardar(c);
-        }
-        return vistaVacia(gymId, c.getCanal());
+        return conReintentos(() -> {
+            Carrito c = carrito(user, gymId, canal);
+            exigirLibre(c);
+            if (c.getCartId() != null || !c.getItems().isEmpty()) {
+                c.setCartId(null);
+                c.getItems().clear();
+                guardar(c);
+            }
+            return vistaVacia(gymId, c.getCanal());
+        });
     }
 
     // Cobra el carrito con el método elegido y devuelve el pedido ya guardado.
@@ -440,6 +456,33 @@ public class CarritoService {
         Carrito c = carrito(user, gymId, canal);
         if (c.getCartId() == null) throw new TiendaException(HttpStatus.NOT_FOUND, "Tu carrito está vacío.");
         return c;
+    }
+
+    // Dos sesiones que cambian el mismo carrito a la vez: la que llega segunda
+    // choca con la versión (o, si las dos lo estaban creando, con el índice
+    // único) y se repite leyendo lo más reciente, así ningún cambio se pierde.
+    // La espera al azar entre intentos evita que choquen otra vez juntas.
+    private static final int MAX_REINTENTOS = 6;
+
+    private static void esperar(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static <T> T conReintentos(Supplier<T> cambio) {
+        for (int intento = 1; ; intento++) {
+            try {
+                return cambio.get();
+            } catch (OptimisticLockingFailureException | DuplicateKeyException e) {
+                if (intento >= MAX_REINTENTOS) {
+                    throw new TiendaException(HttpStatus.CONFLICT, "Tu carrito cambió en otra sesión. Intenta de nuevo.");
+                }
+                esperar(ThreadLocalRandom.current().nextLong(5, 20L * intento));
+            }
+        }
     }
 
     // ═══════════════════════════ CANDADO DE COBRO ═══════════════════════════
