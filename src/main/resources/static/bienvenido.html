@@ -2303,7 +2303,7 @@
         /* ═══════════════════════════════════════
            VENTAS — /api/gyms/{id}/ventas
            KPIs, gráficas, la lista de pedidos con filtros y el detalle con sus
-           acciones (simular el pago Paynet, reembolsar, cancelar). Todo sale de
+           acciones (simular el pago Paynet, cancelar). Todo sale de
            la colección de pedidos.
         ═══════════════════════════════════════ */
         const COLORES_VENTAS = ['#f45124', '#20221f', '#8a8c82', '#f2a541', '#5b8def'];
@@ -2596,7 +2596,6 @@
                     <div class="d-flex justify-content-between small text-body-secondary"><span>IVA 16 %</span><span>${dinero(d.iva)}</span></div>
                     <div class="d-flex justify-content-between fw-bold"><span>Total</span><span>${dinero(d.total)}</span></div>
                 </div>
-                ${d.planAplicado && d.estado === 'pagado' ? '<div class="alert alert-light border small py-2 mt-3 mb-0"><i class="bx bx-purchase-tag-alt"></i> Este pedido extendió una membresía. Si lo reembolsas, la membresía vuelve a su fecha anterior.</div>' : ''}
                 ${d.fichaVencida ? '<div class="alert alert-warning small py-2 mt-3 mb-0">La ficha ya venció: el pedido se cancelará solo en unos minutos.</div>' : ''}`;
 
             const a = d.acciones;
@@ -2605,7 +2604,6 @@
                 a.recibo && ['recibo', 'btn-outline-primary', 'bx-receipt', 'Recibo (PDF)'],
                 a.ficha && ['ficha', 'btn-outline-primary', 'bx-barcode', 'Ficha Paynet (PDF)'],
                 a.reenviar && ['reenviar', 'btn-outline-secondary', 'bx-envelope', 'Reenviar correo'],
-                a.reembolsar && ['reembolsar', 'btn-outline-danger', 'bx-undo', 'Reembolsar'],
                 a.cancelar && ['cancelar', 'btn-outline-danger', 'bx-x-circle', 'Cancelar pedido']
             ].filter(Boolean);
             document.getElementById('venta-detalle-acciones').innerHTML = botones.map(([accion, clase, icono, texto]) =>
@@ -2627,15 +2625,11 @@
                     .catch(err => { if (ventana) ventana.close(); avisoVenta(err.message, 'danger'); });
                 return;
             }
-            const cliente = d.clienteNombre || 'Público en general';
-            if (accion === 'reembolsar' && !confirm('¿Reembolsar ' + dinero(d.total) + ' a ' + cliente + '?\n\nEs un reembolso simulado: no se mueve dinero real. Los productos no regresan al inventario'
-                    + (d.planAplicado ? ' y la membresía vuelve a su fecha anterior' : '') + '.')) return;
             if (accion === 'cancelar' && !confirm('¿Cancelar el pedido #' + d.folio + '? La ficha deja de servir y se libera lo apartado.')) return;
 
             const rutas = {
                 reenviar: '/api/recibos/pedidos/' + encodeURIComponent(d.orderId) + '/enviar',
                 simular: '/api/simuladores/paynet/' + encodeURIComponent(d.orderId) + '/pagar',
-                reembolsar: rutaVenta(d.orderId) + '/reembolsar',
                 cancelar: rutaVenta(d.orderId) + '/cancelar'
             };
             const original = boton.innerHTML;
@@ -2657,7 +2651,7 @@
                         avisoVenta(mensajeDeAccion(accion, r), 'success');
                         cargarVentas();
                         const gymId = localStorage.getItem('gymId');
-                        if (accion === 'simular' || r.membresia) { loadMembers(gymId); loadBilling(gymId); }
+                        if (accion === 'simular') { loadMembers(gymId); loadBilling(gymId); }
                     });
                 })
                 .catch(err => {
@@ -2669,14 +2663,7 @@
 
         function mensajeDeAccion(accion, r) {
             if (accion === 'simular') return 'Pago en tienda simulado: el pedido quedó pagado.';
-            if (accion === 'cancelar') return 'Pedido cancelado.';
-            let texto = 'Reembolso simulado listo.';
-            if (r.membresia && r.membresia.ajustada) {
-                texto += ' La membresía de ' + r.membresia.miembro + ' vuelve a vencer el ' + diaLargo(r.membresia.vence) + '.';
-            } else if (r.membresia) {
-                texto += ' La membresía de ' + r.membresia.miembro + ' no se movió porque tiene pagos posteriores: revísala en Membresías y Pagos.';
-            }
-            return texto;
+            return 'Pedido cancelado.';
         }
 
         function avisoVenta(mensaje, tipo) {
@@ -2708,10 +2695,6 @@
 
         function diaCorto(iso) {
             return new Date(iso + 'T12:00:00Z').toLocaleDateString('es-MX', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-        }
-
-        function diaLargo(iso) {
-            return new Date(iso + 'T12:00:00Z').toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
         }
 
         function fechaHoraVenta(instante) {
