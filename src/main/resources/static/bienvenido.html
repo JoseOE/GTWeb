@@ -2365,7 +2365,9 @@
                     </div>
                 </div>`).join('');
 
-            document.getElementById('ventas-periodo-texto').textContent = (r.desde === r.hasta ? diaCorto(r.hasta) : 'Del ' + diaCorto(r.desde) + ' al ' + diaCorto(r.hasta))
+            // Con 12 meses el periodo cruza de año: "Del 15 oct 2025 al 14 oct 2026".
+            const fecha = r.desde.slice(0, 4) === r.hasta.slice(0, 4) ? diaCorto : diaConAnio;
+            document.getElementById('ventas-periodo-texto').textContent = (r.desde === r.hasta ? diaCorto(r.hasta) : 'Del ' + fecha(r.desde) + ' al ' + fecha(r.hasta))
                 + ' · ' + dinero(r.periodo.total) + ' en ' + textoPedidos(r.periodo.pedidos);
             pintarBarrasVentas(document.getElementById('ventas-top'), r.topProductos.map(p => ({
                 nombre: p.titulo, total: p.total,
@@ -2647,6 +2649,10 @@
 
         function diaCorto(iso) {
             return new Date(iso + 'T12:00:00Z').toLocaleDateString('es-MX', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+        }
+
+        function diaConAnio(iso) {
+            return new Date(iso + 'T12:00:00Z').toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
         }
 
         function fechaHoraVenta(instante) {
