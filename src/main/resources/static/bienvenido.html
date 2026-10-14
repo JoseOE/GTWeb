@@ -546,19 +546,29 @@
 
                 <div class="row g-3 mb-4" id="ventas-kpis"></div>
 
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                    <span class="small fw-semibold text-body-secondary me-1" id="ventas-periodo-etiqueta">Periodo</span>
+                    <div class="ventas-periodos" role="radiogroup" aria-labelledby="ventas-periodo-etiqueta" id="ventas-periodo">
+                        <input type="radio" class="btn-check" name="ventas-periodo" id="ventas-p1" value="1" autocomplete="off">
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="ventas-p1">Hoy</label>
+                        <input type="radio" class="btn-check" name="ventas-periodo" id="ventas-p7" value="7" autocomplete="off">
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="ventas-p7">7 días</label>
+                        <input type="radio" class="btn-check" name="ventas-periodo" id="ventas-p30" value="30" autocomplete="off" checked>
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="ventas-p30">30 días</label>
+                        <input type="radio" class="btn-check" name="ventas-periodo" id="ventas-p90" value="90" autocomplete="off">
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="ventas-p90">90 días</label>
+                        <input type="radio" class="btn-check" name="ventas-periodo" id="ventas-p365" value="365" autocomplete="off">
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="ventas-p365">12 meses</label>
+                    </div>
+                    <small class="text-body-secondary" id="ventas-periodo-texto" aria-live="polite"></small>
+                </div>
+
                 <div class="row g-3 mb-4">
                     <div class="col-lg-8">
                         <div class="dash-empty text-start p-0 overflow-hidden h-100">
-                            <div class="p-4 pb-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
-                                <div>
-                                    <h4 class="fw-bold mb-0 fs-6">Ventas por día</h4>
-                                    <small class="text-body-secondary" id="ventas-periodo-texto"></small>
-                                </div>
-                                <select class="form-select form-select-sm w-auto" id="ventas-periodo" aria-label="Periodo de las gráficas">
-                                    <option value="7">Últimos 7 días</option>
-                                    <option value="30" selected>Últimos 30 días</option>
-                                    <option value="90">Últimos 90 días</option>
-                                </select>
+                            <div class="p-4 pb-2">
+                                <h4 class="fw-bold mb-0 fs-6">Ventas por día</h4>
+                                <small class="text-body-secondary">En el periodo</small>
                             </div>
                             <div class="px-3 pb-3"><div class="ventas-grafica" id="ventas-dias"></div></div>
                         </div>
@@ -593,54 +603,8 @@
 
                 <div class="dash-empty text-start p-0 overflow-hidden">
                     <div class="p-4 border-bottom">
-                        <h4 class="fw-bold mb-3 fs-6">Pedidos</h4>
-                        <form class="row g-2 align-items-end" id="ventas-filtros" role="search" aria-label="Filtrar pedidos">
-                            <div class="col-12 col-lg-6">
-                                <label for="ventas-buscar" class="form-label small text-body-secondary mb-1">Buscar</label>
-                                <input type="search" class="form-control form-control-sm" id="ventas-buscar" placeholder="Folio, cliente o correo">
-                            </div>
-                            <div class="col-6 col-lg-3">
-                                <label for="ventas-f-desde" class="form-label small text-body-secondary mb-1">Desde</label>
-                                <input type="date" class="form-control form-control-sm" id="ventas-f-desde">
-                            </div>
-                            <div class="col-6 col-lg-3">
-                                <label for="ventas-f-hasta" class="form-label small text-body-secondary mb-1">Hasta</label>
-                                <input type="date" class="form-control form-control-sm" id="ventas-f-hasta">
-                            </div>
-                            <div class="col-6 col-lg-3">
-                                <label for="ventas-f-metodo" class="form-label small text-body-secondary mb-1">Forma de pago</label>
-                                <select class="form-select form-select-sm" id="ventas-f-metodo">
-                                    <option value="">Todas</option>
-                                    <option value="tarjeta">Tarjeta</option>
-                                    <option value="paypal">PayPal</option>
-                                    <option value="paynet">Paynet</option>
-                                    <option value="efectivo">Efectivo</option>
-                                </select>
-                            </div>
-                            <div class="col-6 col-lg-3">
-                                <label for="ventas-f-estado" class="form-label small text-body-secondary mb-1">Estado</label>
-                                <select class="form-select form-select-sm" id="ventas-f-estado">
-                                    <option value="">Todos</option>
-                                    <option value="pagado">Pagado</option>
-                                    <option value="pendiente_pago">Pendiente de pago</option>
-                                    <option value="cancelado">Cancelado</option>
-                                    <option value="reembolsado">Reembolsado</option>
-                                </select>
-                            </div>
-                            <div class="col-6 col-lg-3">
-                                <label for="ventas-f-canal" class="form-label small text-body-secondary mb-1">Canal</label>
-                                <select class="form-select form-select-sm" id="ventas-f-canal">
-                                    <option value="">Todos</option>
-                                    <option value="web">Página web</option>
-                                    <option value="app">App</option>
-                                    <option value="mostrador">Mostrador</option>
-                                </select>
-                            </div>
-                            <div class="col-6 col-lg-3">
-                                <button type="reset" class="btn btn-outline-secondary btn-sm w-100">Limpiar filtros</button>
-                            </div>
-                        </form>
-                        <small class="text-body-secondary d-block mt-3" id="ventas-conteo" aria-live="polite"></small>
+                        <h4 class="fw-bold mb-0 fs-6">Pedidos</h4>
+                        <small class="text-body-secondary d-block" id="ventas-conteo" aria-live="polite"></small>
                     </div>
                     <div class="table-responsive">
                         <table class="table dash-table mb-0">
@@ -2302,7 +2266,7 @@
 
         /* ═══════════════════════════════════════
            VENTAS — /api/gyms/{id}/ventas
-           KPIs, gráficas, la lista de pedidos con filtros y el detalle con sus
+           KPIs, gráficas y la lista de pedidos del periodo elegido, y el detalle con sus
            acciones (simular el pago Paynet, cancelar). Todo sale de
            la colección de pedidos.
         ═══════════════════════════════════════ */
@@ -2321,25 +2285,12 @@
         let chartJsCargando = null;
 
         function initVentas() {
-            const filtros = document.getElementById('ventas-filtros');
             const detalleModal = new bootstrap.Modal(document.getElementById('ventaDetalleModal'));
-            let busqueda = null;
 
             document.getElementById('tab-ventas').addEventListener('click', cargarVentas);
             document.getElementById('ventas-actualizar').addEventListener('click', cargarVentas);
-            document.getElementById('ventas-periodo').addEventListener('change', cargarResumenVentas);
-            filtros.addEventListener('submit', (e) => e.preventDefault());
-            filtros.addEventListener('change', (e) => {
-                if (e.target.id === 'ventas-buscar') return;
-                ventasPagina = 0;
-                cargarPedidosVentas();
-            });
-            filtros.addEventListener('input', (e) => {
-                if (e.target.id !== 'ventas-buscar') return;
-                clearTimeout(busqueda);
-                busqueda = setTimeout(() => { ventasPagina = 0; cargarPedidosVentas(); }, 300);
-            });
-            filtros.addEventListener('reset', () => setTimeout(() => { ventasPagina = 0; cargarPedidosVentas(); }));
+            // El periodo manda en las gráficas y en la lista de pedidos.
+            document.getElementById('ventas-periodo').addEventListener('change', () => { ventasPagina = 0; cargarVentas(); });
             document.getElementById('ventas-anterior').addEventListener('click', () => { ventasPagina--; cargarPedidosVentas(); });
             document.getElementById('ventas-siguiente').addEventListener('click', () => { ventasPagina++; cargarPedidosVentas(); });
 
@@ -2369,6 +2320,14 @@
             cargarPedidosVentas();
         }
 
+        // Fechas del periodo elegido (hora de México), de hoy hacia atrás.
+        function periodoVentas() {
+            const elegido = document.querySelector('input[name="ventas-periodo"]:checked');
+            const dias = Number(elegido ? elegido.value : 30);
+            const hasta = fechaMx(new Date());
+            return { dias, desde: sumarDias(hasta, 1 - dias), hasta };
+        }
+
         // ─── Resumen: KPIs y gráficas ───
         function cargarResumenVentas() {
             const gymId = localStorage.getItem('gymId');
@@ -2377,9 +2336,7 @@
                 kpis.innerHTML = '<div class="col-12">' + avisoSinGimnasio('Configura primero "Mi Gimnasio" para ver tus ventas.', 'bx-line-chart') + '</div>';
                 return;
             }
-            const dias = Number(document.getElementById('ventas-periodo').value);
-            const hasta = fechaMx(new Date());
-            const desde = sumarDias(hasta, 1 - dias);
+            const { desde, hasta } = periodoVentas();
             kpis.innerHTML = '<div class="col-12" id="ventas-kpis-estado"></div>';
             estadoCargando(document.getElementById('ventas-kpis-estado'), 'Cargando tus ventas…');
             apiTienda('/api/gyms/' + gymId + '/ventas/resumen?desde=' + desde + '&hasta=' + hasta)
@@ -2408,7 +2365,7 @@
                     </div>
                 </div>`).join('');
 
-            document.getElementById('ventas-periodo-texto').textContent = 'Del ' + diaCorto(r.desde) + ' al ' + diaCorto(r.hasta)
+            document.getElementById('ventas-periodo-texto').textContent = (r.desde === r.hasta ? diaCorto(r.hasta) : 'Del ' + diaCorto(r.desde) + ' al ' + diaCorto(r.hasta))
                 + ' · ' + dinero(r.periodo.total) + ' en ' + textoPedidos(r.periodo.pedidos);
             pintarBarrasVentas(document.getElementById('ventas-top'), r.topProductos.map(p => ({
                 nombre: p.titulo, total: p.total,
@@ -2522,26 +2479,21 @@
                 tbody.innerHTML = '<tr><td colspan="6" class="text-center text-body-secondary py-5 px-4">Configura primero "Mi Gimnasio".</td></tr>';
                 return;
             }
-            const params = new URLSearchParams();
-            let conFiltros = false;
-            [['buscar', 'ventas-buscar'], ['metodo', 'ventas-f-metodo'], ['estado', 'ventas-f-estado'], ['canal', 'ventas-f-canal'],
-             ['desde', 'ventas-f-desde'], ['hasta', 'ventas-f-hasta']].forEach(([clave, id]) => {
-                const valor = document.getElementById(id).value.trim();
-                if (valor) { params.set(clave, valor); conFiltros = true; }
-            });
+            const { desde, hasta } = periodoVentas();
+            const params = new URLSearchParams({ desde, hasta });
             params.set('pagina', ventasPagina);
             params.set('tamano', 15);
             const turno = ++ventasTurno;
             tbody.innerHTML = '<tr><td colspan="6" class="text-center text-body-secondary py-4"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Cargando pedidos…</td></tr>';
             apiTienda('/api/gyms/' + gymId + '/ventas/pedidos?' + params)
-                .then(r => { if (turno === ventasTurno) pintarPedidosVentas(r, conFiltros); })
+                .then(r => { if (turno === ventasTurno) pintarPedidosVentas(r); })
                 .catch(err => {
                     if (turno !== ventasTurno) return;
                     tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4 px-4">' + escapeHtml(err.message) + '</td></tr>';
                 });
         }
 
-        function pintarPedidosVentas(r, conFiltros) {
+        function pintarPedidosVentas(r) {
             document.getElementById('ventas-conteo').textContent = r.total
                 ? (r.total === 1 ? '1 pedido' : r.total + ' pedidos') + ' · cobrado ' + dinero(r.cobrado)
                 : '';
@@ -2559,7 +2511,7 @@
                         <td class="pe-4 text-end fw-semibold text-nowrap">${dinero(v.total)}</td>
                     </tr>`).join('')
                 : '<tr><td colspan="6" class="text-center text-body-secondary py-5 px-4"><i class="bx bx-receipt fs-1 d-block mb-2 opacity-50"></i>'
-                    + (conFiltros ? 'Ningún pedido coincide con los filtros.' : 'Todavía no hay pedidos. Aparecen aquí al vender en la tienda, la app o el mostrador.') + '</td></tr>';
+                    + 'No hay pedidos en este periodo. Aparecen aquí al vender en la tienda, la app o el mostrador.</td></tr>';
             const paginacion = document.getElementById('ventas-paginacion');
             paginacion.classList.toggle('d-none', r.paginas <= 1);
             document.getElementById('ventas-pagina').textContent = 'Página ' + (r.pagina + 1) + ' de ' + r.paginas;
