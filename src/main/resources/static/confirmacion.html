@@ -69,7 +69,18 @@
                         <p class="text-body-secondary mb-1">${Tienda.escapar(enc.texto)}</p>
                         <div class="titulo-display mt-2">Pedido #${Tienda.escapar(p.folio)}</div>
                         <span class="estado-pedido ${Tienda.escapar(p.estado)} mt-2">${Tienda.escapar(p.estadoTexto)}</span>
+                        ${Tienda.insigniaEntrega(p) ? '<div class="mt-2">' + Tienda.insigniaEntrega(p) + '</div>' : ''}
                     </div>
+                    ${p.entrega && p.entrega.estado === 'pendiente' ? `
+                        <section class="paso mt-4 recoger" aria-labelledby="recoger-titulo">
+                            <h2 class="seccion-titulo fs-5 mb-1" id="recoger-titulo">Recoge tus productos</h2>
+                            <p class="small text-body-secondary mb-3">Muestra este código en la recepción de ${Tienda.escapar(gym.nombre || 'tu gimnasio')}. También viene en tu comprobante en PDF.</p>
+                            <img class="recoger-qr" id="recoger-qr" alt="Código QR del pedido #${Tienda.escapar(p.folio)}" width="220" height="220">
+                            <div class="titulo-display mt-2">#${Tienda.escapar(p.folio)}</div>
+                        </section>` : ''}
+                    ${p.entrega && p.entrega.estado === 'entregado' && p.canal !== 'mostrador'
+                        ? '<div class="aviso-tienda mt-4" role="status"><i class="bx bx-check-double fs-4 text-success" aria-hidden="true"></i><span>Recogiste tus productos el <strong>' + Tienda.escapar(new Date(p.entrega.entregadoEn).toLocaleString("es-MX", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })) + '</strong>.</span></div>'
+                        : ''}
                     ${conPlan && p.estado === 'pagado' && cuenta && cuenta.fechaProximoPago
                         ? '<div class="aviso-tienda mt-4" role="status"><i class="bx bx-check-circle fs-4 text-success" aria-hidden="true"></i><span>Tu membresía quedó activa hasta el <strong>' + Tienda.fecha(cuenta.fechaProximoPago + 'T12:00:00') + '</strong>.</span></div>'
                         : ''}
@@ -103,6 +114,8 @@
                         <a class="btn btn-link tocable" href="tienda.html">Seguir comprando</a>
                     </div>`;
 
+                const qr = document.getElementById('recoger-qr');
+                if (qr) Tienda.cargarQrEntrega(p.orderId, qr);
                 document.getElementById('recibo')?.addEventListener('click', (e) => Tienda.descargarRecibo(p.orderId, p.folio, e.currentTarget));
                 document.getElementById('actualizar')?.addEventListener('click', (e) => {
                     e.currentTarget.disabled = true;

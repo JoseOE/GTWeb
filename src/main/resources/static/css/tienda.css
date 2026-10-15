@@ -1129,3 +1129,28 @@ body.con-barra-carrito {
 .opcion-compartir .bx { font-size: 20px; }
 .icono-whatsapp { color: #128c4b; }
 .compartir-grande .dropdown-menu { width: 100%; }
+
+/* ─── Recoger en recepción (Tienda.insigniaEntrega y la confirmación) ─── */
+.estado-entrega {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 2px 10px;
+}
+.estado-entrega.pendiente { background: #e3edfb; color: #1d4f91; }
+.estado-entrega.entregado { background: #e8e6dc; color: var(--muted); }
+.recoger { text-align: center; }
+.recoger-qr {
+    display: block;
+    width: 220px;
+    max-width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    margin: 0 auto;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+}

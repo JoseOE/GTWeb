@@ -9,6 +9,7 @@
    - Pie con quién vende (los datos del vendedor del gimnasio) y los enlaces a
      los términos de compra y al aviso de privacidad.
    - Compartir el comprobante: WhatsApp, correo o el menú del celular.
+   - Recoger en recepción: si el pedido está por recoger o ya se entregó, y su QR.
    El carrito vive en el servidor (es el mismo en cualquier dispositivo);
    localStorage solo guarda el último contador para pintarlo al instante.
 ═══════════════════════════════════════ */
@@ -338,6 +339,27 @@ const Tienda = (() => {
             .finally(() => { if (boton) boton.disabled = false; });
     }
 
+    /* ─── Recoger en recepción ───
+       Lo que se compra en línea se recoge en el gimnasio: el miembro muestra el
+       QR del pedido y el dueño lo escanea en Ventas → "Entregar pedido". */
+    function insigniaEntrega(p) {
+        const e = p.entrega || {};
+        if (e.estado === 'pendiente') return '<span class="estado-entrega pendiente"><i class="bx bx-package" aria-hidden="true"></i> Por recoger</span>';
+        if (e.estado === 'entregado' && p.canal !== 'mostrador') return '<span class="estado-entrega entregado"><i class="bx bx-check-double" aria-hidden="true"></i> Entregado</span>';
+        return '';
+    }
+
+    // Pinta en <img> el QR del pedido (GET /api/recibos/pedidos/{id}/qr.png con X-User-Id).
+    function cargarQrEntrega(orderId, img) {
+        return fetch('/api/recibos/pedidos/' + encodeURIComponent(orderId) + '/qr.png', { headers: { 'X-User-Id': sesion.userId } })
+            .then(res => {
+                if (!res.ok) throw new Error('No se pudo mostrar el código.');
+                return res.blob();
+            })
+            .then(blob => { img.src = URL.createObjectURL(blob); })
+            .catch(() => { img.replaceWith(Object.assign(document.createElement('p'), { className: 'small text-body-secondary', textContent: 'No se pudo mostrar el código. Da tu folio en recepción o abre el comprobante en PDF.' })); });
+    }
+
     /* ─── Compartir el comprobante ───
        - WhatsApp: el servidor da un enlace temporal (7 días) al PDF y se abre
          wa.me con el mensaje listo; desde una página de escritorio WhatsApp no
@@ -481,7 +503,7 @@ const Tienda = (() => {
     return {
         sesion, escapar, dinero, fecha, exigirSesion, api, cuenta, puedeComprar, montar,
         cargarCarrito, agregar, cambiar, quitar, abrirCarrito, avisar, descargarRecibo, pintarEstado,
-        menuCompartir, compartirRecibo,
+        menuCompartir, compartirRecibo, insigniaEntrega, cargarQrEntrega,
         get carrito() { return carrito; }
     };
 })();
