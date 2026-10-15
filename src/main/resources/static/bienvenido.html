@@ -2616,6 +2616,7 @@
                 a.simularPaynet && ['simular', 'btn-primary', 'bx-store', 'Simular pago en tienda'],
                 a.recibo && ['recibo', 'btn-outline-primary', 'bx-receipt', 'Recibo (PDF)'],
                 a.ficha && ['ficha', 'btn-outline-primary', 'bx-barcode', 'Ficha de pago (PDF)'],
+                (a.recibo || a.ficha) && ['whatsapp', 'btn-outline-success', 'bxl-whatsapp', 'WhatsApp'],
                 a.reenviar && ['reenviar', 'btn-outline-secondary', 'bx-envelope', 'Reenviar correo'],
                 a.cancelar && ['cancelar', 'btn-outline-danger', 'bx-x-circle', 'Cancelar pedido']
             ].filter(Boolean);
@@ -2643,6 +2644,18 @@
                     .then(res => res.ok ? res.blob() : res.json().catch(() => ({})).then(b => { throw new Error(b.error || 'No se pudo generar el PDF.'); }))
                     .then(blob => { if (ventana) ventana.location = URL.createObjectURL(blob); })
                     .catch(err => { if (ventana) ventana.close(); avisoVenta(err.message, 'danger'); });
+                return;
+            }
+            if (accion === 'whatsapp') {
+                // Enlace temporal (7 días) al comprobante o a la ficha, con el
+                // mensaje listo; la persona elige a quién mandarlo en WhatsApp.
+                const pestana = window.open('', '_blank');
+                apiTienda('/api/recibos/pedidos/' + encodeURIComponent(d.orderId) + '/enlace', { method: 'POST' })
+                    .then(r => {
+                        const url = 'https://wa.me/?text=' + encodeURIComponent(r.texto);
+                        if (pestana) { pestana.opener = null; pestana.location.href = url; } else { location.href = url; }
+                    })
+                    .catch(err => { if (pestana) pestana.close(); avisoVenta(err.message, 'danger'); });
                 return;
             }
             if (accion === 'cancelar' && !confirm('¿Cancelar el pedido #' + d.folio + '? La ficha deja de servir y se libera lo apartado.')) return;

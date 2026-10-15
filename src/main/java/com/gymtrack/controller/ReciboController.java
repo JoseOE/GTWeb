@@ -9,6 +9,7 @@ import com.gymtrack.repository.PaymentRepository;
 import com.gymtrack.repository.PedidoRepository;
 import com.gymtrack.service.AccesoService;
 import com.gymtrack.service.AvisosPedidoService;
+import com.gymtrack.service.EnlaceReciboService;
 import com.gymtrack.service.PedidoService;
 import com.gymtrack.service.ReciboService;
 import com.gymtrack.service.TiendaException;
@@ -39,10 +40,11 @@ public class ReciboController {
     private final PaymentRepository paymentRepository;
     private final GymRepository gymRepository;
     private final AccesoService acceso;
+    private final EnlaceReciboService enlaces;
 
     public ReciboController(ReciboService recibos, AvisosPedidoService avisos, PedidoService pedidoService,
                             PedidoRepository pedidoRepository, PaymentRepository paymentRepository,
-                            GymRepository gymRepository, AccesoService acceso) {
+                            GymRepository gymRepository, AccesoService acceso, EnlaceReciboService enlaces) {
         this.recibos = recibos;
         this.avisos = avisos;
         this.pedidoService = pedidoService;
@@ -50,6 +52,7 @@ public class ReciboController {
         this.paymentRepository = paymentRepository;
         this.gymRepository = gymRepository;
         this.acceso = acceso;
+        this.enlaces = enlaces;
     }
 
     // GET /api/recibos/pedidos/{orderId}.pdf → recibo tamaño carta;
@@ -108,6 +111,21 @@ public class ReciboController {
     public Map<String, Object> reenviarPago(@PathVariable String paymentId,
                                             @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
         return respuestaEnvio(avisos.enviarReciboDePago(pago(paymentId, userId)));
+    }
+
+    // POST /api/recibos/pedidos/{orderId}/enlace → enlace temporal (7 días) al
+    // comprobante o a la ficha, con el mensaje listo para WhatsApp.
+    @PostMapping("/pedidos/{orderId}/enlace")
+    public Map<String, Object> enlacePedido(@PathVariable String orderId,
+                                            @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
+        return enlaces.crear(pedido(orderId, userId), userId);
+    }
+
+    // GET /api/recibos/compartidos/{token}.pdf → lo abre quien recibió el enlace, sin sesión.
+    @GetMapping("/compartidos/{token}.pdf")
+    public ResponseEntity<byte[]> compartido(@PathVariable String token) {
+        EnlaceReciboService.Archivo archivo = enlaces.abrir(token);
+        return pdf(archivo.pdf(), archivo.nombre());
     }
 
     private Pedido pedido(String orderId, String userId) {

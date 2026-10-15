@@ -8,6 +8,7 @@
      celular y la notificación de "Agregado".
    - Pie con quién vende (los datos del vendedor del gimnasio) y los enlaces a
      los términos de compra y al aviso de privacidad.
+   - Compartir el comprobante: WhatsApp, correo o el menú del celular.
    El carrito vive en el servidor (es el mismo en cualquier dispositivo);
    localStorage solo guarda el último contador para pintarlo al instante.
 ═══════════════════════════════════════ */
@@ -337,6 +338,99 @@ const Tienda = (() => {
             .finally(() => { if (boton) boton.disabled = false; });
     }
 
+    /* ─── Compartir el comprobante ───
+       - WhatsApp: el servidor da un enlace temporal (7 días) al PDF y se abre
+         wa.me con el mensaje listo; desde una página de escritorio WhatsApp no
+         recibe archivos, pero sí enlaces.
+       - Correo: se reenvía al correo de quien compró.
+       - Más opciones: el menú de compartir del celular con el PDF adjunto (Web
+         Share API), solo donde el navegador puede compartir archivos.
+       Un pedido pendiente de pago en tienda comparte su ficha; uno pagado, su
+       comprobante. */
+    function puedeCompartirArchivos() {
+        try {
+            return !!(navigator.canShare && navigator.canShare({ files: [new File([''], 'comprobante.pdf', { type: 'application/pdf' })] }));
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function menuCompartir(p, clases) {
+        const datos = ' data-pedido="' + escapar(p.orderId) + '" data-folio="' + escapar(p.folio) + '"'
+            + (p.estado === 'pendiente_pago' ? ' data-ficha="1"' : '');
+        const opcion = (via, icono, texto) => '<li><button type="button" class="dropdown-item opcion-compartir" data-compartir="' + via + '"' + datos + '>'
+            + '<i class="bx ' + icono + '" aria-hidden="true"></i> ' + texto + '</button></li>';
+        return '<div class="dropdown">'
+            + '<button type="button" class="' + (clases || 'btn btn-outline-primary tocable px-3') + ' dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">'
+            + '<i class="bx bx-share-alt" aria-hidden="true"></i> Compartir</button>'
+            + '<ul class="dropdown-menu dropdown-menu-end">'
+            + opcion('whatsapp', 'bxl-whatsapp icono-whatsapp', 'WhatsApp')
+            + opcion('correo', 'bx-envelope', 'Enviar a mi correo')
+            + (puedeCompartirArchivos() ? opcion('sistema', 'bx-dots-horizontal-rounded', 'Más opciones…') : '')
+            + '</ul></div>';
+    }
+
+    function pdfDelPedido(orderId, ficha) {
+        const ruta = ficha ? '/api/recibos/paynet/' : '/api/recibos/pedidos/';
+        return fetch(ruta + encodeURIComponent(orderId) + '.pdf', { headers: { 'X-User-Id': sesion.userId } })
+            .then(res => {
+                if (!res.ok) throw new Error('No se pudo preparar el comprobante. Intenta de nuevo.');
+                return res.blob();
+            });
+    }
+
+    function compartirRecibo(via, orderId, folio, ficha, boton) {
+        const ruta = '/api/recibos/pedidos/' + encodeURIComponent(orderId);
+        const listo = () => { if (boton) boton.disabled = false; };
+        if (boton) boton.disabled = true;
+        if (via === 'correo') {
+            return api(ruta + '/enviar', { method: 'POST' })
+                .then(r => avisar(r.enviado ? (ficha ? 'Te enviamos la ficha a tu correo.' : 'Te enviamos el comprobante a tu correo.') : r.message))
+                .catch(err => avisar(err.message))
+                .finally(listo);
+        }
+        if (via === 'sistema') {
+            const nombre = (ficha ? 'ficha-pago-' : 'recibo-') + (folio || orderId) + '.pdf';
+            return pdfDelPedido(orderId, ficha)
+                .then(blob => navigator.share({
+                    files: [new File([blob], nombre, { type: 'application/pdf' })],
+                    title: (ficha ? 'Ficha de pago del pedido #' : 'Comprobante del pedido #') + (folio || '')
+                }))
+                .catch(err => {
+                    if (err.name === 'AbortError') return;
+                    avisar(err.name === 'NotAllowedError'
+                        ? 'Tu navegador no dejó compartir el archivo. Descárgalo y compártelo desde tus archivos.'
+                        : err.message);
+                })
+                .finally(listo);
+        }
+        // WhatsApp. La pestaña se abre antes de pedir el enlace: si se abriera
+        // después, el navegador la bloquearía por no venir directo del clic.
+        const pestana = window.open('', '_blank');
+        return api(ruta + '/enlace', { method: 'POST' })
+            .then(r => {
+                const url = 'https://wa.me/?text=' + encodeURIComponent(r.texto);
+                if (pestana) {
+                    pestana.opener = null;
+                    pestana.location.href = url;
+                } else {
+                    location.href = url;
+                }
+            })
+            .catch(err => {
+                if (pestana) pestana.close();
+                avisar(err.message);
+            })
+            .finally(listo);
+    }
+
+    // Las opciones de menuCompartir() en cualquier parte de la página.
+    document.addEventListener('click', (e) => {
+        const opcion = e.target.closest('[data-compartir]');
+        if (!opcion) return;
+        compartirRecibo(opcion.dataset.compartir, opcion.dataset.pedido, opcion.dataset.folio, opcion.dataset.ficha === '1', opcion);
+    });
+
     // Quién vende, en todas las páginas de la tienda: la ley de comercio
     // electrónico pide mostrarlo antes de comprar. Si el gimnasio no llenó sus
     // datos del vendedor, se usa su nombre y su dirección.
@@ -387,6 +481,7 @@ const Tienda = (() => {
     return {
         sesion, escapar, dinero, fecha, exigirSesion, api, cuenta, puedeComprar, montar,
         cargarCarrito, agregar, cambiar, quitar, abrirCarrito, avisar, descargarRecibo, pintarEstado,
+        menuCompartir, compartirRecibo,
         get carrito() { return carrito; }
     };
 })();
