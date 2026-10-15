@@ -105,6 +105,7 @@
                     return pintarEstado('bx-check-double', 'Este pago ya se completó', 'Ya puedes cerrar esta página.', null, 'ok');
                 }
                 const articulos = orden.articulos === 1 ? '1 artículo' : orden.articulos + ' artículos';
+                const textoAprobar = (orden.recordar ? 'Aprobar, vincular y pagar ' : 'Aprobar y pagar ') + dinero(orden.monto);
                 raiz.innerHTML = `
                     <h1 class="pp-titulo">Paga con PayPal</h1>
                     <p class="pp-texto">Elige con qué cuenta de prueba quieres pagar. Al aprobar regresas a la tienda para terminar tu compra.</p>
@@ -142,8 +143,9 @@
                         </fieldset>
                         <p class="pp-nota"><i class="bx bx-lock-alt" aria-hidden="true"></i>
                             No se pide contraseña: es una simulación. No escribas datos de tu cuenta real.</p>
+                        ${orden.recordar ? '<p class="pp-vinculo-aviso"><i class="bx bx-link" aria-hidden="true"></i><span>Al aprobar, esta cuenta queda <strong>vinculada a ' + escapar(orden.comercio) + '</strong>: tus siguientes compras se pagan con solo confirmar, sin volver aquí. La puedes quitar cuando quieras en Mi cuenta.</span></p>' : ''}
                         <div class="alert alert-danger small py-2 d-none" id="pp-error" role="alert"></div>
-                        <button type="submit" class="pp-boton" id="pp-aprobar">Aprobar y pagar ${dinero(orden.monto)}</button>
+                        <button type="submit" class="pp-boton" id="pp-aprobar">${textoAprobar}</button>
                         <button type="button" class="pp-boton-secundario" id="pp-cancelar">Cancelar y volver a la tienda</button>
                     </form>`;
 
@@ -166,7 +168,7 @@
                 function fallo(err) {
                     error.textContent = err.message;
                     error.classList.remove('d-none');
-                    ocupado(false, 'Aprobar y pagar ' + dinero(orden.monto));
+                    ocupado(false, textoAprobar);
                 }
 
                 form.addEventListener('submit', (e) => {

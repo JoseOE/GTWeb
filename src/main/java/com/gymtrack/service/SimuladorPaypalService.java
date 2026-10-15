@@ -3,8 +3,10 @@ package com.gymtrack.service;
 import com.gymtrack.model.Gym;
 import com.gymtrack.model.OrdenPaypal;
 import com.gymtrack.model.User;
+import com.gymtrack.model.VinculoPaypal;
 import com.gymtrack.repository.GymRepository;
 import com.gymtrack.repository.OrdenPaypalRepository;
+import com.gymtrack.repository.VinculoPaypalRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -31,6 +33,11 @@ import java.util.Set;
 //      enlace de la app) con token y PayerID, y el checkout paga: consumir()
 //      revisa la orden y la cambia por los datos con que SimuladorPagoService
 //      autoriza y captura el pago.
+//
+// Cuenta vinculada: si al crear la orden se pide "recordar", al pagar con ella
+// la cuenta queda vinculada al usuario (como un acuerdo de pago de PayPal). Las
+// siguientes compras mandan {"vinculo": true} y se cobran sin abrir el
+// simulador. No se guarda contraseña ni tarjeta: solo la cuenta y el acuerdo.
 @Service
 public class SimuladorPaypalService {
 
@@ -53,12 +60,14 @@ public class SimuladorPaypalService {
 
     private final OrdenPaypalRepository ordenes;
     private final GymRepository gymRepository;
+    private final VinculoPaypalRepository vinculos;
     private final String urlPublica;
 
-    public SimuladorPaypalService(OrdenPaypalRepository ordenes, GymRepository gymRepository,
+    public SimuladorPaypalService(OrdenPaypalRepository ordenes, GymRepository gymRepository, VinculoPaypalRepository vinculos,
                                   @Value("${app.url-publica:http://localhost:8080}") String urlPublica) {
         this.ordenes = ordenes;
         this.gymRepository = gymRepository;
+        this.vinculos = vinculos;
         this.urlPublica = urlPublica.replaceAll("/+$", "");
     }
 
@@ -66,7 +75,7 @@ public class SimuladorPaypalService {
     // que llegó la petición: junto con APP_URL, son los únicos sitios web a los
     // que se puede volver.
     public Map<String, Object> crear(User comprador, String canal, double total, int articulos,
-                                     String returnUrl, String cancelUrl, String hostPropio) {
+                                     String returnUrl, String cancelUrl, String hostPropio, boolean recordar) {
         if (articulos <= 0 || total <= 0) {
             throw new TiendaException(HttpStatus.BAD_REQUEST, "Tu carrito está vacío.");
         }
@@ -83,6 +92,7 @@ public class SimuladorPaypalService {
         orden.setReturnUrl(validarRegreso(returnUrl, "returnUrl", hostPropio));
         orden.setCancelUrl(validarRegreso(cancelUrl, "cancelUrl", hostPropio));
         orden.setCreadaEn(Instant.now());
+        orden.setRecordar(recordar);
         ordenes.save(orden);
 
         Map<String, Object> v = new LinkedHashMap<>();
@@ -106,6 +116,7 @@ public class SimuladorPaypalService {
         v.put("articulos", orden.getArticulos());
         v.put("vence", orden.getCreadaEn().plus(VIGENCIA));
         v.put("cuenta", orden.getCuenta());
+        v.put("recordar", orden.isRecordar());
         v.put("cuentas", CUENTAS.stream().map(c -> Map.of("correo", c.correo(), "nombre", c.nombre())).toList());
         // Si ya se decidió (p. ej. cerró la pestaña antes de volver), por dónde seguir.
         v.put("regreso", switch (orden.getEstado()) {
@@ -151,6 +162,7 @@ public class SimuladorPaypalService {
     // sustituye a lo que mandó la página, así el resultado no se puede inventar
     // desde el navegador.
     public Map<String, Object> consumir(String userId, String gymId, String canal, double total, Map<String, Object> datos) {
+        if (datos != null && Boolean.TRUE.equals(datos.get("vinculo"))) return conVinculo(userId);
         Object token = datos == null ? null : datos.get("token");
         Object payerId = datos == null ? null : datos.get("payerId");
         OrdenPaypal orden = token == null ? null : ordenes.findById(token.toString()).orElse(null);
@@ -181,7 +193,58 @@ public class SimuladorPaypalService {
         CUENTAS.stream().filter(c -> c.correo().equals(orden.getCuenta()) && APROBADA.equals(c.resultado()))
                 .findFirst().ifPresent(c -> seguros.put("nombre", c.nombre()));
         seguros.put("resultado", orden.getResultado());
+        // Solo se vincula una cuenta con la que PayPal sí cobra.
+        if (orden.isRecordar() && APROBADA.equals(orden.getResultado())) {
+            VinculoPaypal v = vinculos.findById(userId).orElseGet(VinculoPaypal::new);
+            v.setUserId(userId);
+            v.setCuenta(orden.getCuenta());
+            v.setNombre((String) seguros.get("nombre"));
+            v.setPayerId(orden.getPayerId());
+            v.setAcuerdo("B-SIM-" + alAzar(17));
+            v.setCreadoEn(Instant.now());
+            v.setUltimoUsoEn(Instant.now());
+            vinculos.save(v);
+            seguros.put("acuerdo", v.getAcuerdo());
+            seguros.put("vinculada", true);
+        }
         return seguros;
+    }
+
+    // Cobra con la cuenta vinculada: no hay ventana de PayPal ni orden que
+    // aprobar. La cuenta sin saldo sigue rechazándose al cobrar.
+    private Map<String, Object> conVinculo(String userId) {
+        VinculoPaypal v = vinculos.findById(userId).orElseThrow(() ->
+                new TiendaException(HttpStatus.BAD_REQUEST, "Tu cuenta PayPal ya no está vinculada. Elige tu cuenta de nuevo."));
+        v.setUltimoUsoEn(Instant.now());
+        vinculos.save(v);
+        Map<String, Object> seguros = new LinkedHashMap<>();
+        seguros.put("orden", "PAYID-SIM-" + alAzar(16));
+        seguros.put("payerId", v.getPayerId());
+        seguros.put("cuenta", v.getCuenta());
+        if (v.getNombre() != null) seguros.put("nombre", v.getNombre());
+        seguros.put("resultado", CUENTAS.stream().filter(c -> c.correo().equals(v.getCuenta()))
+                .map(CuentaDePrueba::resultado).findFirst().orElse(APROBADA));
+        seguros.put("acuerdo", v.getAcuerdo());
+        seguros.put("vinculada", true);
+        return seguros;
+    }
+
+    // Lo que muestran el checkout y "Mi cuenta".
+    public Map<String, Object> vinculo(String userId) {
+        Map<String, Object> r = new LinkedHashMap<>();
+        VinculoPaypal v = vinculos.findById(userId).orElse(null);
+        r.put("vinculada", v != null);
+        if (v != null) {
+            r.put("cuenta", v.getCuenta());
+            r.put("nombre", v.getNombre());
+            r.put("desde", v.getCreadoEn());
+        }
+        return r;
+    }
+
+    public Map<String, Object> desvincular(String userId) {
+        vinculos.deleteById(userId);
+        return vinculo(userId);
     }
 
     private OrdenPaypal exigir(String id) {

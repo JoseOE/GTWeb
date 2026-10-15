@@ -103,11 +103,57 @@
                         </form>
                     </div>
                 </div>
+
+                <!-- Cuenta PayPal vinculada (solo aparece si hay una) -->
+                <div class="col-12 page-fade-in delay-2" id="paypal-vinculo" hidden>
+                    <div class="card auth-card border-0 shadow-lg rounded-4 p-4">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                            <div style="min-width:0">
+                                <h3 class="fw-bold fs-5 mb-1"><i class='bx bx-link text-primary'></i> PayPal vinculado</h3>
+                                <p class="text-body-secondary small mb-0">Tus compras en la tienda se pagan con <strong id="paypal-vinculo-cuenta"></strong> con solo confirmar. Solo guardamos la cuenta que autorizaste, nunca contraseñas ni tarjetas.</p>
+                            </div>
+                            <button type="button" class="btn btn-outline-danger rounded-pill px-4" id="paypal-desvincular">Desvincular</button>
+                        </div>
+                        <div id="alerta-paypal" class="alert d-none mt-3 mb-0" role="status"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
 
     <script src="js/cuenta.js"></script>
+    <script>
+        // Cuenta PayPal vinculada (simulada): se muestra si hay una y se puede quitar.
+        (function () {
+            const caja = document.getElementById('paypal-vinculo');
+            const cabeceras = { 'X-User-Id': localStorage.getItem('userId') || '' };
+            fetch('/api/simuladores/paypal/vinculo', { headers: cabeceras })
+                .then(res => res.ok ? res.json() : { vinculada: false })
+                .then(v => {
+                    if (!v.vinculada) return;
+                    document.getElementById('paypal-vinculo-cuenta').textContent = v.cuenta;
+                    caja.hidden = false;
+                })
+                .catch(() => {});
+            document.getElementById('paypal-desvincular').addEventListener('click', (e) => {
+                const boton = e.currentTarget;
+                const alerta = document.getElementById('alerta-paypal');
+                boton.disabled = true;
+                fetch('/api/simuladores/paypal/vinculo', { method: 'DELETE', headers: cabeceras })
+                    .then(res => {
+                        if (!res.ok) throw new Error();
+                        alerta.className = 'alert alert-success mt-3 mb-0';
+                        alerta.textContent = 'Listo: tu cuenta PayPal ya no está vinculada. La próxima vez que pagues con PayPal te pediremos aprobar de nuevo.';
+                        boton.hidden = true;
+                    })
+                    .catch(() => {
+                        alerta.className = 'alert alert-danger mt-3 mb-0';
+                        alerta.textContent = 'No se pudo desvincular. Intenta de nuevo.';
+                        boton.disabled = false;
+                    });
+            });
+        })();
+    </script>
     <script>
         const userId = localStorage.getItem('userId');
         // Protección de ruta: sin sesión, al login.
