@@ -62,8 +62,8 @@ public class SesionFilter extends OncePerRequestFilter {
     }
 
     // Sin sesión: crear cuenta, entrar, verificar, recuperar, el catálogo, el
-    // estado de la tienda, las imágenes y el simulador de PayPal (su id de
-    // orden es la llave).
+    // estado de la tienda, las imágenes, el simulador de PayPal (su id de
+    // orden es la llave) y los comprobantes compartidos (su token es la llave).
     private static final List<Regla> PUBLICAS = List.of(
             regla("POST", "/api/users/register"),
             regla("POST", "/api/users/login"),
@@ -81,7 +81,8 @@ public class SesionFilter extends OncePerRequestFilter {
             regla("GET", "/api/imagenes/*"),
             regla("GET", "/api/simuladores/paypal/ordenes/*"),
             regla("POST", "/api/simuladores/paypal/ordenes/*/aprobar"),
-            regla("POST", "/api/simuladores/paypal/ordenes/*/cancelar"));
+            regla("POST", "/api/simuladores/paypal/ordenes/*/cancelar"),
+            regla("GET", "/api/recibos/compartidos/*"));
 
     // Solo las usa el panel de la página: exigen sesión aunque la app siga en transición.
     private static final List<Regla> PANEL = List.of(

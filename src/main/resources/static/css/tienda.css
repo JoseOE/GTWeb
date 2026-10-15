@@ -1118,3 +1118,14 @@ body.con-barra-carrito {
     border: 0;
     border-radius: 10px;
 }
+
+/* ─── Compartir el comprobante (Tienda.menuCompartir) ─── */
+.opcion-compartir {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+}
+.opcion-compartir .bx { font-size: 20px; }
+.icono-whatsapp { color: #128c4b; }
+.compartir-grande .dropdown-menu { width: 100%; }

@@ -70,10 +70,11 @@
                         ${calificar(p)}
                         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
                             <strong class="fs-5" style="font-family:var(--identity)">${Tienda.dinero(p.total)}</strong>
-                            <div class="d-flex gap-2">
+                            <div class="d-flex flex-wrap gap-2">
                                 ${p.estado === 'pagado' || p.estado === 'reembolsado'
                                     ? '<button type="button" class="btn btn-outline-primary tocable px-3" data-recibo="' + Tienda.escapar(p.orderId) + '" data-folio="' + Tienda.escapar(p.folio) + '"><i class="bx bx-download"></i> Recibo</button>'
                                     : ''}
+                                ${p.estado === 'pagado' || p.estado === 'reembolsado' || (p.estado === 'pendiente_pago' && p.paynet) ? Tienda.menuCompartir(p) : ''}
                                 <a class="btn btn-primary tocable px-3" href="confirmacion.html?pedido=${encodeURIComponent(p.orderId)}">Ver</a>
                             </div>
                         </div>

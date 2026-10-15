@@ -97,6 +97,8 @@
                     <div class="d-grid gap-2 mt-4">
                         ${p.estado === 'pagado' || p.estado === 'reembolsado' ? '<button type="button" class="btn btn-primary btn-grande" id="recibo"><i class="bx bx-download"></i> Descargar recibo</button>' : ''}
                         ${p.estado === 'pendiente_pago' ? '<button type="button" class="btn btn-primary btn-grande" id="actualizar"><i class="bx bx-refresh"></i> Ya pagué: actualizar estado</button>' : ''}
+                        ${p.estado === 'pagado' || p.estado === 'reembolsado' || (p.estado === 'pendiente_pago' && p.paynet)
+                            ? '<div class="compartir-grande">' + Tienda.menuCompartir(p, 'btn btn-outline-primary btn-grande w-100') + '</div>' : ''}
                         <a class="btn btn-outline-primary btn-grande" href="pedidos.html">Ver mis pedidos</a>
                         <a class="btn btn-link tocable" href="tienda.html">Seguir comprando</a>
                     </div>`;

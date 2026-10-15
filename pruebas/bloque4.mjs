@@ -133,6 +133,45 @@ ok(lineasLog('Recibimos tu pago').filter(l => l.includes('pedido #' + ficha.foli
 ok(compras === 2, 'compra: un correo automático + el reenvío pedido', compras);
 ok(lineasLog('La plantilla de correo').length === 0, 'las plantillas se arman sin errores', lineasLog('La plantilla de correo').slice(-1)[0]);
 
+console.log('\n6. Compartir el comprobante (WhatsApp)');
+r = await api('POST', `/api/recibos/pedidos/${pagado.orderId}/enlace`, null, member);
+const enlace = r.body || {};
+const token = (enlace.url || '').split('/compartidos/')[1]?.replace(/\.pdf$/, '') || '';
+ok(r.status === 200 && /\/api\/recibos\/compartidos\/[A-Za-z0-9_-]{43}\.pdf$/.test(enlace.url || ''), 'el comprador genera el enlace', enlace.url?.slice(-20));
+ok(enlace.texto?.startsWith('Comprobante del pedido #' + pagado.folio) && enlace.texto.includes(enlace.url) && enlace.texto.includes('vence'), 'mensaje listo para WhatsApp', enlace.texto?.slice(0, 60));
+const dias = (new Date(enlace.venceEn) - Date.now()) / 86400000;
+ok(dias > 6.99 && dias <= 7, 'vence a los 7 días', dias.toFixed(3));
+b = await binario(`/api/recibos/compartidos/${token}.pdf`);
+ok(b.status === 200 && b.tipo === 'application/pdf' && b.buf.subarray(0, 5).toString() === '%PDF-', 'el enlace baja el PDF sin sesión', { bytes: b.buf.length });
+b = await binario('/api/recibos/compartidos/' + 'x'.repeat(43) + '.pdf');
+ok(b.status === 404, 'un token inventado → 404');
+r = await api('POST', `/api/recibos/pedidos/${pagado.orderId}/enlace`, null, ajeno.id);
+ok(r.status === 404, 'otra persona no puede generar el enlace', r.status);
+r = await api('POST', `/api/recibos/pedidos/${pagado.orderId}/enlace`, null, owner);
+ok(r.status === 200, 'el dueño también lo genera (Ventas)');
+r = await api('POST', `/api/recibos/pedidos/${vieja.orderId}/enlace`, null, member);
+ok(r.status === 409, 'un pedido cancelado no tiene enlace', r.body?.error);
+let m2 = await MongoClient.connect(MONGO);
+const guardado = await m2.db().collection('enlaces_recibo').findOne({ orderId: pagado.orderId });
+const enClaro = await m2.db().collection('enlaces_recibo').countDocuments({ _id: token });
+ok(guardado && enClaro === 0 && /^[0-9a-f]{64}$/.test(guardado._id), 'en la base solo queda la huella del token', guardado?._id?.slice(0, 12));
+await m2.db().collection('enlaces_recibo').updateOne({ _id: guardado._id }, { $set: { venceEn: new Date(Date.now() - 1000) } });
+b = await binario(`/api/recibos/compartidos/${token}.pdf`);
+ok(b.status === 404, 'un enlace vencido → 404');
+// Ficha pendiente: el enlace baja la ficha; si se cancela, ya no hay nada que bajar.
+c = (await api('POST', '/api/tienda/carrito/items', { varianteId: agua.id, cantidad: 1 }, member)).body;
+const pendiente = (await api('POST', '/api/tienda/carrito/checkout', { metodo: 'paynet', datos: {}, totalVisto: c.total, consentimiento: CONSENTIMIENTO }, member)).body;
+r = await api('POST', `/api/recibos/pedidos/${pendiente.orderId}/enlace`, null, member);
+ok(r.status === 200 && r.body.tipo === 'ficha' && r.body.texto.startsWith('Ficha de pago del pedido #'), 'un pedido pendiente comparte su ficha', r.body?.tipo);
+const tokenFicha = r.body.url.split('/compartidos/')[1].replace(/\.pdf$/, '');
+b = await binario(`/api/recibos/compartidos/${tokenFicha}.pdf`);
+ok(b.status === 200 && b.buf.subarray(0, 5).toString() === '%PDF-', 'el enlace de la ficha baja el PDF');
+r = await api('POST', `/api/gyms/${gymId}/ventas/pedidos/${pendiente.orderId}/cancelar`, null, owner);
+ok(r.status === 200, 'el dueño cancela el pedido pendiente', r.body?.estado);
+b = await binario(`/api/recibos/compartidos/${tokenFicha}.pdf`);
+ok(b.status === 410, 'el enlace de un pedido cancelado → 410');
+await m2.close();
+
 console.log(fallos ? `\n${fallos} prueba(s) fallaron` : '\nTodo bien');
 // Código de salida 1 si algo falló: así correr-todas.mjs y la CI lo marcan en rojo.
 if (fallos) process.exitCode = 1;
