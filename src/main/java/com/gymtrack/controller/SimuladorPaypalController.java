@@ -19,6 +19,7 @@ import java.util.Map;
 // no: paypal-sim.html se puede abrir desde el navegador de la app, que no tiene
 // la sesión de la página, y el id de la orden hace de llave (como el token de
 // la URL de PayPal). Pagar con ella sí vuelve a exigir al comprador.
+// La cuenta vinculada (ver y desvincular) es de quien tiene la sesión.
 @RestController
 @RequestMapping("/api/simuladores/paypal")
 public class SimuladorPaypalController {
@@ -35,7 +36,8 @@ public class SimuladorPaypalController {
 
     // POST /api/simuladores/paypal/ordenes?canal=web|app
     //   {"returnUrl": "https://.../checkout.html?metodo=paypal&continuar=1" | "gymtrack://pago-paypal",
-    //    "cancelUrl": "https://.../checkout.html?metodo=paypal&paypal=cancelado"}
+    //    "cancelUrl": "https://.../checkout.html?metodo=paypal&paypal=cancelado",
+    //    "recordar": true}   ← opcional: al pagar, la cuenta queda vinculada
     // → {"id": "PAYID-SIM-...", "monto": 458.0, "moneda": "MXN", "aprobarUrl": "https://.../paypal-sim.html?token=..."}
     @PostMapping("/ordenes")
     public Map<String, Object> crear(@RequestParam(required = false) String canal,
@@ -54,7 +56,8 @@ public class SimuladorPaypalController {
                     Map.of("avisos", carrito.get("avisos"), "carrito", carrito));
         }
         return paypal.crear(comprador, elegido, ((Number) carrito.get("total")).doubleValue(),
-                ((Number) carrito.get("articulos")).intValue(), request.getReturnUrl(), request.getCancelUrl(), http.getServerName());
+                ((Number) carrito.get("articulos")).intValue(), request.getReturnUrl(), request.getCancelUrl(), http.getServerName(),
+                Boolean.TRUE.equals(request.getRecordar()));
     }
 
     @GetMapping("/ordenes/{id}")
@@ -74,9 +77,25 @@ public class SimuladorPaypalController {
         return paypal.cancelar(id);
     }
 
+    // GET /api/simuladores/paypal/vinculo → {"vinculada": true, "cuenta", "nombre", "desde"}
+    @GetMapping("/vinculo")
+    public Map<String, Object> vinculo(@RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
+        return paypal.vinculo(acceso.exigirUsuario(userId).getId());
+    }
+
+    // DELETE /api/simuladores/paypal/vinculo → {"vinculada": false}
+    @DeleteMapping("/vinculo")
+    public Map<String, Object> desvincular(@RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
+        return paypal.desvincular(acceso.exigirUsuario(userId).getId());
+    }
+
     public static class OrdenRequest {
         private String returnUrl;
         private String cancelUrl;
+        private Boolean recordar;
+
+        public Boolean getRecordar() { return recordar; }
+        public void setRecordar(Boolean recordar) { this.recordar = recordar; }
 
         public String getReturnUrl() { return returnUrl; }
         public void setReturnUrl(String returnUrl) { this.returnUrl = returnUrl; }

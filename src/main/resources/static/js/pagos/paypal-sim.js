@@ -10,6 +10,11 @@
         con el token y Spring paga con la orden aprobada.
    Si cancela, vuelve a checkout.html?metodo=paypal&paypal=cancelado y no se
    crea ningún pedido.
+
+   Cuenta vinculada: con "Recordar mi cuenta PayPal" la orden se crea con
+   recordar: true y, al pagar, la cuenta queda vinculada. Las siguientes
+   compras muestran esa cuenta y pagan con {vinculo: true}, sin salir de la
+   tienda. "Usar otra cuenta" vuelve al flujo normal.
 ═══════════════════════════════════════ */
 (function () {
     // Se lee al cargar, antes de que el checkout quite "continuar" de la URL:
@@ -20,6 +25,11 @@
         ? { token: inicio.get('token'), payerId: inicio.get('PayerID') }
         : null;
     let cancelado = inicio.get('paypal') === 'cancelado';
+    // La cuenta vinculada (GET /api/simuladores/paypal/vinculo) y si la persona prefirió otra.
+    let vinculo = null;
+    let usarOtra = false;
+    let contenedorActual = null;
+    let resumenActual = null;
 
     function cargarEstilos() {
         if (document.getElementById('estilos-paypal-sim')) return;
@@ -41,8 +51,44 @@
         history.replaceState(null, '', location.pathname + (params.toString() ? '?' + params : ''));
     }
 
+    function conVinculo() {
+        return !!(vinculo && vinculo.vinculada && !usarOtra);
+    }
+
     function montar(contenedor, resumen) {
         cargarEstilos();
+        contenedorActual = contenedor;
+        resumenActual = resumen;
+        pintar();
+        if (vinculo === null) {
+            Tienda.api('/api/simuladores/paypal/vinculo')
+                .then(v => { vinculo = v; if (contenedorActual === contenedor) pintar(); })
+                .catch(() => { vinculo = { vinculada: false }; });
+        }
+    }
+
+    function pintar() {
+        const contenedor = contenedorActual;
+        const resumen = resumenActual;
+        if (!contenedor) return;
+        if (conVinculo()) {
+            const quien = vinculo.nombre || vinculo.cuenta;
+            contenedor.innerHTML = `
+                <div class="pp-caja">
+                    <div class="pp-caja-cabeza">
+                        <img src="img/pagos/paypal.svg" alt="PayPal" width="78" height="26">
+                        <span class="pp-simulacion">Simulación</span>
+                    </div>
+                    <div class="pp-vinculada mt-3">
+                        <span class="pp-avatar-mini" aria-hidden="true">${Tienda.escapar(String(quien).trim().charAt(0).toUpperCase())}</span>
+                        <span style="min-width:0"><span class="fw-semibold d-block">Cuenta vinculada</span><small class="text-body-secondary">${Tienda.escapar(vinculo.cuenta)}</small></span>
+                    </div>
+                    <p class="small mt-3 mb-2">Pagas <strong>${dinero(resumen && resumen.total)}</strong> con esta cuenta al confirmar tu compra, sin salir de la tienda.</p>
+                    <button type="button" class="btn btn-link btn-sm p-0" id="pp-usar-otra">Usar otra cuenta</button>
+                </div>`;
+            contenedor.querySelector('#pp-usar-otra').addEventListener('click', () => { usarOtra = true; pintar(); });
+            return;
+        }
         contenedor.innerHTML = `
             <div class="pp-caja">
                 <div class="pp-caja-cabeza">
@@ -52,10 +98,14 @@
                 ${cancelado ? '<div class="alert alert-warning small py-2 mt-2 mb-0" role="status">Cancelaste el pago en PayPal. Tu carrito sigue igual: vuelve a intentarlo o elige otro método.</div>' : ''}
                 <p class="mt-3 mb-2">Al pagar te llevamos al <strong>Simulador PayPal</strong> para aprobar
                     <strong>${dinero(resumen && resumen.total)}</strong> con una cuenta de prueba. Después regresas aquí y tu pedido queda pagado.</p>
-                <ul class="small text-body-secondary mb-0 ps-3">
+                <ul class="small text-body-secondary mb-3 ps-3">
                     <li>No se pide contraseña ni se usa tu cuenta real de PayPal.</li>
                     <li>Si cancelas en el simulador, no se crea ningún pedido.</li>
                 </ul>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="pp-recordar">
+                    <label class="form-check-label small" for="pp-recordar"><strong>Recordar mi cuenta PayPal.</strong> Tus siguientes compras se pagan con solo confirmar, sin volver a PayPal. Puedes quitarla en Mi cuenta.</label>
+                </div>
             </div>`;
         if (cancelado) {
             cancelado = false;
@@ -64,6 +114,7 @@
     }
 
     function obtenerDatos() {
+        if (conVinculo() && !aprobado) return Promise.resolve({ vinculo: true });
         if (aprobado) {
             const datos = aprobado;
             aprobado = null;
@@ -77,7 +128,8 @@
             method: 'POST',
             body: JSON.stringify({
                 returnUrl: base + 'checkout.html?metodo=paypal&continuar=1',
-                cancelUrl: base + 'checkout.html?metodo=paypal&paypal=cancelado'
+                cancelUrl: base + 'checkout.html?metodo=paypal&paypal=cancelado',
+                recordar: !!(document.getElementById('pp-recordar') || {}).checked
             })
         }).then(orden => {
             location.href = 'paypal-sim.html?token=' + encodeURIComponent(orden.id);
@@ -96,6 +148,8 @@
         // Sale a paypal-sim.html: el checkout pide la confirmación antes de salir.
         saleDeLaPagina: true,
         montar,
-        obtenerDatos
+        obtenerDatos,
+        // Para "¿Confirmas tu compra?": con qué cuenta se cobra.
+        detalle: () => conVinculo() ? 'Cuenta vinculada · ' + vinculo.cuenta : ''
     });
 })();

@@ -377,6 +377,7 @@ public class ReciboService {
                 agregar(filas, "ID del pagador", d.get("payerId"));
                 agregar(filas, "Orden", d.get("orden"));
                 agregar(filas, "ID de transacción", d.get("captura"));
+                agregar(filas, "Cuenta vinculada", d.get("acuerdo") == null ? null : "Sí · acuerdo " + d.get("acuerdo"));
             }
             default -> {
                 titulo = "Pago";

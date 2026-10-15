@@ -1,6 +1,9 @@
 // Prueba del bloque 5 (simulador de PayPal y dashboard de ventas) contra Spring y MongoDB locales.
 import fs from 'node:fs';
-import { API, ESTADO, CONSENTIMIENTO } from './entorno.mjs';
+import { createRequire } from 'node:module';
+import { API, ESTADO, CONSENTIMIENTO, MONGO } from './entorno.mjs';
+
+const { MongoClient } = createRequire(import.meta.url)('mongodb');
 
 const n = JSON.parse(fs.readFileSync(ESTADO, 'utf8'));
 const TOKENS = n.tokens || {};
@@ -255,6 +258,49 @@ r = await api('POST', `/api/gyms/${gymId}/ventas/pedidos/${ficha2.orderId}/cance
 ok(r.status === 200 && r.body.estado === 'cancelado' && !r.body.acciones.cancelar, 'cancelar una ficha pendiente', r.body.estado || r.body.error);
 r = await api('POST', `/api/gyms/${gymId}/ventas/pedidos/${ficha2.orderId}/cancelar`, null, owner);
 ok(r.status === 409, 'no se cancela dos veces → 409', r.body.error);
+
+console.log('\nCuenta PayPal vinculada');
+await api('DELETE', '/api/simuladores/paypal/vinculo', null, member);
+r = await api('GET', '/api/simuladores/paypal/vinculo', null, member);
+ok(r.status === 200 && r.body.vinculada === false, 'sin cuenta vinculada al inicio', r.body);
+r = await api('GET', '/api/simuladores/paypal/vinculo');
+ok(r.status === 401 || r.status === 403, 'sin sesión no se ve el vínculo', r.status);
+// Una cuenta sin saldo no queda vinculada: PayPal no cobra con ella.
+c = await carritoCon(aguaV.id, 1);
+let ov = (await crearOrden({ returnUrl: RETORNO, cancelUrl: CANCELA, recordar: true })).body;
+r = await api('GET', `/api/simuladores/paypal/ordenes/${ov.id}`);
+ok(r.body.recordar === true, 'el simulador sabe que se va a vincular');
+let ap = (await aprobar(ov.id, 'sin-saldo@sim-paypal.test')).body;
+r = await pagar({ token: ov.id, payerId: payerDe(ap.redirect) }, c.total);
+ok(r.status === 402, 'la cuenta sin saldo se rechaza', r.body?.error);
+r = await api('GET', '/api/simuladores/paypal/vinculo', null, member);
+ok(r.body.vinculada === false, 'y no queda vinculada');
+// Aprobar con "recordar" vincula la cuenta.
+c = await carritoCon(aguaV.id, 1);
+ov = (await crearOrden({ returnUrl: RETORNO, cancelUrl: CANCELA, recordar: true })).body;
+ap = (await aprobar(ov.id, 'ana.compradora@sim-paypal.test')).body;
+r = await pagar({ token: ov.id, payerId: payerDe(ap.redirect) }, c.total);
+ok(r.status === 200 && r.body.estado === 'pagado', 'paga y vincula la cuenta', r.body?.detallePago);
+r = await api('GET', '/api/simuladores/paypal/vinculo', null, member);
+ok(r.body.vinculada === true && r.body.cuenta === 'ana.compradora@sim-paypal.test' && r.body.nombre === 'Ana Compradora', 'el vínculo queda con la cuenta y su titular', r.body);
+r = await api('GET', '/api/simuladores/paypal/vinculo', null, owner);
+ok(r.body.vinculada === false, 'el vínculo es solo de quien lo hizo');
+// Siguiente compra: un solo "Confirmar", sin orden ni simulador.
+c = await carritoCon(aguaV.id, 2);
+r = await pagar({ vinculo: true }, c.total);
+ok(r.status === 200 && r.body.estado === 'pagado' && r.body.detallePago.includes('ana.compradora'), 'paga con la cuenta vinculada sin abrir PayPal', r.body?.detallePago);
+const conVinculo = r.body;
+let m5 = await MongoClient.connect(MONGO);
+const guardadoV = await m5.db().collection('pedidos').findOne({ orderId: conVinculo.orderId });
+await m5.close();
+ok(guardadoV.datosPago.vinculada === true && /^B-SIM-/.test(guardadoV.datosPago.acuerdo) && /^CAPTURE-SIM/.test(guardadoV.datosPago.captura), 'el pago guarda el acuerdo y la captura', { acuerdo: guardadoV.datosPago.acuerdo });
+// Desvincular.
+r = await api('DELETE', '/api/simuladores/paypal/vinculo', null, member);
+ok(r.status === 200 && r.body.vinculada === false, 'desvincular desde Mi cuenta');
+c = await carritoCon(aguaV.id, 1);
+r = await pagar({ vinculo: true }, c.total);
+ok(r.status === 400 || r.status === 402, 'sin vínculo ya no se puede pagar así', r.body?.error);
+await api('DELETE', '/api/tienda/carrito', null, member);
 
 console.log(fallos ? `\n${fallos} prueba(s) fallaron` : '\nTodo bien');
 process.exit(fallos ? 1 : 0);

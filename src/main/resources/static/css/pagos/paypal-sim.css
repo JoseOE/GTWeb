@@ -45,6 +45,39 @@
     width: auto;
 }
 
+.pp-vinculada {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #fff;
+    border: 1px solid #cfe0f5;
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+.pp-avatar-mini {
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #e3edfb;
+    color: #003087;
+    font-weight: 700;
+}
+.pp-vinculo-aviso {
+    display: flex;
+    gap: 10px;
+    background: #f4f8fe;
+    border: 1px solid #cfe0f5;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #001435;
+    margin: 0 0 16px;
+}
+.pp-vinculo-aviso .bx { color: #0070e0; font-size: 20px; flex: none; }
+
 /* ─── paypal-sim.html ─── */
 .pp-pagina {
     min-height: 100vh;

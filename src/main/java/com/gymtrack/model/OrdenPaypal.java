@@ -37,6 +37,9 @@ public class OrdenPaypal {
     private String payerId;
     // Qué pasará al cobrar: aprobada, o rechazada con la cuenta sin saldo.
     private String resultado;
+    // El comprador pidió recordar la cuenta: al pagar con esta orden queda
+    // vinculada (VinculoPaypal) y las siguientes compras no pasan por aquí.
+    private boolean recordar;
     // A dónde vuelve el comprador: una página de esta web o un enlace de la app.
     private String returnUrl;
     private String cancelUrl;
@@ -82,6 +85,9 @@ public class OrdenPaypal {
 
     public String getResultado() { return resultado; }
     public void setResultado(String resultado) { this.resultado = resultado; }
+
+    public boolean isRecordar() { return recordar; }
+    public void setRecordar(boolean recordar) { this.recordar = recordar; }
 
     public String getReturnUrl() { return returnUrl; }
     public void setReturnUrl(String returnUrl) { this.returnUrl = returnUrl; }
