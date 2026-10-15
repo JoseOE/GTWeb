@@ -241,7 +241,7 @@ public class CarritoService {
             }
             // La tarjeta llega como token: se cambia por los datos guardados del token
             // para que el resultado del cobro no se pueda inventar desde el navegador.
-            if (MetodosPago.STRIPE.equals(proveedor)) datos = stripe.consumir(user.getId(), datos);
+            if (MetodosPago.STRIPE.equals(proveedor)) datos = stripe.consumir(user.getId(), datos, total);
 
             pedido = pedidos.cobrar(new PedidoService.Venta(gymId, c.getCanal(), user.getId(), user.getEmail(),
                     null, null, lineas(c, cat), proveedor, datos, false, null, consentimiento));

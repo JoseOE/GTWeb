@@ -63,6 +63,11 @@ public class SimuladorPagoService {
                 base(d, "pi_sim", "sim-stripe", monto);
                 // Como Stripe: el PaymentIntent (pi_sim_...) genera un cargo (ch_sim_...).
                 d.put("cargo", nuevoId("ch_sim"));
+                // Lo que imprime la terminal: número de autorización del banco y
+                // número de operación.
+                d.put("autorizacion", digitos(6));
+                d.put("operacion", digitos(12));
+                d.remove("resultado");
                 cobrado(d, ahora);
                 return new Resultado(true, d);
             }
@@ -114,6 +119,12 @@ public class SimuladorPagoService {
         reembolsos.add(r);
         datos.put("reembolsos", reembolsos);
         datos.put("estado", "reembolsado");
+    }
+
+    private static String digitos(int n) {
+        StringBuilder s = new StringBuilder(n);
+        for (int i = 0; i < n; i++) s.append(AZAR.nextInt(10));
+        return s.toString();
     }
 
     // "93" identifica al convenio simulado de GymTrack; luego 15 dígitos al azar

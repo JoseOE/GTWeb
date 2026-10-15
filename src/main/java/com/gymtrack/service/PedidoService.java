@@ -347,8 +347,10 @@ public class PedidoService {
     public static String detallePago(Pedido p) {
         Map<String, Object> d = p.getDatosPago() == null ? Map.of() : p.getDatosPago();
         if (d.get("marca") != null && d.get("ultimos4") != null) {
-            return MARCAS.getOrDefault(String.valueOf(d.get("marca")), String.valueOf(d.get("marca")))
+            String tarjeta = MARCAS.getOrDefault(String.valueOf(d.get("marca")), String.valueOf(d.get("marca")))
                     + " •••• " + d.get("ultimos4");
+            Object meses = d.get("meses");
+            return meses == null ? tarjeta : tarjeta + " · " + meses + " meses sin intereses";
         }
         if (d.get("recibido") != null) {
             return "Efectivo · recibido " + dinero(d.get("recibido")) + ", cambio " + dinero(d.get("cambio"));

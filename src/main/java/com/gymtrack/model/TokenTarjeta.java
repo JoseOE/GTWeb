@@ -21,6 +21,8 @@ public class TokenTarjeta {
     // "MM/AA"
     private String vencimiento;
     private String titular;
+    // credito | debito: con crédito se puede pagar a meses sin intereses.
+    private String tipo;
     // aprobada | rechazada | fondos_insuficientes | vencida | cvc_incorrecto
     private String resultado;
     @Indexed(expireAfter = "30m")
@@ -37,6 +39,9 @@ public class TokenTarjeta {
 
     public String getMarca() { return marca; }
     public void setMarca(String marca) { this.marca = marca; }
+
+    public String getTipo() { return tipo; }
+    public void setTipo(String tipo) { this.tipo = tipo; }
 
     public String getUltimos4() { return ultimos4; }
     public void setUltimos4(String ultimos4) { this.ultimos4 = ultimos4; }
