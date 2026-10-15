@@ -138,4 +138,20 @@ ok(r.status === 402 && r.body.error.includes('rechazada'), 'tarjeta rechazada en
 r = await cobrar({ partidas: [{ varianteId: aguaV.id, cantidad: 1 }], clienteId: 'no-existe', metodo: 'efectivo', recibido: 100, totalVisto: aguaV.precio });
 ok(r.status === 400, 'cliente que no es miembro → 400', r.body.error);
 
+console.log('\n4. Crédito, débito y meses sin intereses');
+const caro = (await api('POST', `/api/gyms/${gymId}/productos`, { nombre: 'Banca plegable', categoria: 'accesorios', variantes: [{ precio: 700, existencias: 5 }] }, owner)).body;
+const debito = await token('4000056655665556');
+ok(debito.tipo === 'debito', 'la Visa de débito se reconoce al tokenizar', debito.tipo);
+c = await carritoCon(caro.variantes[0].id);
+r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: debito.token, meses: 3 }, totalVisto: c.total, consentimiento: CONSENTIMIENTO }, member);
+ok(r.status === 400 && r.body.error.includes('crédito'), 'débito a meses → 400', r.body.error);
+const credito = await token('4242424242424242');
+r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: credito.token, meses: 9 }, totalVisto: c.total, consentimiento: CONSENTIMIENTO }, member);
+ok(r.status === 400 && r.body.error.includes('900'), '9 meses en $700 → 400 (y el token sigue sirviendo)', r.body.error);
+r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: credito.token, meses: 6 }, totalVisto: c.total, consentimiento: CONSENTIMIENTO }, member);
+ok(r.status === 200 && r.body.detallePago === 'Visa •••• 4242 · 6 meses sin intereses', '6 meses sin intereses con crédito', r.body.detallePago);
+const recibo = await fetch(API + `/api/recibos/pedidos/${r.body.orderId}.pdf`, { headers: cabeceras(member) });
+ok(recibo.status === 200 && recibo.headers.get('content-type') === 'application/pdf', 'el comprobante con tarjeta se descarga', recibo.status);
+await api('DELETE', `/api/gyms/${gymId}/productos/${caro.id}`, null, owner);
+
 console.log(fallos ? `\n${fallos} prueba(s) fallaron` : '\nTodo bien');
