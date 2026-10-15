@@ -165,6 +165,7 @@ Y abre http://localhost:5500. **Ojo:** así no funcionan el catálogo, el regist
 | `APP_URL` | No | Dirección con la que se arman los enlaces de los correos. Por defecto `http://localhost:8080`; en Render debe ser `https://gtweb.onrender.com`. |
 | `PORT` | No | Puerto del servidor. Por defecto `8080`; Render lo asigna solo. |
 | `EXIGIR_TOKEN` | No | `true` para que toda la API exija el token de sesión. Por defecto `false` mientras la app móvil se actualiza (ver [Seguridad y sesiones](#-seguridad-y-sesiones)). |
+| `EXIGIR_CONSENTIMIENTO_APP` | No | `true` para exigir también en la app la aceptación de los términos de compra al pagar. En la web se exige siempre. Por defecto `false` hasta que GTApp lo mande (ver "Compras conforme a la ley"). |
 
 \* Sin `BREVO_API_KEY` y `MAIL_USERNAME` la página funciona igual: los códigos de verificación y los enlaces de recuperación se escriben en la consola en lugar de enviarse.
 
@@ -228,8 +229,11 @@ GTWeb/
         ├── templates/correos/         # Plantillas HTML de los correos
         └── static/                    # La página web
             ├── *.html
+            ├── terminos.html · privacidad.html  # Términos de compra y aviso de privacidad
             ├── css/                   # Estilos de la marca
-            ├── js/                    # Slider, catálogo, mapa y utilidades de la cuenta
+            ├── js/                    # Slider, catálogo, mapa, tienda, reseñas, páginas legales y utilidades de la cuenta
+            │   └── pagos/             # Un archivo por forma de pago del checkout (simuladores)
+            ├── img/pagos/             # Logos de las formas de pago y de las tiendas (SVG)
             └── fonts/                 # Tipografías autoalojadas
 ```
 
@@ -426,7 +430,7 @@ Todas las rutas de la tienda identifican a quien llama con el encabezado **`X-Us
 | GET · POST · DELETE | `/api/tienda/carrito` | Ver el carrito ya revisado · abrirlo · vaciarlo |
 | POST | `/api/tienda/carrito/items` | Agregar `{"varianteId", "cantidad"}` |
 | PATCH · DELETE | `/api/tienda/carrito/items/{id}` | Cambiar la cantidad `{"cantidad"}` (0 la quita) · quitar |
-| POST | `/api/tienda/carrito/checkout` | Pagar `{"metodo", "datos", "totalVisto"}` y devolver el pedido |
+| POST | `/api/tienda/carrito/checkout` | Pagar `{"metodo", "datos", "totalVisto", "consentimiento"}` y devolver el pedido |
 | GET | `/api/tienda/pedidos` · `/api/tienda/pedidos/{orderId}` | Mis pedidos · un pedido |
 
 Todas las rutas del carrito aceptan `?canal=web` (por defecto) o `?canal=app`, y cada canal tiene su carrito.
@@ -440,6 +444,7 @@ Respuestas de `/checkout`:
 - **409**: el carrito cambió desde que la persona lo vio (algo se agotó, se ocultó o cambió de precio). Trae `avisos` y `carrito` ya corregido, y no se cobra nada.
 - **402**: el simulador rechazó el pago, con su mensaje. Las piezas regresan al inventario y el carrito queda igual.
 - **409 "Tu pago ya se está procesando"**: el mismo carrito ya se está cobrando (doble clic o dos dispositivos). Solo el primero cobra.
+- **400 / 409 de consentimiento**: faltó aceptar los términos o la advertencia sanitaria (400), o se aceptó una versión vieja de los términos (409). Ver "Compras conforme a la ley".
 
 **Carrito** (lo que reciben la página y la app):
 
@@ -474,12 +479,18 @@ Respuestas de `/checkout`:
 | 4242 4242 4242 4242 | Visa aprobada |
 | 5555 5555 5555 4444 | Mastercard aprobada |
 | 3782 822463 10005 | American Express aprobada |
+| 4000 0566 5566 5556 | Visa **débito** aprobada |
+| 5200 8282 8282 8210 | Mastercard **débito** aprobada |
 | 4000 0000 0000 0002 | Rechazada |
 | 4000 0000 0000 9995 | Fondos insuficientes |
 | 4000 0000 0000 0069 | Vencida |
 | 4000 0000 0000 0127 | CVC incorrecto |
 
 Los rechazos llegan al checkout como 402 con el mensaje para el comprador, y el carrito queda intacto para intentar con otra tarjeta.
+
+- **Crédito o débito.** Cada tarjeta de prueba tiene su tipo; el checkout lo muestra en la tarjeta dibujada y el comprobante lo imprime ("Visa crédito •••• 4242").
+- **Meses sin intereses.** Solo con crédito y en la tienda (el mostrador cobra de contado). El plazo va en `datos.meses`: 3, 6, 9 o 12, con compra mínima de $300, $600, $900 y $1,200. Spring lo revisa antes de gastar el token, así que si no aplica se puede elegir otro plazo.
+- **Lo que guarda el pago.** `tipo`, `banco`, `meses` y `mensualidad`, más un número de autorización (6 dígitos) y uno de operación (12), como el voucher de una terminal.
 
 **Mostrador.**
 
@@ -499,26 +510,47 @@ Los rechazos llegan al checkout como 402 con el mensaje para el comprador, y el 
 | GET | `/api/recibos/paynet/{orderId}.pdf` · `/codigo.png` | Ficha Paynet en PDF · código de barras de la referencia (para la web y la app) |
 | GET | `/api/recibos/pagos/{paymentId}.pdf` | Recibo de una mensualidad registrada en el panel |
 | POST | `/api/recibos/pedidos/{orderId}/enviar` · `/api/recibos/pagos/{paymentId}/enviar` | Reenviar el recibo (o la ficha) por correo |
-| POST | `/api/simuladores/paynet/{orderId}/pagar` | "Simular pago en tienda" (solo el dueño; lo usa el dashboard de ventas) |
+| POST | `/api/recibos/pedidos/{orderId}/enlace` | Enlace temporal (7 días) al comprobante o a la ficha → `{url, venceEn, texto, tipo}`; `texto` es el mensaje listo para WhatsApp |
+| GET | `/api/recibos/compartidos/{token}.pdf` | Lo abre quien recibió el enlace, **sin sesión**. 404 si venció o no existe; 410 si el pedido se canceló |
+| POST | `/api/simuladores/paynet/{orderId}/pagar` | "Simular pago en tienda" `{tienda}` opcional (`oxxo`, `7-eleven`, `walmart`, `bodega-aurrera`, `farmacias-del-ahorro`, `circle-k`; sin ella, una al azar). Solo el dueño; lo usa Ventas |
 | POST | `/api/simuladores/paynet/vencidas` | Cancelar ahora las fichas vencidas (también corre sola cada 15 minutos) |
 
 **Recibos.**
 
 - **Quién los ve.** Solo el comprador y el dueño del gimnasio. Se piden con `fetch` y `X-User-Id`, porque un enlace no puede mandar el encabezado.
 - **Contenido.** Todos los PDF llevan:
-  - logo y datos del gimnasio, folio, fecha y cliente;
+  - logo y datos del gimnasio (con su razón social y RFC, si los capturó), folio, fecha y cliente;
   - las partidas, con subtotal, IVA 16 % desglosado y total (los precios ya incluyen IVA);
-  - la forma de pago y el estado;
+  - un recuadro con la forma de pago, del color y con el logo de esa forma de pago;
+  - el estado;
   - un QR con el folio y la leyenda **"Comprobante simulado, sin validez fiscal"**.
+- **Un comprobante por forma de pago.** El título y el recuadro cambian con el pago (`ReciboService.bloquePago`); los logos salen de `static/img/pagos/*.svg` con el módulo `svg` de iText:
+
+  | Pago | Título | Lo que muestra |
+  |---|---|---|
+  | Tarjeta | Comprobante de pago con tarjeta | Marca, tipo y últimos 4, titular, banco, plazo (de contado o N meses sin intereses de $X), autorización y operación |
+  | Efectivo en tienda | Comprobante de pago en tienda | Logo de la tienda, referencia y folio de caja |
+  | PayPal | Comprobante de pago con PayPal | Quién pagó, cuenta PayPal, ID del pagador, orden e ID de transacción |
+  | Efectivo en mostrador | Comprobante de pago en efectivo | Recibido, cambio, quién atendió y lugar (también en el ticket de 80 mm) |
 - **Pedidos sin recibo.** Un pedido pendiente o cancelado responde 409.
+
+**Compartir el comprobante.**
+
+- **Dónde.** "Mis pedidos" y la confirmación del pedido tienen un menú **Compartir** (WhatsApp, Enviar a mi correo y, en el celular, Más opciones). En el panel, el detalle de cada venta tiene **WhatsApp** junto a "Reenviar correo". Un pedido pagado comparte su comprobante; uno pendiente de pago en tienda, su ficha.
+- **WhatsApp.** Desde una página de escritorio WhatsApp no recibe archivos, así que Spring da un **enlace temporal** al PDF y la página abre `wa.me` con el mensaje listo ("Comprobante del pedido #189 en … por $705.00: <enlace> (el enlace vence el 22 de octubre)"). La persona elige el chat.
+- **Más opciones.** Donde el navegador puede compartir archivos (Web Share API, sobre todo en celular), se manda el PDF adjunto al menú de compartir del teléfono.
+- **El enlace.**
+  - Lo genera solo quien puede ver el pedido (el comprador o el dueño) y vence a los 7 días.
+  - Como las sesiones, en `enlaces_recibo` solo se guarda la huella SHA-256 del token: quien lea la base no puede abrir los comprobantes. Mongo borra los vencidos solo.
+  - El estado se revisa al abrirlo: si la ficha ya se pagó, baja el comprobante; si el pedido se canceló, responde 410.
 
 **Paynet.**
 
 - **La ficha.** Al pagar, el proveedor genera una referencia de 18 dígitos (convenio `93` y dígito verificador de Luhn) con fecha límite de 72 horas. El pedido queda "Pendiente de pago", aparta sus piezas y no activa ningún plan.
-- **Dónde se ve.** `confirmacion.html` muestra el código de barras, la referencia copiable, las tiendas (marcadas como simulación) y las instrucciones. La ficha también llega por correo en PDF.
-- **El pago.** "Simular pago en tienda" marca el pedido como pagado: se activa el plan, llegan el recibo por correo y el push "Recibimos tu pago". Pagar la misma ficha otra vez responde 409.
+- **Dónde se ve.** `confirmacion.html` muestra el código de barras, la referencia copiable, los logos de las tiendas donde se puede pagar (OXXO, 7-Eleven, Walmart, Bodega Aurrerá, Farmacias del Ahorro y Circle K, marcadas como simulación) y las instrucciones. La ficha también llega por correo en PDF.
+- **El pago.** "Simular pago en tienda" marca el pedido como pagado en la tienda que elige el dueño en Ventas, con un folio de caja de 10 dígitos: se activa el plan, llegan el recibo por correo y el push "Recibimos tu pago". Pagar la misma ficha otra vez responde 409.
 - **Vencimiento.** Cada 15 minutos se cancelan las fichas vencidas y regresa el stock que tenían apartado.
-- **En la vista del pedido.** Viene `paynet: {referencia, vence}` para pintar la ficha en la web y en la app.
+- **En la vista del pedido.** Viene `paynet: {referencia, vence}` para pintar la ficha en la web y en la app; ya pagada, también `tienda`, `tiendaNombre` y `folioCaja`.
 
 **Correos de la tienda.**
 
@@ -540,7 +572,7 @@ Los rechazos llegan al checkout como 402 con el mensaje para el comprador, y el 
 
 - **El flujo.** Como en PayPal, el pago se aprueba fuera de la tienda:
   1. Al pulsar "Pagar", Spring crea una orden `PAYID-SIM-...` por el total del carrito y la página va a `paypal-sim.html?token=...`.
-  2. Ahí se elige una cuenta de prueba (o se escribe un correo) y se aprueba o se cancela. No se pide contraseña y no lleva logotipos de PayPal: es una simulación.
+  2. Ahí se elige una cuenta de prueba (o se escribe un correo) y se aprueba o se cancela. La página se ve como la de PayPal (sus colores y su logo), pero con la franja y la etiqueta "Simulación" siempre visibles y sin pedir contraseña.
   3. Al aprobar, vuelve a `returnUrl` con `token` y `PayerID`, y el checkout paga con `{"metodo": "paypal", "datos": {"token", "payerId"}}`.
 - **Cancelar.** Vuelve a `cancelUrl` y no se crea ningún pedido; el carrito queda igual.
 - **Cuentas de prueba.** `ana.compradora@sim-paypal.test` y `luis.prueba@sim-paypal.test` aprueban; `sin-saldo@sim-paypal.test` aprueba, pero PayPal rechaza el cobro (402 con el mensaje). Cualquier otro correo también aprueba.
@@ -663,13 +695,40 @@ Para crear o editar se manda `nombre`, `descripcion`, `categoria` (el handle), `
 - **Reembolsar** guarda el reembolso (`re_sim_...`) en `datosPago.reembolsos`. **Cancelar** solo aplica a lo pendiente.
 - Nunca guardes ni registres en logs el número completo de una tarjeta ni el CVC: al pedido solo llega el token.
 
+### Compras conforme a la ley (consentimiento, advertencia y vendedor)
+
+Lo que pide la ley de comercio electrónico al vender en línea, con los textos en `terminos.html` y `privacidad.html` (los redactamos nosotros; los revisa el profesor):
+
+- **Quién vende.** En "Mi Gimnasio" → **Datos del vendedor**, el dueño captura razón social, RFC y correo de atención. Salen en el pie de cada página de la tienda, en las páginas legales, en "¿Confirmas tu compra?" y en los comprobantes.
+- **Marca y proveedor.** Cada producto tiene `marca`, `proveedor` y `sitioProveedor`; la ficha del producto los muestra.
+- **Advertencia sanitaria.** Cada producto tiene la casilla `requiereAdvertencia` (por defecto, los de la categoría suplementos). Si el carrito lleva alguno, antes de pagar aparece la advertencia de esos productos y hay que aceptarla.
+- **Antes de cobrar.** Bajo "Pagar" va el aviso de lo que se acepta. Al pulsarlo aparece **"¿Confirmas tu compra?"** con el desglose (subtotal, IVA y total), la forma de pago, el vendedor y la casilla de los términos. PayPal la pide antes de salir al simulador.
+- **El consentimiento.** El checkout manda `consentimiento: {terminosVersion, aceptaTerminos, aceptaAdvertencia}` y el pedido guarda qué se aceptó, de qué productos y cuándo (`Pedido.consentimiento`).
+  - La versión vigente vive en dos lugares que deben coincidir: `ConsentimientoService.VERSION_TERMINOS` y `Legal.VERSION` (`js/legal.js`). Si el texto cambia, se suben los dos y la fecha de `Legal.VIGENTE`.
+  - En la web se exige siempre. La app todavía no lo manda: con `EXIGIR_CONSENTIMIENTO_APP=false` (por defecto) su pedido queda marcado como "no enviado"; al actualizar GTApp, se pone en `true`.
+
+### Reseñas
+
+| Método | Ruta | Uso |
+|---|---|---|
+| GET | `/api/tienda/{gymId}/productos/{id}/resenas` | Resumen (promedio y conteo por estrellas), las reseñas visibles y la mía |
+| PUT · DELETE | `/api/tienda/{gymId}/productos/{id}/resenas/mia` | Calificar o editar `{estrellas, comentario}` · borrar la mía |
+| GET | `/api/tienda/{gymId}/resenas/destacadas` | Carrusel "Lo mejor calificado" de la tienda |
+| GET | `/api/gyms/{gymId}/resenas` | Moderación del dueño (pestaña Productos) |
+| POST | `/api/gyms/{gymId}/resenas/{id}/visibilidad` | Ocultar o mostrar una reseña |
+
+- **Quién califica.** Solo quien compró el producto (un pedido pagado que lo incluye), de 1 a 5 estrellas con comentario opcional. Es **una por persona y producto** (índice único): si lo vuelve a comprar, edita la suya. "Mis pedidos" invita a calificar lo comprado.
+- **Carrusel.** Muestra los productos con promedio **mayor a 3.8** estrellas (con una reseña basta), los mejor calificados primero.
+- **Moderación.** El dueño puede ocultar una reseña ofensiva o que no trata del producto: no cuenta en el promedio ni se muestra, pero su autor la sigue viendo.
+
 ### Formas de pago en el checkout (bloques 3 a 5)
 
 `checkout.html` no sabe cómo cobra cada método: carga `js/pagos/stripe-sim.js`, `paynet-sim.js` y `paypal-sim.js`, y cada uno se registra con `MetodosPago.registrar({...})`. La documentación completa está en `js/pagos/metodos.js`. Si un archivo todavía no existe, ese método no aparece.
 
 | Miembro | Para qué |
 |---|---|
-| `id` · `nombre` · `descripcion` · `icono` · `orden` | `id` es lo que Spring recibe en `metodo` (`stripe`, `paynet`, `paypal`); los demás son para el selector |
+| `id` · `nombre` · `descripcion` · `icono` · `logos` · `orden` | `id` es lo que Spring recibe en `metodo` (`stripe`, `paynet`, `paypal`); los demás son para el selector. `logos` son nombres de `img/pagos/<logo>.svg` (`MetodosPago.logo(id)` arma el `<img>`) |
+| `saleDeLaPagina` (opcional) | `true` si el pago se aprueba fuera (PayPal): el checkout pide la confirmación antes de salir |
 | `montar(contenedor, resumen)` | Dibuja el formulario. `resumen` = `{total, subtotal, iva, articulos, items, gym}` |
 | `obtenerDatos(): Promise` | Valida y resuelve con los `datos` que van a Spring. Para un error, rechaza con `new Error("mensaje")` |
 | `despues(pedido)` (opcional) | Ya creado el pedido. Puede devolver otra URL a la que ir en lugar de `confirmacion.html` |
@@ -864,7 +923,7 @@ La comunicación entre el dispositivo IoT y los servicios backend utilizará pro
 | MongoDB Atlas + Spring Data MongoDB | Base de datos NoSQL en la nube |
 | API de Brevo + Thymeleaf | Correos de la cuenta con plantillas HTML |
 | BCrypt (spring-security-crypto) | Cifrado de contraseñas |
-| iText Core 9 (kernel, layout, barcodes) | Recibos, tickets de 80 mm y fichas Paynet en PDF, con QR y código de barras (licencia AGPL) |
+| iText Core 9 (kernel, layout, barcodes, svg) | Recibos, tickets de 80 mm y fichas Paynet en PDF, con QR, código de barras y los logos de las formas de pago (licencia AGPL) |
 | Expo Push | Notificaciones push a la app móvil |
 | Docker + Render | Publicación de la página y la API |
 | GitHub Actions + GitHub Pages | Publicación de la parte estática |
