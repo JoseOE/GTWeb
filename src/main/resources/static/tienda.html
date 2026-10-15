@@ -45,6 +45,8 @@
                 <div class="planes-fila" id="planes"></div>
             </section>
 
+            <section id="seccion-mejor" class="mt-4" hidden></section>
+
             <section id="seccion-productos" class="mt-4" aria-labelledby="titulo-productos" aria-live="polite">
                 <h2 class="seccion-titulo mb-2" id="titulo-productos">Productos</h2>
                 <div id="productos"></div>
@@ -54,6 +56,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/tienda.js"></script>
+    <script src="js/resenas.js"></script>
     <script>
         (function () {
             Tienda.exigirSesion();
@@ -63,6 +66,8 @@
             const contenedorPlanes = document.getElementById('planes');
             const seccionPlanes = document.getElementById('seccion-planes');
             const seccionProductos = document.getElementById('seccion-productos');
+            const seccionMejor = document.getElementById('seccion-mejor');
+            let hayCarrusel = false;
             const chips = document.getElementById('chips');
             const buscar = document.getElementById('buscar');
             let todo = [];
@@ -121,6 +126,9 @@
                 const planes = visibles.filter(p => p.tipo === 'membresia');
                 const productos = visibles.filter(p => p.tipo !== 'membresia');
 
+                // El carrusel de lo mejor calificado acompaña a la tienda completa;
+                // al buscar o filtrar por categoría se esconde para no estorbar.
+                seccionMejor.hidden = !hayCarrusel || !!q || !!categoria;
                 seccionPlanes.classList.toggle('d-none', !planes.length);
                 contenedorPlanes.innerHTML = planes.map(tarjetaPlan).join('');
 
@@ -164,6 +172,7 @@
                         <div class="cuerpo">
                             <a class="nombre stretched-link text-reset text-decoration-none" href="producto.html?id=${encodeURIComponent(p.id)}">${Tienda.escapar(p.nombre)}</a>
                             <small class="text-body-secondary">${varias ? p.variantes.length + ' presentaciones' : Tienda.escapar(unica.nombre === 'Única' ? '' : unica.nombre)}</small>
+                            ${Resenas.resumenCorto(p.calificacion)}
                             <span class="precio">${varias ? '<small class="fw-normal text-body-secondary">desde </small>' : ''}${Tienda.dinero(p.precioDesde)}</span>
                         </div>
                         ${comprador && unica && !unica.agotado
@@ -205,6 +214,10 @@
                         categorias = cats;
                         pintarChips();
                         pintar();
+                        Resenas.montarCarrusel(seccionMejor, gymId).then(() => {
+                            hayCarrusel = !seccionMejor.hidden;
+                            pintar();
+                        });
                     })
                     .catch(err => Tienda.pintarEstado(contenedorProductos, 'error', err.message, () => cargar(gymId)));
             }
