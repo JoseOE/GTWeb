@@ -696,6 +696,32 @@ body.con-barra-carrito {
 .producto-card .calificacion-corta { font-size: 13px; margin-top: 2px; }
 .producto-card .estrellas { font-size: 13px; }
 
+/* Mis pedidos: enlaces para calificar lo que se compró. */
+.pedido-calificar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    margin-bottom: 10px;
+}
+.pedido-calificar a {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--ink);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+}
+.pedido-calificar a i { color: #b8740a; }
+.pedido-calificar a:hover,
+.pedido-calificar a:focus-visible { border-color: var(--ink); }
+
 /* ─── Carrusel de lo mejor calificado ─── */
 .carrusel-resenas {
     list-style: none;

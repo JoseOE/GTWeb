@@ -41,6 +41,17 @@
                 return nombres.slice(0, 2).join(', ') + (nombres.length > 2 ? ' y ' + (nombres.length - 2) + ' más' : '');
             }
 
+            // En un pedido pagado, enlaces para calificar cada producto (los planes no se califican).
+            function calificar(p) {
+                if (p.estado !== 'pagado' || Tienda.sesion.role === 'owner') return '';
+                const vistos = new Set();
+                const productos = p.partidas.filter(x => x.tipo !== 'membresia' && x.productoId && !vistos.has(x.productoId) && vistos.add(x.productoId));
+                if (!productos.length) return '';
+                return '<div class="pedido-calificar"><span class="small text-body-secondary">Califica tu compra:</span>'
+                    + productos.map(x => '<a href="producto.html?id=' + encodeURIComponent(x.productoId) + '#resenas"><i class="bx bx-star" aria-hidden="true"></i>' + Tienda.escapar(x.titulo) + '</a>').join('')
+                    + '</div>';
+            }
+
             function pintar() {
                 if (!pedidos.length) {
                     lista.innerHTML = '<div class="estado-vacio"><i class="bx bx-receipt"></i>Aún no tienes pedidos.<div class="mt-3"><a class="btn btn-primary tocable px-4" href="tienda.html">Ver la tienda</a></div></div>';
@@ -56,6 +67,7 @@
                             <span class="estado-pedido ${Tienda.escapar(p.estado)}">${Tienda.escapar(p.estadoTexto)}</span>
                         </div>
                         <p class="mt-2 mb-2">${Tienda.escapar(resumenPartidas(p))}</p>
+                        ${calificar(p)}
                         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
                             <strong class="fs-5" style="font-family:var(--identity)">${Tienda.dinero(p.total)}</strong>
                             <div class="d-flex gap-2">
