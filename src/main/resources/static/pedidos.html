@@ -64,7 +64,10 @@
                                 <h2 class="seccion-titulo mb-0">Pedido #${Tienda.escapar(p.folio)}</h2>
                                 <small class="text-body-secondary">${Tienda.escapar(Tienda.fecha(p.creadoEn))} · ${Tienda.escapar(p.detallePago || p.metodo)}${p.gym ? ' · ' + Tienda.escapar(p.gym.nombre) : ''}</small>
                             </div>
-                            <span class="estado-pedido ${Tienda.escapar(p.estado)}">${Tienda.escapar(p.estadoTexto)}</span>
+                            <div class="d-flex flex-column align-items-end gap-1">
+                                <span class="estado-pedido ${Tienda.escapar(p.estado)}">${Tienda.escapar(p.estadoTexto)}</span>
+                                ${Tienda.insigniaEntrega(p)}
+                            </div>
                         </div>
                         <p class="mt-2 mb-2">${Tienda.escapar(resumenPartidas(p))}</p>
                         ${calificar(p)}
