@@ -23,10 +23,12 @@
             <i class='bx bx-chevron-left fs-4' aria-hidden="true"></i> Tienda
         </a>
         <div id="detalle" class="mt-2"></div>
+        <section id="resenas" class="mt-5 pb-4" aria-label="Reseñas del producto" hidden></section>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/tienda.js"></script>
+    <script src="js/resenas.js"></script>
     <script>
         (function () {
             Tienda.exigirSesion();
@@ -101,6 +103,7 @@
                         <div class="col-md-6">
                             <div class="eyebrow">${Tienda.escapar(p.categoria ? p.categoria.nombre : '')}</div>
                             <h1 class="titulo-display mt-1">${Tienda.escapar(p.nombre)}</h1>
+                            ${!plan && p.calificacion ? '<div class="mt-2">' + Resenas.resumenCorto(p.calificacion, '#resenas') + '</div>' : ''}
                             <div class="d-flex align-items-baseline flex-wrap gap-2 mt-3">
                                 <span class="detalle-precio" id="precio">${Tienda.dinero(v.precio)}</span>
                                 <small class="text-body-secondary">IVA incluido</small>
@@ -196,6 +199,15 @@
                         presentacion = inicial.presentacion;
                         sabor = inicial.sabor || null;
                         pintar();
+                        // Los planes no se califican.
+                        if (!p.plan) {
+                            const seccion = document.getElementById('resenas');
+                            seccion.hidden = false;
+                            Resenas.montarSeccion(seccion, gymId, p.id, cal => {
+                                producto.calificacion = cal.total ? { promedio: cal.promedio, total: cal.total } : null;
+                                pintar();
+                            }).then(() => { if (location.hash === '#resenas') seccion.scrollIntoView(); });
+                        }
                     })
                     .catch(err => Tienda.pintarEstado(detalle, err.status === 404 ? 'vacio' : 'error', err.message,
                         err.status === 404 ? null : () => cargar(gymId)));

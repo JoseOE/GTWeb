@@ -315,6 +315,8 @@ public class PedidoService {
         List<Map<String, Object>> partidas = new ArrayList<>();
         for (Pedido.Partida x : p.getPartidas()) {
             Map<String, Object> partida = new LinkedHashMap<>();
+            // Para enlazar al producto (p. ej. "Califica tu compra" en Mis pedidos).
+            partida.put("productoId", x.getProductoId());
             partida.put("titulo", x.getTitulo());
             // "Plan" es el nombre interno de la única variante de un plan: no dice nada al comprador.
             partida.put("variante", "Plan".equals(x.getVariante()) ? null : x.getVariante());
