@@ -10,20 +10,40 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.security.SecureRandom;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 // Lado de Spring del simulador de Paynet.
 //
 // En la vida real la tienda de conveniencia cobra y Paynet avisa. Aquí:
 //  - "Simular pago en tienda" (dashboard de ventas o este endpoint) marca la
-//    ficha como pagada: se activa el plan, sale el recibo por correo y el push
-//    "Recibimos tu pago".
+//    ficha como pagada en una de las tiendas de la red (OXXO, 7-Eleven…), con
+//    un folio de caja como el del ticket de la tienda: se activa el plan, sale
+//    el recibo por correo y el push "Recibimos tu pago".
 //  - Cada 15 minutos se cancelan las fichas que pasaron su fecha límite (72 h)
 //    sin pagarse y se regresa el stock que tenían apartado.
 @Service
 public class SimuladorPaynetService {
 
     private static final Logger log = LoggerFactory.getLogger(SimuladorPaynetService.class);
+
+    // Tiendas donde se paga con la referencia (los mismos logos de img/pagos).
+    public static final Map<String, String> TIENDAS = tiendas();
+
+    private static Map<String, String> tiendas() {
+        Map<String, String> m = new LinkedHashMap<>();
+        m.put("oxxo", "OXXO");
+        m.put("7-eleven", "7-Eleven");
+        m.put("walmart", "Walmart");
+        m.put("bodega-aurrera", "Bodega Aurrerá");
+        m.put("farmacias-del-ahorro", "Farmacias del Ahorro");
+        m.put("circle-k", "Circle K");
+        return java.util.Collections.unmodifiableMap(m);
+    }
+
+    private static final SecureRandom AZAR = new SecureRandom();
 
     private final PedidoService pedidos;
     private final PedidoRepository pedidoRepository;
@@ -33,7 +53,9 @@ public class SimuladorPaynetService {
         this.pedidoRepository = pedidoRepository;
     }
 
-    public Pedido simularPagoEnTienda(Pedido p) {
+    // tienda: dónde se pagó (oxxo, 7-eleven…); sin ella se elige una al azar,
+    // como pasaría con un cliente real.
+    public Pedido simularPagoEnTienda(Pedido p, String tienda) {
         if (!MetodosPago.PAYNET.equals(p.getProveedorPago())) {
             throw new TiendaException(HttpStatus.BAD_REQUEST, "Ese pedido no se pagó con Paynet.");
         }
@@ -43,7 +65,16 @@ public class SimuladorPaynetService {
         if (vencida(p)) {
             throw new TiendaException(HttpStatus.CONFLICT, "La ficha ya venció: el pedido se cancelará.");
         }
-        return pedidos.pagarFicha(p);
+        String id = tienda != null && TIENDAS.containsKey(tienda)
+                ? tienda
+                : TIENDAS.keySet().stream().skip(AZAR.nextInt(TIENDAS.size())).findFirst().orElse("oxxo");
+        if (tienda != null && !tienda.isBlank() && !TIENDAS.containsKey(tienda)) {
+            throw new TiendaException(HttpStatus.BAD_REQUEST, "Esa tienda no recibe pagos con referencia.");
+        }
+        // Folio de caja: lo que imprime el ticket de la tienda.
+        StringBuilder folio = new StringBuilder();
+        for (int i = 0; i < 10; i++) folio.append(AZAR.nextInt(10));
+        return pedidos.pagarFicha(p, id, TIENDAS.get(id), folio.toString());
     }
 
     // Corre cada 15 minutos. También se puede forzar desde POST /api/simuladores/paynet/vencidas.

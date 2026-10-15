@@ -119,7 +119,7 @@ public class CorreoService {
 
     public boolean fichaPaynet(User comprador, String nombreGym, Map<String, Object> pedido, String referencia,
                                String vence, byte[] ficha) {
-        return enviar(comprador.getEmail(), "Tu ficha de pago Paynet · pedido #" + pedido.get("folio"), "ficha-paynet",
+        return enviar(comprador.getEmail(), "Tu ficha de pago en efectivo · pedido #" + pedido.get("folio"), "ficha-paynet",
                 Map.of("saludo", saludo(comprador), "gimnasio", nombreGym, "pedido", pedido, "referencia", referencia,
                         "vence", vence, "enlace", enlace("confirmacion.html?pedido=" + pedido.get("orderId"))),
                 List.of(new Adjunto("ficha-paynet-" + pedido.get("folio") + ".pdf", ficha)));

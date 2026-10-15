@@ -15,7 +15,7 @@ public final class MetodosPago {
 
     private static final Map<String, String> NOMBRES = Map.of(
             STRIPE, "Tarjeta",
-            PAYNET, "Paynet",
+            PAYNET, "Efectivo en tiendas",
             PAYPAL, "PayPal",
             EFECTIVO, "Efectivo");
 
