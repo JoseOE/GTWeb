@@ -25,6 +25,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -39,6 +40,8 @@ public class PedidoService {
 
     private static final Logger log = LoggerFactory.getLogger(PedidoService.class);
     private static final ZoneId ZONA_MX = ZoneId.of("America/Mexico_City");
+    private static final java.time.format.DateTimeFormatter ENTREGA =
+            java.time.format.DateTimeFormatter.ofPattern("d 'de' MMMM 'a las' HH:mm", Locale.forLanguageTag("es-MX"));
     private static final Map<String, String> ESTADOS = Map.of(
             Pedido.ESTADO_PENDIENTE_PAGO, "Pendiente de pago",
             Pedido.ESTADO_PAGADO, "Pagado",
@@ -284,6 +287,43 @@ public class PedidoService {
         return reembolsado;
     }
 
+    // El dueño entrega en recepción los productos de un pedido de la tienda o
+    // la app (escaneó el QR del comprobante o buscó el folio). Una sola vez: la
+    // actualización se condiciona a que siga pagado y sin entregar. Lo apartado
+    // sale del inventario (bajan apartadas y existencias).
+    public Pedido entregar(Pedido p, String userId) {
+        if (Pedido.ESTADO_PENDIENTE_PAGO.equals(p.getEstado())) {
+            throw new TiendaException(HttpStatus.CONFLICT, "Este pedido todavía no está pagado: no lo entregues hasta que se pague.");
+        }
+        if (!Pedido.ESTADO_PAGADO.equals(p.getEstado())) {
+            throw new TiendaException(HttpStatus.CONFLICT, "Este pedido está " + ESTADOS.getOrDefault(p.getEstado(), p.getEstado()).toLowerCase(Locale.ROOT) + ": no hay nada que entregar.");
+        }
+        if (Pedido.CANAL_MOSTRADOR.equals(p.getCanal())) {
+            throw new TiendaException(HttpStatus.CONFLICT, "Las ventas de mostrador se entregan al cobrarlas.");
+        }
+        if (!p.llevaProductos()) {
+            throw new TiendaException(HttpStatus.CONFLICT, "Este pedido solo lleva membresía: no hay productos que entregar.");
+        }
+        if (p.getEntregadoEn() != null) {
+            throw new TiendaException(HttpStatus.CONFLICT, "Este pedido ya se entregó el " + ENTREGA.format(p.getEntregadoEn().atZone(ZONA_MX)) + ".");
+        }
+        boolean apartado = p.getInventario() != null && Pedido.Inventario.APARTADO.equals(p.getInventario().getEstado());
+        Criteria condicion = Criteria.where("_id").is(p.getId()).and("estado").is(Pedido.ESTADO_PAGADO).and("entregadoEn").is(null);
+        Update cambio = new Update().set("entregadoEn", Instant.now()).set("entregadoPor", userId);
+        if (apartado) {
+            condicion = condicion.and("inventario.estado").is(Pedido.Inventario.APARTADO);
+            cambio.set("inventario.estado", Pedido.Inventario.DESCONTADO);
+        }
+        Pedido entregado = mongo.findAndModify(Query.query(condicion), cambio,
+                FindAndModifyOptions.options().returnNew(true), Pedido.class);
+        if (entregado == null) {
+            throw new TiendaException(HttpStatus.CONFLICT, "Este pedido ya se entregó o cambió. Vuelve a buscarlo.");
+        }
+        if (apartado) inventario.entregar(entregado.getInventario());
+        log.info("Pedido #{} entregado en recepción.", entregado.getFolio());
+        return entregado;
+    }
+
     // Aplica el cambio solo si el pedido sigue en el estado esperado. null = ya no estaba.
     private Pedido cambiarEstado(Pedido p, String estadoEsperado, Update cambio) {
         return mongo.findAndModify(
@@ -293,6 +333,21 @@ public class PedidoService {
 
     static double centavos(double n) {
         return Math.round(n * 100) / 100.0;
+    }
+
+    // Si hay que pasar a recoger algo: "pendiente" (pagado, por recoger en
+    // recepción), "entregado" o "no_aplica" (solo membresía, o sin pagar).
+    static Map<String, Object> entrega(Pedido p) {
+        boolean mostrador = Pedido.CANAL_MOSTRADOR.equals(p.getCanal());
+        String estado;
+        if (!p.llevaProductos()) estado = "no_aplica";
+        else if (p.getEntregadoEn() != null || (mostrador && Pedido.ESTADO_PAGADO.equals(p.getEstado()))) estado = "entregado";
+        else if (p.porEntregar()) estado = "pendiente";
+        else estado = "no_aplica";
+        Map<String, Object> e = new LinkedHashMap<>();
+        e.put("estado", estado);
+        e.put("entregadoEn", p.getEntregadoEn() != null ? p.getEntregadoEn() : ("entregado".equals(estado) ? p.getPagadoEn() : null));
+        return e;
     }
 
     // Forma en que la web y la app reciben un pedido (confirmación y "Mis pedidos").
@@ -327,6 +382,7 @@ public class PedidoService {
         v.put("creadoEn", p.getCreadoEn());
         v.put("pagadoEn", p.getPagadoEn());
         v.put("canceladoEn", p.getCanceladoEn());
+        v.put("entrega", entrega(p));
         List<Map<String, Object>> partidas = new ArrayList<>();
         for (Pedido.Partida x : p.getPartidas()) {
             Map<String, Object> partida = new LinkedHashMap<>();

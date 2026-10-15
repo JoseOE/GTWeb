@@ -25,6 +25,8 @@ import java.util.List;
 //  - apartar: tienda y app. La pieza queda vendida (o por pagar, en Paynet)
 //    hasta que se entrega: baja disponible, sube apartadas.
 //  - descontar: mostrador, que entrega en el acto: bajan disponible y existencias.
+//  - entregar: el pedido apartado se recoge en recepción: bajan apartadas y
+//    existencias (disponible ya había bajado al apartar).
 //  - devolverDePedido: un pago rechazado, un pedido cancelado, una ficha
 //    vencida o un reembolso regresan lo que el pedido tomó, una sola vez.
 //
@@ -41,6 +43,7 @@ public class InventarioService {
         // condición, disponible, apartadas, existencias (por pieza)
         APARTAR("disponible", -1, 1, 0),
         DESCONTAR("disponible", -1, 0, -1),
+        ENTREGAR("apartadas", 0, -1, -1),
         LIBERAR("apartadas", 1, -1, 0),
         REPONER(null, 1, 0, 1);
 
@@ -72,6 +75,16 @@ public class InventarioService {
     // Descuenta todo o nada (venta entregada en el acto).
     public List<Pedido.Pieza> descontar(List<Solicitud> solicitudes) {
         return tomar(solicitudes, Movimiento.DESCONTAR);
+    }
+
+    // Saca del inventario lo que el pedido tenía apartado: se entregó en recepción.
+    public void entregar(Pedido.Inventario inventario) {
+        if (inventario == null || inventario.getPiezas() == null) return;
+        for (Pedido.Pieza p : inventario.getPiezas()) {
+            if (!mover(p.getProductoId(), p.getVarianteId(), p.getCantidad(), Movimiento.ENTREGAR)) {
+                log.info("No se descontaron {} pieza(s) de la variante {}: ya no lleva inventario.", p.getCantidad(), p.getVarianteId());
+            }
+        }
     }
 
     // Arma el registro de inventario del pedido.
@@ -148,9 +161,8 @@ public class InventarioService {
         Criteria variante = Criteria.where("id").is(varianteId).and("controlarInventario").is(true);
         if (m.condicion != null) variante = variante.and(m.condicion).gte(cantidad);
         Query query = Query.query(Criteria.where("_id").is(productoId).and("variantes").elemMatch(variante));
-        Update update = new Update()
-                .inc("variantes.$.disponible", m.disponible * cantidad)
-                .inc("version", 1);
+        Update update = new Update().inc("version", 1);
+        if (m.disponible != 0) update.inc("variantes.$.disponible", m.disponible * cantidad);
         if (m.apartadas != 0) update.inc("variantes.$.apartadas", m.apartadas * cantidad);
         if (m.existencias != 0) update.inc("variantes.$.existencias", m.existencias * cantidad);
         return mongo.findAndModify(query, update, FindAndModifyOptions.options().returnNew(false), Producto.class) != null;

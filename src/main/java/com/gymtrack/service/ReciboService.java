@@ -109,9 +109,7 @@ public class ReciboService {
                     .setFontSize(10).setMarginTop(14).setMarginBottom(2));
             doc.add(new Paragraph()
                     .add(new Text("Entrega: ").setFont(f.negrita()))
-                    .add(Pedido.CANAL_MOSTRADOR.equals(p.getCanal())
-                            ? "Entregado en el mostrador de " + nombre(gym)
-                            : "Recoger en " + nombre(gym) + (gym != null && gym.getDireccion() != null ? " · " + gym.getDireccion() : ""))
+                    .add(entregaTexto(p, gym))
                     .setFontSize(10).setMarginBottom(12));
 
             Table partidas = new Table(UnitValue.createPercentArray(new float[]{10, 54, 18, 18})).useAllAvailableWidth();
@@ -232,6 +230,31 @@ public class ReciboService {
     }
 
     // Código de barras de la referencia como PNG, para la web y la app.
+    // QR para recoger el pedido en recepción (lo muestran la web y la app). Lleva
+    // el orderId, igual que el QR del comprobante en PDF: el panel lo escanea en
+    // "Entregar pedido".
+    public byte[] qrEntregaPng(Pedido p) {
+        BarcodeQRCode qr = new BarcodeQRCode("GymTrack · Pedido #" + p.getFolio() + " · " + p.getOrderId());
+        java.awt.Image awt = qr.createAwtImage(java.awt.Color.BLACK, java.awt.Color.WHITE);
+        // 1 px por módulo: se amplía sin suavizar, con margen blanco para que la cámara lo lea.
+        int escala = 8;
+        int margen = 32;
+        int lado = awt.getWidth(null) * escala + margen * 2;
+        BufferedImage imagen = new BufferedImage(lado, lado, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = imagen.createGraphics();
+        g.setColor(java.awt.Color.WHITE);
+        g.fillRect(0, 0, lado, lado);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        g.drawImage(awt, margen, margen, awt.getWidth(null) * escala, awt.getHeight(null) * escala, null);
+        g.dispose();
+        try (ByteArrayOutputStream salida = new ByteArrayOutputStream()) {
+            ImageIO.write(imagen, "png", salida);
+            return salida.toByteArray();
+        } catch (IOException e) {
+            throw new IllegalStateException("No se pudo dibujar el QR del pedido", e);
+        }
+    }
+
     public byte[] codigoPaynetPng(Pedido p) {
         Barcode128 barras = new Barcode128(null, null);
         barras.setCodeType(Barcode128.CODE128);
@@ -299,6 +322,18 @@ public class ReciboService {
             }
             pie(doc, pdf, f, "GymTrack · " + nombre(gym) + " · Recibo de membresía " + folio, 80);
         });
+    }
+
+    // Qué pasa con los productos: el mostrador los entrega en el acto; la tienda
+    // y la app se recogen en recepción mostrando el QR de este comprobante.
+    private static String entregaTexto(Pedido p, Gym gym) {
+        if (Pedido.CANAL_MOSTRADOR.equals(p.getCanal())) return "Entregado en el mostrador de " + nombre(gym);
+        if (!p.llevaProductos()) return "Membresía: no hay productos que recoger.";
+        if (p.getEntregadoEn() != null) return "Entregado en " + nombre(gym) + " el " + fechaHora(p.getEntregadoEn()) + ".";
+        String lugar = "Recoger en " + nombre(gym) + (gym != null && gym.getDireccion() != null ? " · " + gym.getDireccion() : "");
+        return Pedido.ESTADO_PAGADO.equals(p.getEstado())
+                ? lugar + ". Muestra el código QR de este comprobante en recepción."
+                : lugar;
     }
 
     // ═══════════════════════════ COMPROBANTE POR FORMA DE PAGO ═══════════════════════════
