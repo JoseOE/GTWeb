@@ -250,7 +250,7 @@
                         <div class="fila total"><span>Total a pagar</span><span>${Tienda.dinero(c.total)}</span></div>
                     </div>
                     <dl class="confirmar-datos mt-3 mb-0">
-                        <dt>Forma de pago</dt><dd><span class="fw-semibold">${Tienda.escapar(metodo.nombre)}</span>${(metodo.logos || []).length ? '<span class="metodo-logos">' + metodo.logos.slice(0, 3).map(l => MetodosPago.logo(l)).join('') + '</span>' : ''}</dd>
+                        <dt>Forma de pago</dt><dd><span class="fw-semibold">${Tienda.escapar(metodo.nombre)}</span>${metodo.detalle && metodo.detalle() ? '<br><small>' + Tienda.escapar(metodo.detalle()) + '</small>' : ''}${(metodo.logos || []).length ? '<span class="metodo-logos">' + metodo.logos.slice(0, 3).map(l => MetodosPago.logo(l)).join('') + '</span>' : ''}</dd>
                         <dt>Entrega</dt><dd>Recoger en ${Tienda.escapar(gym.nombre || 'el gimnasio')}${gym.direccion ? '<br><small class="text-body-secondary">' + Tienda.escapar(gym.direccion) + '</small>' : ''}</dd>
                         <dt>Vende</dt><dd>${Tienda.escapar(vendedor ? vendedor.nombre : (gym.nombre || 'Tu gimnasio'))}${vendedor && vendedor.rfc ? '<br><small class="text-body-secondary">RFC ' + Tienda.escapar(vendedor.rfc) + '</small>' : ''}</dd>
                     </dl>`;

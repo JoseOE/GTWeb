@@ -7,17 +7,24 @@
    POST /api/simuladores/stripe/tokens y al pedido solo llega el token: el número
    completo y el CVC no salen de esa petición.
    Solo se aceptan las tarjetas de prueba de abajo.
+   Con tarjeta de crédito y compras desde $300 se puede pagar a meses sin
+   intereses (en el checkout; la terminal del mostrador cobra de contado).
 ═══════════════════════════════════════ */
 (function () {
     const PRUEBAS = [
-        { numero: '4242424242424242', texto: 'Visa · aprobada' },
-        { numero: '5555555555554444', texto: 'Mastercard · aprobada' },
-        { numero: '378282246310005', texto: 'American Express · aprobada' },
-        { numero: '4000000000000002', texto: 'Tarjeta rechazada' },
-        { numero: '4000000000009995', texto: 'Fondos insuficientes' },
-        { numero: '4000000000000069', texto: 'Tarjeta vencida' },
-        { numero: '4000000000000127', texto: 'CVC incorrecto' }
+        { numero: '4242424242424242', texto: 'Visa crédito · aprobada', tipo: 'credito' },
+        { numero: '5555555555554444', texto: 'Mastercard crédito · aprobada', tipo: 'credito' },
+        { numero: '378282246310005', texto: 'American Express · aprobada', tipo: 'credito' },
+        { numero: '4000056655665556', texto: 'Visa débito · aprobada', tipo: 'debito' },
+        { numero: '5200828282828210', texto: 'Mastercard débito · aprobada', tipo: 'debito' },
+        { numero: '4000000000000002', texto: 'Tarjeta rechazada', tipo: 'credito' },
+        { numero: '4000000000009995', texto: 'Fondos insuficientes', tipo: 'debito' },
+        { numero: '4000000000000069', texto: 'Tarjeta vencida', tipo: 'credito' },
+        { numero: '4000000000000127', texto: 'CVC incorrecto', tipo: 'credito' }
     ];
+    // Plazo → compra mínima (la misma tabla que SimuladorStripeService).
+    const MESES = [[3, 300], [6, 600], [9, 900], [12, 1200]];
+    const TIPOS = { credito: 'Crédito', debito: 'Débito' };
     const NOMBRES_MARCA = { visa: 'Visa', mastercard: 'Mastercard', amex: 'Amex' };
     let instancia = 0;
     let actual = null;
@@ -48,6 +55,16 @@
 
     function largoDe(marca) { return marca === 'amex' ? 15 : 16; }
 
+    // Crédito o débito según la tarjeta de prueba (el servidor lo vuelve a decidir).
+    function tipoDe(digitos) {
+        const p = PRUEBAS.find(x => x.numero === digitos);
+        return p ? p.tipo : '';
+    }
+
+    function dinero(n) {
+        return '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
     function pasaLuhn(digitos) {
         let suma = 0;
         let doblar = false;
@@ -74,6 +91,7 @@
                 <div class="tv-giro">
                     <div class="tv-cara frente">
                         <span class="tv-simulacion">Simulación</span>
+                        <span class="tv-tipo" data-tv="tipo"></span>
                         <div class="tv-chip"></div>
                         <div class="tv-numero" data-tv="numero">•••• •••• •••• ••••</div>
                         <div class="tv-pie">
@@ -112,6 +130,11 @@
                     <label class="form-label small fw-semibold mb-1" for="${id}-cvc">CVC</label>
                     <input type="text" class="form-control" id="${id}-cvc" inputmode="numeric" autocomplete="off" placeholder="123" maxlength="4">
                 </div>
+                <div class="col-12" id="${id}-plazo-caja" hidden>
+                    <label class="form-label small fw-semibold mb-1" for="${id}-plazo">Forma de pago con tu crédito</label>
+                    <select class="form-select" id="${id}-plazo"></select>
+                    <small class="text-body-secondary d-block mt-1">Meses sin intereses en compras desde $300. Se cobra el mismo total.</small>
+                </div>
                 <div class="col-12">
                     <div id="${id}-error" class="small text-danger" role="alert"></div>
                 </div>
@@ -136,7 +159,11 @@
         const tarjeta = document.getElementById(id);
         const campos = { numero: $('-numero'), titular: $('-titular'), vence: $('-vence'), cvc: $('-cvc') };
         const vista = (k) => tarjeta.querySelector('[data-tv="' + k + '"]');
-        actual = { campos, error: $('-error'), resumen };
+        const plazoCaja = $('-plazo-caja');
+        const plazo = $('-plazo');
+        // Los meses sin intereses solo se ofrecen en el checkout (trae las partidas del carrito).
+        const conMeses = !!(resumen && resumen.items);
+        actual = { campos, error: $('-error'), resumen, plazo, conMeses };
 
         function pintar() {
             const digitos = campos.numero.value.replace(/\D/g, '');
@@ -146,11 +173,26 @@
             const relleno = (digitos + '•'.repeat(Math.max(0, largo - digitos.length))).slice(0, largo);
             vista('numero').textContent = agrupar(relleno, marca);
             vista('marca').textContent = NOMBRES_MARCA[marca] || '';
+            const tipo = tipoDe(digitos);
+            vista('tipo').textContent = TIPOS[tipo] || '';
+            pintarPlazo(tipo);
             vista('titular').textContent = campos.titular.value.trim() || 'Nombre en la tarjeta';
             vista('vence').textContent = campos.vence.value || 'MM/AA';
             vista('cvc').textContent = campos.cvc.value || (marca === 'amex' ? '••••' : '•••');
             campos.cvc.maxLength = marca === 'amex' ? 4 : 3;
             campos.cvc.placeholder = marca === 'amex' ? '1234' : '123';
+        }
+
+        // Contado y los plazos que alcanza el total; solo con crédito.
+        function pintarPlazo(tipo) {
+            const total = resumen ? Number(resumen.total) || 0 : 0;
+            const disponibles = MESES.filter(([, minimo]) => total + 0.009 >= minimo);
+            const mostrar = conMeses && tipo === 'credito' && disponibles.length > 0;
+            plazoCaja.hidden = !mostrar;
+            if (!mostrar) { plazo.innerHTML = ''; return; }
+            if (plazo.options.length) return;
+            plazo.innerHTML = '<option value="1">De contado · ' + dinero(total) + '</option>'
+                + disponibles.map(([m]) => '<option value="' + m + '">' + m + ' meses sin intereses de ' + dinero(Math.round(total / m * 100) / 100) + '</option>').join('');
         }
 
         campos.numero.addEventListener('input', () => {
@@ -224,7 +266,10 @@
                     error.textContent = body.error || 'No se pudo validar la tarjeta.';
                     throw new Error(body.error || 'No se pudo validar la tarjeta.');
                 }
-                return { token: body.token };
+                actual.ultimo = { marca: body.marca, tipo: body.tipo, ultimos4: body.ultimos4 };
+                const meses = actual.conMeses && !actual.plazo.closest('[hidden]') ? Number(actual.plazo.value) || 1 : 1;
+                actual.ultimo.meses = meses;
+                return meses > 1 ? { token: body.token, meses } : { token: body.token };
             }));
     }
 
@@ -237,6 +282,14 @@
         orden: 1,
         montar,
         obtenerDatos,
+        // Para "¿Confirmas tu compra?": "Visa crédito •••• 4242 · 6 meses sin intereses de $133.33".
+        detalle() {
+            if (!actual || !actual.ultimo) return '';
+            const u = actual.ultimo;
+            const total = actual.resumen ? Number(actual.resumen.total) || 0 : 0;
+            return (NOMBRES_MARCA[u.marca] || '') + (TIPOS[u.tipo] ? ' ' + TIPOS[u.tipo].toLowerCase() : '') + ' •••• ' + u.ultimos4
+                + (u.meses > 1 ? ' · ' + u.meses + ' meses sin intereses de ' + dinero(Math.round(total / u.meses * 100) / 100) : ' · de contado');
+        },
         desmontar() { actual = null; }
     });
 })();

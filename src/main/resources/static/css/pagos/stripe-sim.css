@@ -147,3 +147,15 @@
         transition: none;
     }
 }
+
+/* Crédito o débito, arriba a la derecha de la tarjeta dibujada. */
+.tv-tipo {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.85;
+}
