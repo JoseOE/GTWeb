@@ -6,6 +6,8 @@
    - Llamadas a la API con X-User-Id.
    - Barra superior, mini-carrito (offcanvas), barra inferior con el total en
      celular y la notificación de "Agregado".
+   - Pie con quién vende (los datos del vendedor del gimnasio) y los enlaces a
+     los términos de compra y al aviso de privacidad.
    El carrito vive en el servidor (es el mismo en cualquier dispositivo);
    localStorage solo guarda el último contador para pintarlo al instante.
 ═══════════════════════════════════════ */
@@ -156,6 +158,8 @@ const Tienda = (() => {
         document.getElementById('boton-carrito').addEventListener('click', abrirCarrito);
         document.getElementById('barra-ver').addEventListener('click', abrirCarrito);
         document.getElementById('minicarrito').addEventListener('click', alTocarCarrito);
+
+        pintarPie();
 
         // El contador sale primero de la caché y luego se confirma con el servidor.
         try {
@@ -331,6 +335,46 @@ const Tienda = (() => {
             })
             .catch(err => avisar(err.message))
             .finally(() => { if (boton) boton.disabled = false; });
+    }
+
+    // Quién vende, en todas las páginas de la tienda: la ley de comercio
+    // electrónico pide mostrarlo antes de comprar. Si el gimnasio no llenó sus
+    // datos del vendedor, se usa su nombre y su dirección.
+    function pintarPie() {
+        const main = document.getElementById('contenido');
+        if (!main || document.getElementById('tienda-pie')) return;
+        const gymId = sesion.gymId;
+        const conGym = gymId ? '?gym=' + encodeURIComponent(gymId) : '';
+        main.insertAdjacentHTML('afterend', `
+            <footer class="tienda-pie" id="tienda-pie">
+                <div class="container-tienda">
+                    <div class="tienda-pie-vendedor" id="tienda-pie-vendedor" aria-live="polite"></div>
+                    <nav class="tienda-pie-enlaces" aria-label="Información legal">
+                        <a href="terminos.html${conGym}">Términos de compra</a>
+                        <a href="privacidad.html${conGym}">Aviso de privacidad</a>
+                        <a href="https://www.gob.mx/profeco" target="_blank" rel="noopener">Profeco</a>
+                    </nav>
+                    <p class="tienda-pie-nota">Precios en pesos mexicanos con IVA incluido. GymTrack es un proyecto académico: los pagos son simulados.</p>
+                </div>
+            </footer>`);
+        if (!gymId) return;
+        fetch('/api/gyms/' + encodeURIComponent(gymId))
+            .then(res => res.ok ? res.json() : Promise.reject())
+            .then(g => {
+                const nombre = g.razonSocial || g.nombre;
+                if (!nombre) return;
+                const datos = [
+                    g.razonSocial && g.nombre && g.nombre !== g.razonSocial ? escapar(g.nombre) : '',
+                    g.rfc ? 'RFC ' + escapar(g.rfc) : '',
+                    escapar(g.direccion || ''),
+                    g.telefono ? 'Tel. ' + escapar(g.telefono) : '',
+                    g.correoContacto ? '<a href="mailto:' + escapar(g.correoContacto) + '">' + escapar(g.correoContacto) + '</a>' : ''
+                ].filter(Boolean);
+                document.getElementById('tienda-pie-vendedor').innerHTML =
+                    '<span class="tienda-pie-titulo">Vende</span><strong>' + escapar(nombre) + '</strong>'
+                    + (datos.length ? '<span class="tienda-pie-datos">' + datos.join(' · ') + '</span>' : '');
+            })
+            .catch(() => { /* sin datos del gimnasio: quedan los enlaces */ });
     }
 
     function pintarEstado(contenedor, tipo, mensaje, reintentar) {
