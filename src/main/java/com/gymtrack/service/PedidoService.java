@@ -84,7 +84,8 @@ public class PedidoService {
     // apartado. extrasPago se agrega a datosPago (lo recibido y el cambio).
     public record Venta(String gymId, String canal, String userId, String email, String cliente, String vendedorId,
                         List<Linea> lineas, String proveedor, Map<String, Object> datos,
-                        boolean entregaInmediata, Map<String, Object> extrasPago) {}
+                        boolean entregaInmediata, Map<String, Object> extrasPago,
+                        Pedido.Consentimiento consentimiento) {}
 
     // Cobra una venta y guarda su pedido:
     //  1. toma las piezas del inventario (todo o nada, atómico);
@@ -150,6 +151,7 @@ public class PedidoService {
         p.setEstado(pago.capturado() ? Pedido.ESTADO_PAGADO : Pedido.ESTADO_PENDIENTE_PAGO);
         if (pago.capturado()) p.setPagadoEn(ahora);
         p.setInventario(registro);
+        p.setConsentimiento(v.consentimiento());
         try {
             p = pedidoRepository.insert(p);
         } catch (RuntimeException e) {
@@ -327,6 +329,11 @@ public class PedidoService {
             partidas.add(partida);
         }
         v.put("partidas", partidas);
+        Pedido.Consentimiento acepto = p.getConsentimiento();
+        v.put("consentimiento", acepto == null || !acepto.isEnviado() ? null : Map.of(
+                "terminosVersion", acepto.getTerminosVersion(),
+                "aceptaAdvertencia", acepto.isAceptaAdvertencia(),
+                "aceptadoEn", acepto.getRegistradoEn().toString()));
         Gym gym = p.getGymId() == null ? null : gymRepository.findById(p.getGymId()).orElse(null);
         v.put("gym", gym == null ? null : Map.of(
                 "id", gym.getId(),

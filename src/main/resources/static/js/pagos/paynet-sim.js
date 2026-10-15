@@ -130,9 +130,10 @@
 
     MetodosPago.registrar({
         id: 'paynet',
-        nombre: 'Efectivo en tiendas (Paynet)',
-        descripcion: 'Paga en tiendas de conveniencia en 72 h',
+        nombre: 'Efectivo en tiendas',
+        descripcion: 'Paga con código de barras en tiendas y farmacias en 72 h',
         icono: 'bx-store',
+        logos: ['oxxo', '7-eleven', 'walmart', 'bodega-aurrera', 'farmacias-del-ahorro', 'circle-k'],
         orden: 2,
         montar,
         obtenerDatos,

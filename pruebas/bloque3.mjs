@@ -1,6 +1,6 @@
 // Prueba del bloque 3 (simulador Stripe y mostrador) contra Spring y MongoDB locales.
 import fs from 'node:fs';
-import { API, ESTADO } from './entorno.mjs';
+import { API, ESTADO, CONSENTIMIENTO } from './entorno.mjs';
 
 const n = JSON.parse(fs.readFileSync(ESTADO, 'utf8'));
 const TOKENS = n.tokens || {};
@@ -47,21 +47,21 @@ async function carritoCon(variante, cantidad = 1) {
 let c = await carritoCon(agua.variantes[0].id);
 for (const [num, texto] of [['4000000000000002', 'rechazada'], ['4000000000009995', 'fondos'], ['4000000000000069', 'vencida'], ['4000000000000127', 'CVC']]) {
   const t = await token(num);
-  r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: t.token }, totalVisto: c.total }, member);
+  r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: t.token }, totalVisto: c.total, consentimiento: CONSENTIMIENTO }, member);
   ok(r.status === 402 && r.body.error.includes(texto), `${num.slice(-4)} → 402 "${texto}"`, r.body.error);
 }
 r = await api('GET', '/api/tienda/carrito', null, member);
 ok(r.body.articulos === 1, 'tras los rechazos el carrito sigue intacto', r.body.articulos);
-r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: 'tok_sim_inventado', resultado: 'aprobada', marca: 'visa' }, totalVisto: c.total }, member);
+r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: 'tok_sim_inventado', resultado: 'aprobada', marca: 'visa' }, totalVisto: c.total, consentimiento: CONSENTIMIENTO }, member);
 ok(r.status === 400, 'token inventado → 400 (no se puede forzar "aprobada")', r.body.error);
 const ajeno = await token('4242424242424242', owner);
-r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: ajeno.token }, totalVisto: c.total }, member);
+r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: ajeno.token }, totalVisto: c.total, consentimiento: CONSENTIMIENTO }, member);
 ok(r.status === 400, 'token de otra persona → 400', r.body.error);
 const bueno = await token('4242424242424242');
-r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: bueno.token }, totalVisto: c.total }, member);
+r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: bueno.token }, totalVisto: c.total, consentimiento: CONSENTIMIENTO }, member);
 ok(r.status === 200 && r.body.estado === 'pagado' && r.body.detallePago === 'Visa •••• 4242', '4242 aprueba', { folio: r.body.folio, detalle: r.body.detallePago });
 c = await carritoCon(agua.variantes[0].id);
-r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: bueno.token }, totalVisto: c.total }, member);
+r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: bueno.token }, totalVisto: c.total, consentimiento: CONSENTIMIENTO }, member);
 ok(r.status === 400, 'el mismo token no se puede usar dos veces', r.body.error);
 await api('DELETE', '/api/tienda/carrito', null, member);
 

@@ -233,6 +233,7 @@
         nombre: 'Tarjeta de crédito o débito',
         descripcion: 'Visa, Mastercard o American Express de prueba',
         icono: 'bx-credit-card',
+        logos: ['visa', 'mastercard', 'amex'],
         orden: 1,
         montar,
         obtenerDatos,

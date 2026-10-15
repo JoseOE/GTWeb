@@ -4,6 +4,7 @@ import com.gymtrack.model.Pedido;
 import com.gymtrack.model.User;
 import com.gymtrack.service.AccesoService;
 import com.gymtrack.service.CarritoService;
+import com.gymtrack.service.ConsentimientoService;
 import com.gymtrack.service.PedidoService;
 import com.gymtrack.service.TiendaException;
 import org.springframework.http.HttpStatus;
@@ -81,7 +82,9 @@ public class CarritoController {
         return carritos.quitar(user, user.getGymId(), canal(canal), partidaId);
     }
 
-    // POST /checkout  {"metodo": "stripe" | "paynet" | "paypal", "datos": {...}, "totalVisto": 934.5}
+    // POST /checkout  {"metodo": "stripe" | "paynet" | "paypal", "datos": {...}, "totalVisto": 934.5,
+    //                  "consentimiento": {"terminosVersion": "1", "aceptaTerminos": true, "aceptaAdvertencia": true}}
+    //  - 400 → falta aceptar los términos o la advertencia sanitaria;
     //  - 200 → el pedido (el mismo formato de GET /api/tienda/pedidos/{id});
     //  - 409 → el carrito cambió: trae "avisos" y "carrito" ya corregido;
     //  - 402 → el simulador rechazó el pago, con su mensaje.
@@ -90,7 +93,8 @@ public class CarritoController {
                                         @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId,
                                         @RequestBody CheckoutRequest request) {
         User user = acceso.exigirComprador(userId);
-        Pedido pedido = carritos.checkout(user, user.getGymId(), canal(canal), request.getMetodo(), request.getDatos(), request.getTotalVisto());
+        Pedido pedido = carritos.checkout(user, user.getGymId(), canal(canal), request.getMetodo(), request.getDatos(), request.getTotalVisto(),
+                request.getConsentimiento());
         return pedidos.vista(pedido);
     }
 
@@ -119,6 +123,11 @@ public class CarritoController {
         // Lo que armó el módulo JS del método (token de prueba, cuenta PayPal...).
         private Map<String, Object> datos;
         private Double totalVisto;
+        // {"terminosVersion": "1", "aceptaTerminos": true, "aceptaAdvertencia": true}
+        private ConsentimientoService.Solicitud consentimiento;
+
+        public ConsentimientoService.Solicitud getConsentimiento() { return consentimiento; }
+        public void setConsentimiento(ConsentimientoService.Solicitud consentimiento) { this.consentimiento = consentimiento; }
 
         public String getMetodo() { return metodo; }
         public void setMetodo(String metodo) { this.metodo = metodo; }

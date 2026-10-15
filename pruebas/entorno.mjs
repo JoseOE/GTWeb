@@ -34,6 +34,8 @@ export function leerLog() {
 
 // Lo que deja el bloque 1 (gimnasio, dueño, miembro, planes) para los demás.
 export const ESTADO = new URL('./ultima-prueba.json', import.meta.url);
+// Lo que el checkout manda después de '¿Confirmas tu compra?' (ConsentimientoService).
+export const CONSENTIMIENTO = { terminosVersion: '1', aceptaTerminos: true, aceptaAdvertencia: true };
 
 const esLocal = (url) => /^(https?|mongodb):\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/.test(url);
 if (process.env.PRUEBAS_PERMITIR_REMOTO !== '1') {

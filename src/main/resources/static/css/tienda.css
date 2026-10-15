@@ -815,6 +815,63 @@ body.con-barra-carrito {
 .icono-redondo:hover,
 .icono-redondo:focus-visible { border-color: var(--ink); }
 
+/* ─── Logos de las formas de pago (img/pagos) ─── */
+.logo-pago {
+    height: 24px;
+    width: auto;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: #fff;
+    flex: none;
+}
+.metodo-logos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+.metodo-texto { min-width: 0; }
+
+/* ─── Checkout: aviso legal bajo "Pagar" y modales de confirmación ─── */
+.nota-legal {
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+    margin: 8px 0 0;
+    line-height: 1.45;
+}
+.nota-legal a { color: var(--ink); }
+.confirmar-lista li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 0;
+}
+.confirmar-datos {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 8px 16px;
+    font-size: 15px;
+    border-top: 1px solid var(--line);
+    padding-top: 12px;
+}
+.confirmar-datos dt { color: var(--muted); font-weight: 500; }
+.confirmar-datos dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.legal-leyenda-checkout {
+    background: var(--ink);
+    color: #fff;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-weight: 700;
+    line-height: 1.45;
+}
+#modal-advertencia .form-check-input,
+#modal-confirmar .form-check-input {
+    width: 1.3em;
+    height: 1.3em;
+    margin-top: 0.1em;
+}
+
 /* ─── Pie: quién vende y enlaces legales ─── */
 .tienda-pie {
     border-top: 1px solid var(--line);

@@ -14,7 +14,8 @@
        id: 'stripe',                 // lo que Spring recibe en "metodo"
        nombre: 'Tarjeta de crédito o débito',
        descripcion: 'Visa, Mastercard o American Express de prueba',
-       icono: 'bx-credit-card',      // ícono de Boxicons
+       icono: 'bx-credit-card',      // ícono de Boxicons (si no hay logos)
+       logos: ['visa', 'mastercard', 'amex'], // img/pagos/<logo>.svg
        orden: 1,                     // posición en el selector
 
        // Dibuja el formulario del método dentro de `contenedor`.
@@ -39,6 +40,10 @@
        desmontar() {}
    });
 
+   saleDeLaPagina: true → el checkout pide "¿Confirmas tu compra?" antes de
+   llamar a obtenerDatos(); a los demás se les llama primero, para validar (la
+   tarjeta) antes de pedir la confirmación.
+
    Métodos que salen de la página (PayPal): obtenerDatos() puede navegar a
    otra página. Al volver a checkout.html?metodo=<id>&continuar=1, el checkout
    preselecciona ese método, lo monta y vuelve a pulsar "Pagar" solo; en esa
@@ -46,6 +51,13 @@
 ═══════════════════════════════════════ */
 (function () {
     const CONOCIDOS = ['stripe', 'paynet', 'paypal'];
+    // Logos de img/pagos/: marcas de tarjeta, tiendas que cobran con código de
+    // barras y PayPal. Se usan en el checkout, el mostrador y los tickets.
+    const LOGOS = {
+        visa: 'Visa', mastercard: 'Mastercard', amex: 'American Express', paypal: 'PayPal', efectivo: 'Efectivo',
+        oxxo: 'OXXO', '7-eleven': '7-Eleven', walmart: 'Walmart', 'bodega-aurrera': 'Bodega Aurrerá',
+        'farmacias-del-ahorro': 'Farmacias del Ahorro', 'circle-k': 'Circle K'
+    };
     const registrados = {};
 
     window.MetodosPago = {
@@ -56,6 +68,12 @@
                 return;
             }
             registrados[metodo.id] = metodo;
+        },
+
+        // <img> de un logo de img/pagos/, con su nombre como texto alternativo.
+        logo(id, clase) {
+            if (!LOGOS[id]) return '';
+            return '<img class="logo-pago' + (clase ? ' ' + clase : '') + '" src="img/pagos/' + id + '.svg" alt="' + LOGOS[id] + '" width="44" height="24" loading="lazy">';
         },
 
         obtener(id) {

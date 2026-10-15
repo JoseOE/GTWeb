@@ -1,6 +1,6 @@
 // Prueba del bloque 2 (API del miembro) contra Spring y MongoDB locales.
 import fs from 'node:fs';
-import { API, ESTADO } from './entorno.mjs';
+import { API, ESTADO, CONSENTIMIENTO } from './entorno.mjs';
 
 const n = JSON.parse(fs.readFileSync(ESTADO, 'utf8'));
 const TOKENS = n.tokens || {};
@@ -79,18 +79,28 @@ const totalVisto = r.body.total;
 const agua = (await api('POST', `/api/gyms/${gymId}/productos`, { nombre: 'Chicles', categoria: 'snacks', variantes: [{ precio: 10, existencias: 5 }] }, owner)).body;
 await api('POST', '/api/tienda/carrito/items', { varianteId: agua.variantes[0].id }, member);
 await api('PUT', `/api/gyms/${gymId}/productos/${agua.id}`, { nombre: 'Chicles', categoria: 'snacks', activo: false, variantes: agua.variantes.map(v => ({ ...v, existencias: 5 })) }, owner);
-r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: 'tok_prueba' }, totalVisto: totalVisto + 10 }, member);
+r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: 'tok_prueba' }, totalVisto: totalVisto + 10, consentimiento: CONSENTIMIENTO }, member);
 ok(r.status === 409 && r.body.avisos?.some(a => a.includes('Chicles')), 'producto ocultado → 409 con aviso y carrito corregido', r.body.avisos);
 const totalCorregido = r.body.carrito.total;
-r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: {}, totalVisto: totalCorregido + 1 }, member);
+r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: {}, totalVisto: totalCorregido + 1, consentimiento: CONSENTIMIENTO }, member);
 ok(r.status === 409, 'total distinto al que vio → 409', r.body.error);
 
 console.log('\n5. Checkout');
 const antes = (await api('GET', `/api/users/${member}/me`)).body.fechaProximoPago;
-r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'efectivo', datos: {}, totalVisto: totalCorregido }, member);
+r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'efectivo', datos: {}, totalVisto: totalCorregido, consentimiento: CONSENTIMIENTO }, member);
 ok(r.status === 400, 'método no válido en línea → 400', r.body.error);
+// Consentimiento (ley de comercio electrónico): términos y advertencia sanitaria.
+r = await api('GET', '/api/tienda/carrito', null, member);
+ok(r.body.items.find(i => i.varianteId === bote.id)?.requiereAdvertencia === true, 'el suplemento pide advertencia sanitaria en el carrito');
+r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'paynet', datos: {}, totalVisto: totalCorregido }, member);
+ok(r.status === 400 && r.body.error.includes('términos'), 'sin aceptar los términos → 400', r.body.error);
+r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'paynet', datos: {}, totalVisto: totalCorregido, consentimiento: { ...CONSENTIMIENTO, terminosVersion: '0' } }, member);
+ok(r.status === 409, 'términos de una versión vieja → 409', r.body.error);
+r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'paynet', datos: {}, totalVisto: totalCorregido, consentimiento: { ...CONSENTIMIENTO, aceptaAdvertencia: false } }, member);
+ok(r.status === 400 && r.body.error.includes('advertencia sanitaria'), 'suplemento sin aceptar la advertencia → 400', r.body.error);
 const tok = (await api('POST', '/api/simuladores/stripe/tokens', { numero: '4242424242424242', titular: 'Ana', mes: '12', anio: '30', cvc: '123' }, member)).body.token;
-r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: tok }, totalVisto: totalCorregido }, member);
+r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: tok }, totalVisto: totalCorregido, consentimiento: CONSENTIMIENTO }, member);
+ok(r.body.consentimiento?.terminosVersion === '1' && r.body.consentimiento.aceptaAdvertencia === true, 'el pedido guarda lo que se aceptó', r.body.consentimiento);
 ok(r.status === 200 && r.body.estado === 'pagado', 'pago con tarjeta simulada', { folio: r.body.folio, estado: r.body.estadoTexto, total: r.body.total, metodo: r.body.metodo });
 const pedido = r.body;
 const despues = (await api('GET', `/api/users/${member}/me`)).body;
@@ -107,7 +117,7 @@ ok(r.status === 200, 'el dueño del gimnasio sí lo ve');
 console.log('\n6. Paynet pendiente');
 await api('POST', '/api/tienda/carrito/items', { varianteId: planes.Visita.varianteId }, member);
 const c = (await api('GET', '/api/tienda/carrito', null, member)).body;
-r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'paynet', datos: {}, totalVisto: c.total }, member);
+r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'paynet', datos: {}, totalVisto: c.total, consentimiento: CONSENTIMIENTO }, member);
 ok(r.status === 200 && r.body.estado === 'pendiente_pago', 'pedido Paynet queda pendiente de pago', r.body.estadoTexto);
 const otra = (await api('GET', `/api/users/${member}/me`)).body.fechaProximoPago;
 ok(otra === despues.fechaProximoPago, 'y no mueve la membresía');
