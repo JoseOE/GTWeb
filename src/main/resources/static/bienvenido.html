@@ -558,12 +558,28 @@
                         <h3 class="fw-bold mb-1"><i class='bx bx-line-chart text-primary me-1'></i> Ventas</h3>
                         <p class="text-body-secondary mb-0">Lo que vendes en la página, la app y el mostrador: cuánto, cómo te pagan y qué se vende más.</p>
                     </div>
-                    <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="ventas-actualizar">
-                        <i class='bx bx-refresh'></i> Actualizar
-                    </button>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-primary btn-sm rounded-pill px-3" id="entrega-abrir">
+                            <i class='bx bx-qr-scan'></i> Entregar pedido
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="ventas-actualizar">
+                            <i class='bx bx-refresh'></i> Actualizar
+                        </button>
+                    </div>
                 </div>
 
                 <div class="row g-3 mb-4" id="ventas-kpis"></div>
+
+                <section class="dash-empty text-start p-0 overflow-hidden mb-4" id="por-entregar" aria-labelledby="por-entregar-titulo" hidden>
+                    <div class="p-4 pb-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div>
+                            <h4 class="fw-bold mb-0 fs-6" id="por-entregar-titulo"><i class='bx bx-package text-primary me-1'></i> Por entregar</h4>
+                            <small class="text-body-secondary">Pagados en la app o la tienda que el miembro todavía no recoge. Escanea el QR de su comprobante al entregar.</small>
+                        </div>
+                        <small class="text-body-secondary" id="por-entregar-conteo" aria-live="polite"></small>
+                    </div>
+                    <ul class="list-unstyled mb-0" id="por-entregar-lista"></ul>
+                </section>
 
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
                     <span class="small fw-semibold text-body-secondary me-1" id="ventas-periodo-etiqueta">Periodo</span>
@@ -660,6 +676,31 @@
                         <div class="modal-footer border-0 pt-0 d-block">
                             <div class="alert d-none small py-2 mb-2" id="venta-detalle-aviso" role="status"></div>
                             <div class="d-flex flex-wrap gap-2" id="venta-detalle-acciones"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── MODAL: ENTREGAR UN PEDIDO EN RECEPCIÓN (js/entregas.js) ─── -->
+            <div class="modal fade" id="entregaModal" tabindex="-1" aria-labelledby="entregaModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                    <div class="modal-content border-0 rounded-4">
+                        <div class="modal-header border-0 pb-0">
+                            <h5 class="modal-title fw-bold" id="entregaModalLabel"><i class='bx bx-qr-scan text-primary me-1'></i> Entregar pedido</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="small text-body-secondary">Escanea el código QR del comprobante del miembro (en su celular o impreso), o escribe el folio del pedido.</p>
+                            <form id="entrega-form" class="d-flex gap-2 mb-2" novalidate>
+                                <label for="entrega-codigo" class="visually-hidden">Folio o código del comprobante</label>
+                                <input type="text" id="entrega-codigo" class="form-control" placeholder="Folio (p. ej. 189) o código" autocomplete="off" spellcheck="false">
+                                <button type="submit" class="btn btn-primary rounded-pill px-3">Buscar</button>
+                            </form>
+                            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 mb-3" id="entrega-camara-btn"><i class='bx bx-camera'></i> Escanear con la cámara</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 mb-3" id="entrega-camara-apagar" hidden><i class='bx bx-camera-off'></i> Apagar cámara</button>
+                            <div id="entrega-camara" class="entrega-camara mb-3" hidden></div>
+                            <div class="alert d-none small py-2 mb-3" id="entrega-aviso" role="alert"></div>
+                            <div id="entrega-resultado" aria-live="polite"></div>
                         </div>
                     </div>
                 </div>
@@ -2377,6 +2418,7 @@
         function cargarVentas() {
             cargarResumenVentas();
             cargarPedidosVentas();
+            if (typeof Entregas !== 'undefined') Entregas.cargarPendientes();
         }
 
         // Fechas del periodo elegido (hora de México), de hoy hacia atrás.
@@ -2410,10 +2452,11 @@
                 { valor: dinero(k.mes.total), texto: 'Ventas del mes', detalle: textoPedidos(k.mes.pedidos), icono: 'bx-calendar', color: 'icon-success' },
                 { valor: dinero(k.ticketPromedio), texto: 'Ticket promedio', detalle: 'Este mes', icono: 'bx-receipt', color: 'icon-info' },
                 { valor: String(k.paynetPendientes.pedidos), texto: 'Fichas de pago por cobrar', detalle: dinero(k.paynetPendientes.total), icono: 'bx-store', color: 'icon-warning' },
+                { valor: String(k.porEntregar || 0), texto: 'Pedidos por entregar', detalle: 'Pagados, sin recoger', icono: 'bx-package', color: 'icon-info' },
                 { valor: String(k.membresiasDelMes), texto: 'Membresías vendidas', detalle: 'Este mes, en la tienda', icono: 'bx-purchase-tag-alt', color: 'icon-brand' }
             ];
             document.getElementById('ventas-kpis').innerHTML = tiles.map((t, i) => `
-                <div class="${i === tiles.length - 1 ? 'col-12' : 'col-6'} col-md-4 col-xl">
+                <div class="${i === tiles.length - 1 && tiles.length % 2 ? 'col-12' : 'col-6'} col-md-4 col-xl">
                     <div class="kpi-tile h-100">
                         <div class="icon-circle ${t.color} rounded-circle d-flex align-items-center justify-content-center mb-3" style="width:42px;height:42px">
                             <i class='bx ${t.icono}' aria-hidden="true"></i>
@@ -2568,7 +2611,7 @@
                         <td>${escapeHtml(v.cliente || '—')}<div class="small text-body-secondary">${v.articulos} ${v.articulos === 1 ? 'artículo' : 'artículos'}</div></td>
                         <td class="text-nowrap">${escapeHtml(CANALES_VENTAS[v.canal] || v.canal || '')}</td>
                         <td>${escapeHtml(v.metodo)}<div class="small text-body-secondary text-truncate" style="max-width:220px">${escapeHtml(v.detallePago)}</div></td>
-                        <td>${insigniaVenta(v.estado)}</td>
+                        <td>${insigniaVenta(v.estado)}${v.porEntregar ? '<div><span class="badge rounded-pill bg-info-subtle text-info-emphasis mt-1">Por entregar</span></div>' : ''}</td>
                         <td class="pe-4 text-end fw-semibold text-nowrap">${dinero(v.total)}</td>
                     </tr>`).join('')
                 : '<tr><td colspan="6" class="text-center text-body-secondary py-5 px-4"><i class="bx bx-receipt fs-1 d-block mb-2 opacity-50"></i>'
@@ -2598,6 +2641,8 @@
                     ${fila('Pagado', d.pagadoEn ? fechaHoraVenta(d.pagadoEn) : '')}
                     ${fila('Cancelado', d.canceladoEn ? fechaHoraVenta(d.canceladoEn) : '')}
                     ${fila('Cobró', escapeHtml(d.vendedor || ''))}
+                    ${d.entrega && d.entrega.estado === 'pendiente' ? fila('Entrega', '<span class="badge rounded-pill bg-info-subtle text-info-emphasis">Por entregar</span>') : ''}
+                    ${d.entrega && d.entrega.estado === 'entregado' && d.canal !== 'mostrador' ? fila('Entregado', fechaHoraVenta(d.entrega.entregadoEn) + (d.entregadoPor ? '<br><span class="text-body-secondary">por ' + escapeHtml(d.entregadoPor) + '</span>' : '')) : ''}
                 </dl>
                 <div class="border-top pt-2">
                     ${d.partidas.map(p => `
@@ -2613,6 +2658,7 @@
 
             const a = d.acciones;
             const botones = [
+                a.entregar && ['entregar', 'btn-success', 'bx-package', 'Entregar productos'],
                 a.simularPaynet && ['simular', 'btn-primary', 'bx-store', 'Simular pago en tienda'],
                 a.recibo && ['recibo', 'btn-outline-primary', 'bx-receipt', 'Recibo (PDF)'],
                 a.ficha && ['ficha', 'btn-outline-primary', 'bx-barcode', 'Ficha de pago (PDF)'],
@@ -2663,6 +2709,7 @@
             const rutas = {
                 reenviar: '/api/recibos/pedidos/' + encodeURIComponent(d.orderId) + '/enviar',
                 simular: '/api/simuladores/paynet/' + encodeURIComponent(d.orderId) + '/pagar',
+                entregar: rutaVenta(d.orderId) + '/entregar',
                 cancelar: rutaVenta(d.orderId) + '/cancelar'
             };
             const original = boton.innerHTML;
@@ -2698,6 +2745,7 @@
         }
 
         function mensajeDeAccion(accion, r) {
+            if (accion === 'entregar') return 'Listo: el pedido quedó entregado y salió del inventario.';
             if (accion === 'simular') return 'Pago simulado en ' + (r.paynet && r.paynet.tiendaNombre ? r.paynet.tiendaNombre : 'tienda') + ': el pedido quedó pagado.';
             return 'Pedido cancelado.';
         }
@@ -3778,6 +3826,7 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/pagos/metodos.js"></script>
+    <script src="js/entregas.js"></script>
     <script src="js/alta-recepcion.js"></script>
 </body>
 </html>

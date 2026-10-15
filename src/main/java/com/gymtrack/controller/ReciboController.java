@@ -71,6 +71,21 @@ public class ReciboController {
                 (ticket ? "ticket-" : "recibo-") + p.getFolio() + ".pdf");
     }
 
+    // GET /api/recibos/pedidos/{orderId}/qr.png → QR para recoger el pedido en
+    // recepción (web y app). Solo de pedidos pagados.
+    @GetMapping("/pedidos/{orderId}/qr.png")
+    public ResponseEntity<byte[]> qrPedido(@PathVariable String orderId,
+                                           @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
+        Pedido p = pedido(orderId, userId);
+        if (!CON_RECIBO.contains(p.getEstado())) {
+            throw new TiendaException(HttpStatus.CONFLICT, "Este pedido todavía no está pagado.");
+        }
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .cacheControl(CacheControl.noStore())
+                .body(recibos.qrEntregaPng(p));
+    }
+
     // GET /api/recibos/paynet/{orderId}.pdf → ficha para pagar en tienda.
     @GetMapping("/paynet/{orderId}.pdf")
     public ResponseEntity<byte[]> fichaPaynet(@PathVariable String orderId,

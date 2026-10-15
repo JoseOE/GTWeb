@@ -172,6 +172,61 @@ b = await binario(`/api/recibos/compartidos/${tokenFicha}.pdf`);
 ok(b.status === 410, 'el enlace de un pedido cancelado → 410');
 await m2.close();
 
+console.log('\n7. Entregas en recepción');
+const variante = async () => {
+  const m = await MongoClient.connect(MONGO);
+  const prod = await m.db().collection('productos').findOne({ 'variantes._id': agua.id });
+  await m.close();
+  const v = prod.variantes.find(x => (x._id ?? x.id) === agua.id);
+  return { existencias: v.existencias, apartadas: v.apartadas || 0, disponible: v.disponible };
+};
+await api('DELETE', '/api/tienda/carrito', null, member);
+c = (await api('POST', '/api/tienda/carrito/items', { varianteId: agua.id, cantidad: 2 }, member)).body;
+const antesCompra = await variante();
+const tokE = (await api('POST', '/api/simuladores/stripe/tokens', { numero: '4242424242424242', titular: 'Ana', mes: '12', anio: '30', cvc: '123' }, member)).body.token;
+const enLinea = (await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: tokE }, totalVisto: c.total, consentimiento: CONSENTIMIENTO }, member)).body;
+ok(enLinea.estado === 'pagado' && enLinea.entrega?.estado === 'pendiente', 'compra en línea pagada → por recoger', enLinea.entrega);
+const trasCompra = await variante();
+ok(trasCompra.apartadas === antesCompra.apartadas + 2 && trasCompra.existencias === antesCompra.existencias, 'al pagar se aparta (no baja existencias)', { antesCompra, trasCompra });
+b = await binario(`/api/recibos/pedidos/${enLinea.orderId}/qr.png`, member);
+ok(b.status === 200 && b.tipo === 'image/png', 'el miembro ve el QR para recoger', { bytes: b.buf.length });
+r = await api('GET', `/api/gyms/${gymId}/ventas/resumen`, null, owner);
+ok(r.body.kpis.porEntregar >= 1, 'KPI "por entregar"', r.body.kpis.porEntregar);
+r = await api('GET', `/api/gyms/${gymId}/ventas/pedidos?estado=por_entregar&tamano=100`, null, owner);
+ok(r.body.pedidos.some(p => p.orderId === enLinea.orderId && p.porEntregar), 'aparece en la lista "Por entregar"', r.body.total);
+r = await api('GET', `/api/gyms/${gymId}/ventas/entregas/buscar?codigo=${encodeURIComponent('GymTrack · Pedido #' + enLinea.folio + ' · ' + enLinea.orderId)}`, null, owner);
+ok(r.status === 200 && r.body.orderId === enLinea.orderId && r.body.acciones.entregar === true, 'el dueño escanea el QR y lo encuentra', r.body?.folio);
+r = await api('GET', `/api/gyms/${gymId}/ventas/entregas/buscar?codigo=%23${enLinea.folio}`, null, owner);
+ok(r.status === 200 && r.body.orderId === enLinea.orderId, 'también por folio (#N)');
+r = await api('GET', `/api/gyms/${gymId}/ventas/entregas/buscar?codigo=999999999`, null, owner);
+ok(r.status === 404, 'un folio que no es del gimnasio → 404', r.body?.error);
+r = await api('POST', `/api/gyms/${gymId}/ventas/pedidos/${enLinea.orderId}/entregar`, null, member);
+ok(r.status === 401 || r.status === 403 || r.status === 404, 'un miembro no puede marcarlo entregado', r.status);
+r = await api('POST', `/api/gyms/${gymId}/ventas/pedidos/${enLinea.orderId}/entregar`, null, owner);
+ok(r.status === 200 && r.body.entrega?.estado === 'entregado' && r.body.acciones.entregar === false && r.body.entregadoPor, 'el dueño lo entrega', r.body?.entregadoPor);
+const trasEntrega = await variante();
+ok(trasEntrega.apartadas === trasCompra.apartadas - 2 && trasEntrega.existencias === trasCompra.existencias - 2 && trasEntrega.disponible === trasCompra.disponible,
+  'al entregar bajan apartadas y existencias; disponible no cambia', { trasCompra, trasEntrega });
+r = await api('POST', `/api/gyms/${gymId}/ventas/pedidos/${enLinea.orderId}/entregar`, null, owner);
+ok(r.status === 409, 'entregarlo dos veces → 409', r.body?.error);
+r = await api('GET', `/api/tienda/pedidos/${enLinea.orderId}`, null, member);
+ok(r.body.entrega?.estado === 'entregado' && r.body.entrega.entregadoEn, 'el miembro lo ve entregado');
+b = await binario(`/api/recibos/pedidos/${enLinea.orderId}.pdf`, member);
+ok(b.status === 200, 'el comprobante se sigue bajando');
+// Ficha pendiente: no se entrega hasta que se pague.
+c = (await api('POST', '/api/tienda/carrito/items', { varianteId: agua.id, cantidad: 1 }, member)).body;
+const sinPagar = (await api('POST', '/api/tienda/carrito/checkout', { metodo: 'paynet', datos: {}, totalVisto: c.total, consentimiento: CONSENTIMIENTO }, member)).body;
+r = await api('POST', `/api/gyms/${gymId}/ventas/pedidos/${sinPagar.orderId}/entregar`, null, owner);
+ok(r.status === 409 && r.body.error.includes('no está pagado'), 'una ficha sin pagar no se entrega', r.body?.error);
+await api('POST', `/api/gyms/${gymId}/ventas/pedidos/${sinPagar.orderId}/cancelar`, null, owner);
+// Mostrador: se entrega en el acto.
+const precioAgua = (await api('GET', `/api/tienda/${gymId}/productos`, null, member)).body.find(p => p.nombre.startsWith('Agua')).variantes[0].precio;
+r = await api('POST', `/api/gyms/${gymId}/mostrador/cobrar`, { partidas: [{ varianteId: agua.id, cantidad: 1 }], clienteId: null, metodo: 'efectivo', recibido: 500, totalVisto: precioAgua }, owner);
+const delMostrador = r.body?.pedido;
+ok(r.status === 200 && delMostrador?.entrega?.estado === 'entregado', 'la venta de mostrador ya sale entregada', delMostrador?.entrega);
+r = await api('POST', `/api/gyms/${gymId}/ventas/pedidos/${delMostrador?.orderId}/entregar`, null, owner);
+ok(r.status === 409, 'el mostrador no pasa por "Entregar"', r.body?.error);
+
 console.log(fallos ? `\n${fallos} prueba(s) fallaron` : '\nTodo bien');
 // Código de salida 1 si algo falló: así correr-todas.mjs y la CI lo marcan en rojo.
 if (fallos) process.exitCode = 1;

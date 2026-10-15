@@ -28,7 +28,7 @@ public class VentasController {
     }
 
     // GET /resumen?desde=2026-09-03&hasta=2026-10-02 (por defecto, los últimos 30 días)
-    // → {kpis: {hoy, mes, ticketPromedio, paynetPendientes, membresiasDelMes},
+    // → {kpis: {hoy, mes, ticketPromedio, paynetPendientes, porEntregar, membresiasDelMes},
     //    periodo, porDia: [{fecha, pedidos, total}], porMetodo, porCanal, topProductos}
     @GetMapping("/resumen")
     public Map<String, Object> resumen(@PathVariable String gymId,
@@ -39,7 +39,7 @@ public class VentasController {
         return ventas.resumen(gymId, fecha(desde), fecha(hasta));
     }
 
-    // GET /pedidos?metodo=tarjeta|paynet|paypal|efectivo&estado=pagado|pendiente_pago|cancelado|reembolsado
+    // GET /pedidos?metodo=tarjeta|paynet|paypal|efectivo&estado=pagado|pendiente_pago|cancelado|reembolsado|por_entregar
     //            &canal=web|app|mostrador&desde=&hasta=&buscar=<folio, cliente o correo>&pagina=0&tamano=20
     // → {pedidos: [...], total, pagina, paginas, cobrado}
     @GetMapping("/pedidos")
@@ -80,6 +80,23 @@ public class VentasController {
                                         @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
         acceso.exigirDueno(gymId, userId);
         return ventas.cancelar(gymId, orderId);
+    }
+
+    // GET /entregas/buscar?codigo=<lo que leyó el QR del comprobante, o el folio>
+    // → el detalle del pedido, con acciones.entregar si falta entregarlo.
+    @GetMapping("/entregas/buscar")
+    public Map<String, Object> buscarEntrega(@PathVariable String gymId, @RequestParam(required = false) String codigo,
+                                             @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
+        acceso.exigirDueno(gymId, userId);
+        return ventas.buscarParaEntregar(gymId, codigo);
+    }
+
+    // Marca como entregados en recepción los productos de un pedido de la tienda o la app.
+    @PostMapping("/pedidos/{orderId}/entregar")
+    public Map<String, Object> entregar(@PathVariable String gymId, @PathVariable String orderId,
+                                        @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
+        acceso.exigirDueno(gymId, userId);
+        return ventas.entregar(gymId, orderId, userId);
     }
 
     private static LocalDate fecha(String valor) {

@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 // Dashboard de ventas del panel (pestaña Ventas). Todo sale de la colección
@@ -38,6 +39,10 @@ import java.util.regex.Pattern;
 // México. Los reembolsados y cancelados no suman.
 @Service
 public class VentasService {
+
+    // Filtro especial de la lista: pagados de la tienda o la app que faltan por entregar.
+    public static final String POR_ENTREGAR = "por_entregar";
+    private static final Pattern ORDER_ID = Pattern.compile("order_[0-9A-Za-z]+");
 
     private static final Logger log = LoggerFactory.getLogger(VentasService.class);
     private static final ZoneId ZONA_MX = ZoneId.of("America/Mexico_City");
@@ -128,6 +133,7 @@ public class VentasService {
         int pedidosMes = (int) mes.get("pedidos");
         kpis.put("ticketPromedio", pedidosMes == 0 ? 0.0 : centavos((double) mes.get("total") / pedidosMes));
         kpis.put("paynetPendientes", paynetPendientes(gymId));
+        kpis.put("porEntregar", (int) mongo.count(Query.query(new Criteria().andOperator(Criteria.where("gymId").is(gymId), porEntregar())), Pedido.class));
         List<Document> membresias = r.getList("membresiasDelMes", Document.class, List.of());
         kpis.put("membresiasDelMes", membresias.isEmpty() ? 0 : numero(membresias.get(0).get("cantidad")).intValue());
 
@@ -255,8 +261,12 @@ public class VentasService {
         }
         if (vacio(f.estado()) != null) {
             String estado = f.estado().trim().toLowerCase();
-            if (!ESTADOS.contains(estado)) throw new TiendaException(HttpStatus.BAD_REQUEST, "Estado no válido.");
-            y.add(Criteria.where("estado").is(estado));
+            if (POR_ENTREGAR.equals(estado)) {
+                y.add(porEntregar());
+            } else {
+                if (!ESTADOS.contains(estado)) throw new TiendaException(HttpStatus.BAD_REQUEST, "Estado no válido.");
+                y.add(Criteria.where("estado").is(estado));
+            }
         }
         if (vacio(f.canal()) != null) {
             String canal = f.canal().trim().toLowerCase();
@@ -276,6 +286,15 @@ public class VentasService {
             y.add(new Criteria().orOperator(o.toArray(new Criteria[0])));
         }
         return new Criteria().andOperator(y.toArray(new Criteria[0]));
+    }
+
+    // Lo mismo que Pedido.porEntregar(), en la base: pagado, de la tienda o la
+    // app, sin entregar y con al menos un producto (no solo membresía).
+    private static Criteria porEntregar() {
+        return Criteria.where("estado").is(Pedido.ESTADO_PAGADO)
+                .and("canal").ne(Pedido.CANAL_MOSTRADOR)
+                .and("entregadoEn").is(null)
+                .and("partidas").elemMatch(Criteria.where("tipo").ne(TiendaGymService.TIPO_MEMBRESIA));
     }
 
     private double cobrado(Criteria criterios) {
@@ -315,6 +334,7 @@ public class VentasService {
         f.put("metodo", MetodosPago.nombre(p.getProveedorPago()));
         f.put("detallePago", PedidoService.detallePago(p));
         f.put("estado", p.getEstado());
+        f.put("porEntregar", p.porEntregar());
         f.put("total", p.getTotal());
         f.put("articulos", p.getPartidas().stream().mapToInt(x -> x.getCantidad() == null ? 0 : x.getCantidad()).sum());
         return f;
@@ -334,6 +354,8 @@ public class VentasService {
         d.put("vendedor", p.getVendedorId() == null ? null
                 : userRepository.findById(p.getVendedorId()).map(User::getNombre).orElse(null));
         d.put("planAplicado", p.isPlanAplicado());
+        d.put("entregadoPor", p.getEntregadoPor() == null ? null
+                : userRepository.findById(p.getEntregadoPor()).map(User::getNombre).orElse(null));
         boolean pagado = Pedido.ESTADO_PAGADO.equals(p.getEstado());
         boolean pendiente = Pedido.ESTADO_PENDIENTE_PAGO.equals(p.getEstado());
         boolean paynet = MetodosPago.PAYNET.equals(p.getProveedorPago());
@@ -347,6 +369,7 @@ public class VentasService {
         acciones.put("simularPaynet", pendiente && paynet && !vencida);
         acciones.put("reembolsar", pagado);
         acciones.put("cancelar", pendiente);
+        acciones.put("entregar", p.porEntregar());
         d.put("acciones", acciones);
         d.put("fichaVencida", vencida);
         return d;
@@ -389,6 +412,34 @@ public class VentasService {
         Pedido cancelado = pedidos.cancelar(p);
         log.info("Pedido #{} cancelado desde el panel.", p.getFolio());
         return detalle(cancelado);
+    }
+
+    // ═══════════════════════════ ENTREGAS EN RECEPCIÓN ═══════════════════════════
+
+    // El pedido que el dueño escaneó o escribió: el QR del comprobante trae el
+    // orderId ("... · order_01..."), y también se acepta el folio ("#189" o "189").
+    // Solo busca en su gimnasio.
+    public Map<String, Object> buscarParaEntregar(String gymId, String codigo) {
+        String texto = codigo == null ? "" : codigo.trim();
+        Matcher id = ORDER_ID.matcher(texto);
+        Pedido p = null;
+        if (id.find()) {
+            p = pedidoRepository.findByOrderId(id.group()).filter(x -> gymId.equals(x.getGymId())).orElse(null);
+        } else {
+            String folio = texto.replace("#", "").trim();
+            if (folio.matches("\\d{1,18}")) {
+                p = mongo.findOne(Query.query(Criteria.where("gymId").is(gymId).and("folio").is(Long.parseLong(folio))), Pedido.class);
+            } else if (texto.isEmpty()) {
+                throw new TiendaException(HttpStatus.BAD_REQUEST, "Escanea el código QR del comprobante o escribe el folio del pedido.");
+            }
+        }
+        if (p == null) throw new TiendaException(HttpStatus.NOT_FOUND, "No encontramos ese pedido en tu gimnasio. Revisa el folio.");
+        return detalle(p);
+    }
+
+    public Map<String, Object> entregar(String gymId, String orderId, String userId) {
+        Pedido entregado = pedidos.entregar(exigirPedido(gymId, orderId), userId);
+        return detalle(entregado);
     }
 
     // ═══════════════════════════ AYUDANTES ═══════════════════════════

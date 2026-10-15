@@ -70,6 +70,11 @@ public class Pedido {
     private Instant creadoEn;
     private Instant pagadoEn;
     private Instant canceladoEn;
+    // Tienda y app: cuándo se entregaron los productos en recepción y quién
+    // los entregó (el dueño escanea el QR del comprobante). null = por
+    // entregar. El mostrador entrega en el acto y no los usa.
+    private Instant entregadoEn;
+    private String entregadoPor;
     // true cuando ya se extendió la membresía por el plan de este pedido.
     private boolean planAplicado;
     private Instant sincronizadoEn;
@@ -114,6 +119,16 @@ public class Pedido {
 
     public boolean incluyePlan() {
         return partidas.stream().anyMatch(Partida::esPlan);
+    }
+
+    // Lleva algo que se entrega en mano (una membresía sola no).
+    public boolean llevaProductos() {
+        return partidas.stream().anyMatch(x -> !x.esPlan());
+    }
+
+    // Pedido de la tienda o la app, pagado, cuyos productos todavía no se recogen.
+    public boolean porEntregar() {
+        return ESTADO_PAGADO.equals(estado) && !CANAL_MOSTRADOR.equals(canal) && entregadoEn == null && llevaProductos();
     }
 
     public static class Inventario {
@@ -263,6 +278,12 @@ public class Pedido {
 
     public Instant getCanceladoEn() { return canceladoEn; }
     public void setCanceladoEn(Instant canceladoEn) { this.canceladoEn = canceladoEn; }
+
+    public Instant getEntregadoEn() { return entregadoEn; }
+    public void setEntregadoEn(Instant entregadoEn) { this.entregadoEn = entregadoEn; }
+
+    public String getEntregadoPor() { return entregadoPor; }
+    public void setEntregadoPor(String entregadoPor) { this.entregadoPor = entregadoPor; }
 
     public boolean isPlanAplicado() { return planAplicado; }
     public void setPlanAplicado(boolean planAplicado) { this.planAplicado = planAplicado; }
