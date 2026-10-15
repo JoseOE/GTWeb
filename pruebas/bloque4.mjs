@@ -87,7 +87,7 @@ ok(venceDespues !== venceAntes, 'la Visita del pedido Paynet se aplicó al pagar
 r = await api('POST', `/api/simuladores/paynet/${ficha.orderId}/pagar`, null, owner);
 ok(r.status === 409, 'pagar dos veces → 409', r.body.error);
 await espera(2500);
-ok(lineasLog('Tu ficha de pago Paynet').some(l => l.includes('#' + ficha.folio)), 'correo con la ficha', lineasLog('Tu ficha de pago Paynet').slice(-1)[0]?.slice(-70));
+ok(lineasLog('Tu ficha de pago en efectivo').some(l => l.includes('#' + ficha.folio)), 'correo con la ficha', lineasLog('Tu ficha de pago en efectivo').slice(-1)[0]?.slice(-70));
 ok(lineasLog('Recibimos tu pago').some(l => l.includes('#' + ficha.folio)), 'correo "Recibimos tu pago" con recibo', lineasLog('Recibimos tu pago').slice(-1)[0]?.slice(-70));
 b = await binario(`/api/recibos/pedidos/${ficha.orderId}.pdf`, member);
 ok(b.status === 200, 'ahora sí tiene recibo');

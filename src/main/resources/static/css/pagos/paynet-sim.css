@@ -63,3 +63,21 @@
 .pn-pasos li {
     padding: 2px 0;
 }
+
+/* Logos de las tiendas donde se paga con la referencia. */
+.pn-tiendas-logos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 4px 0 10px;
+}
+.pn-tiendas-logos .logo-pago.grande { height: 32px; }
+.pn-pagada { border-left: 4px solid #2e7d4f; }
+.pn-datos {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 2px 16px;
+    font-size: 15px;
+}
+.pn-datos dt { color: var(--muted); font-weight: 500; }
+.pn-datos dd { margin: 0; font-variant-numeric: tabular-nums; }

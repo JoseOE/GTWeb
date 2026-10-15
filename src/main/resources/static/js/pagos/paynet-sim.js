@@ -1,5 +1,6 @@
 /* ═══════════════════════════════════════
-   Simulador de Paynet: pago en efectivo en tiendas.
+   Efectivo en tiendas (simulador tipo Paynet): OXXO, 7-Eleven, Walmart,
+   Bodega Aurrerá, Farmacias del Ahorro y Circle K.
    ───────────────────────────────────────
    Al pagar, el pedido queda apartado como "Pendiente de pago" con una
    referencia de 18 dígitos y 72 h para pagar. La ficha (código de barras,
@@ -8,7 +9,11 @@
    simulación, el dueño marca el pago desde el dashboard de ventas.
 ═══════════════════════════════════════ */
 (function () {
-    const TIENDAS = ['Tiendas de conveniencia', 'Farmacias', 'Supermercados', 'Tiendas departamentales'];
+    const TIENDAS = ['oxxo', '7-eleven', 'walmart', 'bodega-aurrera', 'farmacias-del-ahorro', 'circle-k'];
+
+    function logos(clase) {
+        return '<div class="pn-tiendas-logos">' + TIENDAS.map(t => MetodosPago.logo(t, clase)).join('') + '</div>';
+    }
 
     function cargarEstilos() {
         if (document.getElementById('estilos-paynet-sim')) return;
@@ -39,7 +44,8 @@
             <div class="pn-ficha">
                 <span class="pn-simulacion">Simulación</span>
                 <p class="mt-2 mb-2">Al confirmar te damos una <strong>referencia</strong> y un <strong>código de barras</strong> para pagar
-                    <strong>${dinero(resumen && resumen.total)}</strong> en efectivo en cualquier tienda de la red.</p>
+                    <strong>${dinero(resumen && resumen.total)}</strong> en efectivo en cualquiera de estas tiendas:</p>
+                ${logos()}
                 <ul class="small text-body-secondary mb-0 ps-3">
                     <li>Tienes 72 horas para pagar; después el pedido se cancela solo.</li>
                     <li>Apartamos tu pedido y te avisamos por correo cuando recibamos el pago.</li>
@@ -56,8 +62,21 @@
     // Ficha en la confirmación: código de barras, referencia, fecha límite y
     // dónde pagar. Solo mientras el pedido esté pendiente.
     function confirmacion(contenedor, pedido) {
-        if (pedido.estado !== 'pendiente_pago' || !pedido.paynet) return;
+        if (!pedido.paynet) return;
         cargarEstilos();
+        // Ya se pagó: en qué tienda y con qué folio de caja.
+        if (pedido.estado === 'pagado' && pedido.paynet.tienda) {
+            contenedor.innerHTML = `
+                <section class="pn-ficha pn-pagada" aria-label="Pago en tienda">
+                    <div class="d-flex align-items-center gap-2">${MetodosPago.logo(pedido.paynet.tienda)}<strong>Pagaste en ${escapar(pedido.paynet.tiendaNombre)}</strong></div>
+                    <dl class="pn-datos mt-2 mb-0">
+                        <dt>Referencia</dt><dd>${escapar(pedido.paynet.referencia)}</dd>
+                        <dt>Folio de caja</dt><dd>${escapar(pedido.paynet.folioCaja || '')}</dd>
+                    </dl>
+                </section>`;
+            return;
+        }
+        if (pedido.estado !== 'pendiente_pago') return;
         const vence = pedido.paynet.vence
             ? new Date(pedido.paynet.vence).toLocaleString('es-MX', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
             : '';
@@ -79,13 +98,13 @@
                 </div>
                 <h3 class="fs-6 fw-bold mt-4 mb-2">Cómo pagar</h3>
                 <ol class="pn-pasos">
-                    <li>Acude a cualquier tienda de la red Paynet.</li>
-                    <li>Indica en caja que vas a pagar un servicio Paynet.</li>
+                    <li>Acude a cualquiera de las tiendas de abajo.</li>
+                    <li>Indica en caja que vas a pagar con referencia.</li>
                     <li>Muestra el código de barras o dicta la referencia.</li>
                     <li>Paga el monto exacto en efectivo y conserva tu comprobante.</li>
                 </ol>
                 <h3 class="fs-6 fw-bold mt-3 mb-2">Dónde pagar <small class="text-body-secondary fw-normal">(red simulada)</small></h3>
-                <div class="pn-tiendas">${TIENDAS.map(t => '<span>' + escapar(t) + '</span>').join('')}</div>
+                ${logos('grande')}
                 <p class="small mt-3 mb-3"><strong>Esta ficha es una simulación:</strong> no la presentes en una tienda real.</p>
                 <button type="button" class="btn btn-outline-primary w-100 tocable" id="pn-pdf"><i class="bx bx-download" aria-hidden="true"></i> Descargar ficha (PDF)</button>
                 <div class="small text-danger mt-2" id="pn-error" role="alert"></div>
@@ -117,7 +136,7 @@
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = 'ficha-paynet-' + pedido.folio + '.pdf';
+                    a.download = 'ficha-pago-' + pedido.folio + '.pdf';
                     document.body.appendChild(a);
                     a.click();
                     a.remove();

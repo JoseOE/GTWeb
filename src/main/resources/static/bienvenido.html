@@ -1325,7 +1325,7 @@
                 vencidas && { icono: 'bx-error-circle', texto: plural(vencidas, 'membresía vencida', 'membresías vencidas') + ' en los últimos 30 días', boton: 'Cobrar', destino: 'membresias' },
                 porVencer && { icono: 'bx-time-five', texto: plural(porVencer, 'membresía vence', 'membresías vencen') + ' en los próximos 5 días', boton: 'Ver', destino: 'membresias' },
                 sinPagos && { icono: 'bx-wallet', texto: plural(sinPagos, 'miembro activo sin pagos registrados', 'miembros activos sin pagos registrados'), boton: 'Registrar', destino: 'membresias' },
-                paynet && paynet.pedidos && { icono: 'bx-store', texto: plural(paynet.pedidos, 'ficha Paynet por cobrar', 'fichas Paynet por cobrar') + ' (' + dinero(paynet.total) + ')', boton: 'Ver', destino: 'ventas' }
+                paynet && paynet.pedidos && { icono: 'bx-store', texto: plural(paynet.pedidos, 'ficha de pago por cobrar', 'fichas de pago por cobrar') + ' (' + dinero(paynet.total) + ')', boton: 'Ver', destino: 'ventas' }
             ].filter(Boolean);
             contenedor.innerHTML = filas.length
                 ? '<ul class="list-unstyled mb-0 resumen-pendientes">' + filas.map(f => `
@@ -2409,7 +2409,7 @@
                 { valor: dinero(k.hoy.total), texto: 'Ventas de hoy', detalle: textoPedidos(k.hoy.pedidos), icono: 'bx-calendar-check', color: 'icon-brand' },
                 { valor: dinero(k.mes.total), texto: 'Ventas del mes', detalle: textoPedidos(k.mes.pedidos), icono: 'bx-calendar', color: 'icon-success' },
                 { valor: dinero(k.ticketPromedio), texto: 'Ticket promedio', detalle: 'Este mes', icono: 'bx-receipt', color: 'icon-info' },
-                { valor: String(k.paynetPendientes.pedidos), texto: 'Fichas Paynet por cobrar', detalle: dinero(k.paynetPendientes.total), icono: 'bx-store', color: 'icon-warning' },
+                { valor: String(k.paynetPendientes.pedidos), texto: 'Fichas de pago por cobrar', detalle: dinero(k.paynetPendientes.total), icono: 'bx-store', color: 'icon-warning' },
                 { valor: String(k.membresiasDelMes), texto: 'Membresías vendidas', detalle: 'Este mes, en la tienda', icono: 'bx-purchase-tag-alt', color: 'icon-brand' }
             ];
             document.getElementById('ventas-kpis').innerHTML = tiles.map((t, i) => `
@@ -2594,7 +2594,7 @@
                 <dl class="row small mb-2">
                     ${fila('Cliente', escapeHtml(d.clienteNombre || 'Público en general') + (d.email ? '<br><span class="text-body-secondary">' + escapeHtml(d.email) + '</span>' : ''))}
                     ${fila('Pago', escapeHtml(d.detallePago || d.metodo))}
-                    ${d.paynet ? fila('Referencia', '<span class="font-monospace">' + escapeHtml(d.paynet.referencia) + '</span>' + (vence ? '<br><span class="text-body-secondary">Vence el ' + escapeHtml(vence) + '</span>' : '')) : ''}
+                    ${d.paynet ? fila('Referencia', '<span class="font-monospace">' + escapeHtml(d.paynet.referencia) + '</span>' + (d.paynet.tiendaNombre ? '<br><span class="text-body-secondary">Pagada en ' + escapeHtml(d.paynet.tiendaNombre) + ' · folio de caja ' + escapeHtml(d.paynet.folioCaja || '') + '</span>' : (vence ? '<br><span class="text-body-secondary">Vence el ' + escapeHtml(vence) + '</span>' : ''))) : ''}
                     ${fila('Pagado', d.pagadoEn ? fechaHoraVenta(d.pagadoEn) : '')}
                     ${fila('Cancelado', d.canceladoEn ? fechaHoraVenta(d.canceladoEn) : '')}
                     ${fila('Cobró', escapeHtml(d.vendedor || ''))}
@@ -2615,11 +2615,18 @@
             const botones = [
                 a.simularPaynet && ['simular', 'btn-primary', 'bx-store', 'Simular pago en tienda'],
                 a.recibo && ['recibo', 'btn-outline-primary', 'bx-receipt', 'Recibo (PDF)'],
-                a.ficha && ['ficha', 'btn-outline-primary', 'bx-barcode', 'Ficha Paynet (PDF)'],
+                a.ficha && ['ficha', 'btn-outline-primary', 'bx-barcode', 'Ficha de pago (PDF)'],
                 a.reenviar && ['reenviar', 'btn-outline-secondary', 'bx-envelope', 'Reenviar correo'],
                 a.cancelar && ['cancelar', 'btn-outline-danger', 'bx-x-circle', 'Cancelar pedido']
             ].filter(Boolean);
-            document.getElementById('venta-detalle-acciones').innerHTML = botones.map(([accion, clase, icono, texto]) =>
+            document.getElementById('venta-detalle-acciones').innerHTML = (a.simularPaynet
+                    ? '<div class="w-100 d-flex flex-wrap align-items-center gap-2 mb-1"><label for="venta-tienda" class="small text-body-secondary">Pagar en</label>'
+                        + '<select id="venta-tienda" class="form-select form-select-sm w-auto">'
+                        + [['oxxo', 'OXXO'], ['7-eleven', '7-Eleven'], ['walmart', 'Walmart'], ['bodega-aurrera', 'Bodega Aurrerá'], ['farmacias-del-ahorro', 'Farmacias del Ahorro'], ['circle-k', 'Circle K']]
+                            .map(([id, nombre]) => '<option value="' + id + '">' + nombre + '</option>').join('')
+                        + '</select></div>'
+                    : '')
+                + botones.map(([accion, clase, icono, texto]) =>
                 `<button type="button" class="btn ${clase} btn-sm rounded-pill px-3" data-accion="${accion}"><i class='bx ${icono}' aria-hidden="true"></i> ${texto}</button>`).join('');
         }
 
@@ -2649,7 +2656,10 @@
             boton.disabled = true;
             boton.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> ' + boton.textContent.trim();
             avisoVenta('');
-            apiTienda(rutas[accion], { method: 'POST' })
+            const tienda = document.getElementById('venta-tienda');
+            apiTienda(rutas[accion], accion === 'simular' && tienda
+                ? { method: 'POST', body: JSON.stringify({ tienda: tienda.value }) }
+                : { method: 'POST' })
                 .then(r => {
                     if (accion === 'reenviar') {
                         avisoVenta(r.message || 'Listo.', r.enviado === false ? 'warning' : 'success');
@@ -2675,7 +2685,7 @@
         }
 
         function mensajeDeAccion(accion, r) {
-            if (accion === 'simular') return 'Pago en tienda simulado: el pedido quedó pagado.';
+            if (accion === 'simular') return 'Pago simulado en ' + (r.paynet && r.paynet.tiendaNombre ? r.paynet.tiendaNombre : 'tienda') + ': el pedido quedó pagado.';
             return 'Pedido cancelado.';
         }
 

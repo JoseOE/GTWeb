@@ -227,17 +227,21 @@ public class PedidoService {
 
     // La ficha Paynet se pagó en la tienda: el pedido queda pagado (las piezas
     // siguen apartadas hasta entregarse), se activa el plan y sale el recibo.
-    public Pedido pagarFicha(Pedido p) {
+    // tienda y folioCaja: dónde se pagó y el folio de su ticket.
+    public Pedido pagarFicha(Pedido p, String tienda, String tiendaNombre, String folioCaja) {
         Instant ahora = Instant.now();
         Pedido pagado = cambiarEstado(p, Pedido.ESTADO_PENDIENTE_PAGO, new Update()
                 .set("estado", Pedido.ESTADO_PAGADO)
                 .set("pagadoEn", ahora)
                 .set("datosPago.estado", "capturado")
-                .set("datosPago.capturadoEn", ahora.toString()));
+                .set("datosPago.capturadoEn", ahora.toString())
+                .set("datosPago.tienda", tienda)
+                .set("datosPago.tiendaNombre", tiendaNombre)
+                .set("datosPago.folioCaja", folioCaja));
         if (pagado == null) {
             throw new TiendaException(HttpStatus.CONFLICT, "La ficha ya no está pendiente.");
         }
-        log.info("Ficha Paynet del pedido #{} pagada en tienda.", pagado.getFolio());
+        log.info("Ficha del pedido #{} pagada en {}.", pagado.getFolio(), tiendaNombre);
         confirmarPago(pagado);
         return pagado;
     }
@@ -303,9 +307,18 @@ public class PedidoService {
         v.put("cliente", p.getCliente());
         // Para la pantalla de la ficha (web y app): referencia y fecha límite.
         Object referencia = p.getDatosPago() == null ? null : p.getDatosPago().get("referencia");
-        v.put("paynet", referencia == null ? null : Map.of(
-                "referencia", referenciaLegible(referencia.toString()),
-                "vence", String.valueOf(p.getDatosPago().getOrDefault("vence", ""))));
+        if (referencia == null) {
+            v.put("paynet", null);
+        } else {
+            Map<String, Object> ficha = new LinkedHashMap<>();
+            ficha.put("referencia", referenciaLegible(referencia.toString()));
+            ficha.put("vence", String.valueOf(p.getDatosPago().getOrDefault("vence", "")));
+            // Ya pagada: en qué tienda y con qué folio de caja.
+            ficha.put("tienda", p.getDatosPago().get("tienda"));
+            ficha.put("tiendaNombre", p.getDatosPago().get("tiendaNombre"));
+            ficha.put("folioCaja", p.getDatosPago().get("folioCaja"));
+            v.put("paynet", ficha);
+        }
         v.put("proveedorPago", p.getProveedorPago());
         v.put("canal", p.getCanal());
         v.put("total", p.getTotal());
@@ -356,7 +369,8 @@ public class PedidoService {
             return "Efectivo · recibido " + dinero(d.get("recibido")) + ", cambio " + dinero(d.get("cambio"));
         }
         if (d.get("referencia") != null) {
-            return "Paynet · referencia " + referenciaLegible(String.valueOf(d.get("referencia")));
+            Object tienda = d.get("tiendaNombre");
+            return (tienda != null ? "Efectivo en " + tienda : "Efectivo en tiendas") + " · referencia " + referenciaLegible(String.valueOf(d.get("referencia")));
         }
         if (MetodosPago.PAYPAL.equals(p.getProveedorPago()) && d.get("cuenta") != null) {
             return "PayPal · " + d.get("cuenta");
