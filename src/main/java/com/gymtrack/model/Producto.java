@@ -37,6 +37,19 @@ public class Producto {
     private String descripcion;
     // URL de /api/imagenes/{id}
     private String imagen;
+    // ─── Quién lo hace y quién lo surte ───
+    // La ley de comercio electrónico pide mostrar al comprador la información
+    // del producto y de su proveedor. Marca: "Optimum Nutrition". Proveedor: de
+    // quién lo compra el gimnasio (el distribuidor o la tienda oficial), con su
+    // sitio web si tiene.
+    private String marca;
+    private String proveedor;
+    private String sitioProveedor;
+    // Suplementos con riesgo para la salud (preentreno, proteína, creatina,
+    // quemadores…): antes de comprarlos se muestra la advertencia sanitaria y se
+    // pide aceptarla. null = productos de antes de esta casilla: se decide por
+    // la categoría (ver conAdvertencia()).
+    private Boolean requiereAdvertencia;
     // false = oculto: no aparece en la tienda ni en el mostrador.
     private boolean activo = true;
     // Posición para ordenar a mano (0 = por nombre).
@@ -53,6 +66,13 @@ public class Producto {
 
     public boolean esPlan() {
         return TIPO_MEMBRESIA.equals(tipo);
+    }
+
+    // Si el producto pide aceptar la advertencia sanitaria antes de comprarlo.
+    // Sin decisión guardada, los suplementos sí y lo demás no.
+    public boolean conAdvertencia() {
+        if (esPlan()) return false;
+        return requiereAdvertencia != null ? requiereAdvertencia : "suplementos".equals(categoria);
     }
 
     public Variante variante(String varianteId) {
@@ -164,6 +184,18 @@ public class Producto {
 
     public String getImagen() { return imagen; }
     public void setImagen(String imagen) { this.imagen = imagen; }
+
+    public String getMarca() { return marca; }
+    public void setMarca(String marca) { this.marca = marca; }
+
+    public String getProveedor() { return proveedor; }
+    public void setProveedor(String proveedor) { this.proveedor = proveedor; }
+
+    public String getSitioProveedor() { return sitioProveedor; }
+    public void setSitioProveedor(String sitioProveedor) { this.sitioProveedor = sitioProveedor; }
+
+    public Boolean getRequiereAdvertencia() { return requiereAdvertencia; }
+    public void setRequiereAdvertencia(Boolean requiereAdvertencia) { this.requiereAdvertencia = requiereAdvertencia; }
 
     public boolean isActivo() { return activo; }
     public void setActivo(boolean activo) { this.activo = activo; }

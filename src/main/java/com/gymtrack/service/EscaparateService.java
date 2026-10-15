@@ -64,6 +64,11 @@ public class EscaparateService {
         v.put("imagen", vacio(p.getImagen()));
         v.put("tipo", p.esPlan() ? TIPO_MEMBRESIA : TiendaGymService.TIPO_PRODUCTO);
         v.put("categoria", CatalogoService.vistaCategoria(p.getCategoria()));
+        // Información del producto que se muestra antes de comprar.
+        v.put("marca", p.getMarca());
+        v.put("proveedor", p.getProveedor());
+        v.put("sitioProveedor", p.getSitioProveedor());
+        v.put("requiereAdvertencia", p.conAdvertencia());
 
         List<Map<String, Object>> variantes = new ArrayList<>();
         Double desde = null;
