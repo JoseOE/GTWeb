@@ -123,3 +123,5 @@ const otra = (await api('GET', `/api/users/${member}/me`)).body.fechaProximoPago
 ok(otra === despues.fechaProximoPago, 'y no mueve la membresía');
 
 console.log(fallos ? `\n${fallos} prueba(s) fallaron` : '\nTodo bien');
+// Código de salida 1 si algo falló: así correr-todas.mjs y la CI lo marcan en rojo.
+if (fallos) process.exitCode = 1;

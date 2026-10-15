@@ -155,3 +155,5 @@ ok(recibo.status === 200 && recibo.headers.get('content-type') === 'application/
 await api('DELETE', `/api/gyms/${gymId}/productos/${caro.id}`, null, owner);
 
 console.log(fallos ? `\n${fallos} prueba(s) fallaron` : '\nTodo bien');
+// Código de salida 1 si algo falló: así correr-todas.mjs y la CI lo marcan en rojo.
+if (fallos) process.exitCode = 1;
