@@ -186,7 +186,7 @@ public class ReciboService {
             encabezado(doc, pdf, f, gym, "FICHA DE PAGO EN EFECTIVO", "Pedido #" + p.getFolio(),
                     fechaHora(p.getCreadoEn()), "Pendiente de pago");
 
-            doc.add(new Paragraph("Paynet · simulación").setFont(f.negrita()).setFontSize(10).setFontColor(MARCA).setMarginTop(18).setMarginBottom(0));
+            doc.add(new Paragraph("Efectivo en tiendas · simulación").setFont(f.negrita()).setFontSize(10).setFontColor(MARCA).setMarginTop(18).setMarginBottom(0));
             doc.add(new Paragraph(dinero(p.getTotal())).setFont(f.negrita()).setFontSize(34).setFontColor(TINTA).setMarginTop(0).setMarginBottom(0));
             doc.add(new Paragraph("Monto exacto a pagar en efectivo").setFontSize(10).setFontColor(GRIS).setMarginTop(0));
 
@@ -211,19 +211,23 @@ public class ReciboService {
 
             doc.add(new Paragraph("Cómo pagar").setFont(f.negrita()).setFontSize(12).setMarginTop(16).setMarginBottom(4));
             List pasos = new List(com.itextpdf.layout.properties.ListNumberingType.DECIMAL).setFontSize(10);
-            pasos.add(new ListItem("Acude a cualquier tienda de la red Paynet."));
-            pasos.add(new ListItem("Indica en caja que vas a pagar un servicio Paynet."));
+            pasos.add(new ListItem("Acude a cualquiera de las tiendas de abajo."));
+            pasos.add(new ListItem("Indica en caja que vas a pagar con referencia."));
             pasos.add(new ListItem("Muestra el código de barras o dicta la referencia."));
             pasos.add(new ListItem("Paga el monto exacto en efectivo y conserva tu comprobante."));
             pasos.add(new ListItem("Recibirás un correo cuando " + nombre(gym) + " reciba tu pago."));
             doc.add(pasos);
 
             doc.add(new Paragraph("Dónde pagar (red simulada)").setFont(f.negrita()).setFontSize(12).setMarginTop(14).setMarginBottom(4));
-            doc.add(new Paragraph("Tiendas de conveniencia · Farmacias · Supermercados · Tiendas departamentales")
-                    .setFontSize(10).setFontColor(GRIS));
+            Paragraph tiendas = new Paragraph().setMarginTop(2);
+            for (String tienda : SimuladorPaynetService.TIENDAS.keySet()) {
+                Image img = logoPago(pdf, tienda, 22);
+                if (img != null) tiendas.add(img.setMarginRight(6));
+            }
+            doc.add(tiendas);
             doc.add(new Paragraph("Esta ficha es una simulación para pruebas: no la presentes en una tienda real.")
                     .setFont(f.negrita()).setFontSize(10).setFontColor(MARCA).setBackgroundColor(PAPEL).setPadding(8).setMarginTop(10));
-            pie(doc, pdf, f, "GymTrack · Ficha Paynet · Pedido #" + p.getFolio() + " · " + referencia, 70);
+            pie(doc, pdf, f, "GymTrack · Ficha de pago · Pedido #" + p.getFolio() + " · " + referencia, 70);
         });
     }
 
@@ -356,8 +360,11 @@ public class ReciboService {
             case MetodosPago.PAYNET -> {
                 titulo = "Pago en efectivo en tienda";
                 color = TIENDAS;
-                logos.add("oxxo");
+                Object tienda = d.get("tienda");
+                logos.add(tienda != null ? String.valueOf(tienda) : "oxxo");
+                agregar(filas, "Tienda", d.get("tiendaNombre"));
                 agregar(filas, "Referencia", d.get("referencia") == null ? null : PedidoService.referenciaLegible(String.valueOf(d.get("referencia"))));
+                agregar(filas, "Folio de caja", d.get("folioCaja"));
             }
             case MetodosPago.PAYPAL -> {
                 titulo = "Pago con PayPal";
