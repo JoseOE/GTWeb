@@ -31,20 +31,23 @@ public class EscaparateService {
             .thenComparing(Producto::getNombre, String.CASE_INSENSITIVE_ORDER);
 
     private final ProductoRepository productos;
+    private final ResenaService resenas;
 
-    public EscaparateService(ProductoRepository productos) {
+    public EscaparateService(ProductoRepository productos, ResenaService resenas) {
         this.productos = productos;
+        this.resenas = resenas;
     }
 
     // GET /api/tienda/{gymId}/productos: todo lo publicado, filtrado por
     // categoría y por texto.
     public List<Map<String, Object>> productos(String gymId, String categoria, String busqueda) {
         String texto = normalizar(busqueda);
+        Map<String, ResenaService.Calificacion> cal = resenas.calificaciones(gymId);
         return productos.findByGymIdAndActivoTrue(gymId).stream()
                 .filter(p -> categoria == null || categoria.isBlank() || categoria.equals(p.getCategoria()))
                 .filter(p -> texto.isEmpty() || coincide(p, texto))
                 .sorted(EN_ESCAPARATE)
-                .map(EscaparateService::vista)
+                .map(p -> conCalificacion(vista(p), cal.get(p.getId())))
                 .toList();
     }
 
@@ -52,8 +55,14 @@ public class EscaparateService {
     public Map<String, Object> producto(String gymId, String productoId) {
         return productos.findByIdAndGymId(productoId, gymId)
                 .filter(Producto::isActivo)
-                .map(EscaparateService::vista)
+                .map(p -> conCalificacion(vista(p), resenas.calificaciones(gymId).get(p.getId())))
                 .orElseThrow(() -> new TiendaException(HttpStatus.NOT_FOUND, "Ese producto ya no está a la venta."));
+    }
+
+    // Las estrellas del producto: null si nadie lo ha calificado (y en los planes).
+    private static Map<String, Object> conCalificacion(Map<String, Object> v, ResenaService.Calificacion c) {
+        v.put("calificacion", c == null ? null : c.vista());
+        return v;
     }
 
     static Map<String, Object> vista(Producto p) {
