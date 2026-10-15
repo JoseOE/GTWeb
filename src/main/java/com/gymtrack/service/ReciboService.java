@@ -370,8 +370,13 @@ public class ReciboService {
                 titulo = "Pago con PayPal";
                 color = PAYPAL;
                 logos.add("paypal");
-                agregar(filas, "Cuenta", d.get("cuenta"));
-                agregar(filas, "Transacción", d.get("captura"));
+                // Como el recibo de PayPal: quién pagó, con qué cuenta y los ids
+                // de la orden aprobada y de la transacción (captura).
+                agregar(filas, "Pagó", d.get("nombre"));
+                agregar(filas, "Cuenta PayPal", d.get("cuenta"));
+                agregar(filas, "ID del pagador", d.get("payerId"));
+                agregar(filas, "Orden", d.get("orden"));
+                agregar(filas, "ID de transacción", d.get("captura"));
             }
             default -> {
                 titulo = "Pago";
