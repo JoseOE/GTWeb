@@ -157,3 +157,5 @@ ok(r.status === 404, 'ya no aparece', r.body);
 
 console.log(fallos ? `\n${fallos} prueba(s) fallaron` : '\nTodo bien');
 fs.writeFileSync(ESTADO, JSON.stringify({ gymId, owner: owner.id, member: member.id, tokens: TOKENS, planes, prod: prod.id }, null, 2));
+// Código de salida 1 si algo falló: así correr-todas.mjs y la CI lo marcan en rojo.
+if (fallos) process.exitCode = 1;

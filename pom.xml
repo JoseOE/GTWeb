@@ -54,6 +54,12 @@
 			<artifactId>barcodes</artifactId>
 			<version>${itext.version}</version>
 		</dependency>
+		<!-- Logos de las formas de pago (static/img/pagos/*.svg) en los comprobantes -->
+		<dependency>
+			<groupId>com.itextpdf</groupId>
+			<artifactId>svg</artifactId>
+			<version>${itext.version}</version>
+		</dependency>
 		<!-- DevTools -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

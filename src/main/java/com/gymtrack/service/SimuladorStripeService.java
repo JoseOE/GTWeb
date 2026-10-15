@@ -25,19 +25,30 @@ import java.util.Map;
 public class SimuladorStripeService {
 
     public static final String APROBADA = "aprobada";
+    public static final String CREDITO = "credito";
+    public static final String DEBITO = "debito";
+    // Así aparece el banco en el comprobante: es una simulación, no hay banco real.
+    public static final String BANCO = "Banco emisor de prueba";
+
+    // Meses sin intereses con crédito y el monto mínimo para cada plazo
+    // (js/pagos/stripe-sim.js usa la misma tabla para ofrecerlos).
+    public static final Map<Integer, Double> MESES_SIN_INTERESES = new java.util.TreeMap<>(Map.of(
+            3, 300.0, 6, 600.0, 9, 900.0, 12, 1200.0));
 
     // Número → marca y lo que pasará al cobrar. Los rechazos se deciden al
     // cobrar (como en Stripe), no al tokenizar: así se prueba el mensaje del checkout.
-    private record TarjetaDePrueba(String marca, String resultado) {}
+    private record TarjetaDePrueba(String marca, String resultado, String tipo) {}
 
     private static final Map<String, TarjetaDePrueba> TARJETAS = Map.of(
-            "4242424242424242", new TarjetaDePrueba("visa", APROBADA),
-            "5555555555554444", new TarjetaDePrueba("mastercard", APROBADA),
-            "378282246310005", new TarjetaDePrueba("amex", APROBADA),
-            "4000000000000002", new TarjetaDePrueba("visa", "rechazada"),
-            "4000000000009995", new TarjetaDePrueba("visa", "fondos_insuficientes"),
-            "4000000000000069", new TarjetaDePrueba("visa", "vencida"),
-            "4000000000000127", new TarjetaDePrueba("visa", "cvc_incorrecto"));
+            "4242424242424242", new TarjetaDePrueba("visa", APROBADA, CREDITO),
+            "5555555555554444", new TarjetaDePrueba("mastercard", APROBADA, CREDITO),
+            "378282246310005", new TarjetaDePrueba("amex", APROBADA, CREDITO),
+            "4000056655665556", new TarjetaDePrueba("visa", APROBADA, DEBITO),
+            "5200828282828210", new TarjetaDePrueba("mastercard", APROBADA, DEBITO),
+            "4000000000000002", new TarjetaDePrueba("visa", "rechazada", CREDITO),
+            "4000000000009995", new TarjetaDePrueba("visa", "fondos_insuficientes", DEBITO),
+            "4000000000000069", new TarjetaDePrueba("visa", "vencida", CREDITO),
+            "4000000000000127", new TarjetaDePrueba("visa", "cvc_incorrecto", CREDITO));
 
     private static final ZoneId ZONA_MX = ZoneId.of("America/Mexico_City");
     private static final SecureRandom AZAR = new SecureRandom();
@@ -77,6 +88,7 @@ public class SimuladorStripeService {
         token.setToken("tok_sim_" + HexFormat.of().formatHex(bytesAlAzar(12)));
         token.setUserId(userId);
         token.setMarca(prueba.marca());
+        token.setTipo(prueba.tipo());
         token.setUltimos4(numero.substring(numero.length() - 4));
         token.setVencimiento(String.format("%02d/%02d", vence.getMonthValue(), vence.getYear() % 100));
         token.setTitular(titular);
@@ -87,6 +99,7 @@ public class SimuladorStripeService {
         Map<String, Object> respuesta = new LinkedHashMap<>();
         respuesta.put("token", token.getToken());
         respuesta.put("marca", token.getMarca());
+        respuesta.put("tipo", token.getTipo());
         respuesta.put("ultimos4", token.getUltimos4());
         respuesta.put("vencimiento", token.getVencimiento());
         return respuesta;
@@ -95,11 +108,30 @@ public class SimuladorStripeService {
     // Cambia los datos que mandó la página por los del token guardado: así el
     // resultado del cobro no se puede inventar desde el navegador. El token se
     // gasta aquí; si el pago no pasa, la página tokeniza de nuevo.
+    // Sin total no hay meses sin intereses (la terminal del mostrador cobra de contado).
     public Map<String, Object> consumir(String userId, Map<String, Object> datos) {
+        return consumir(userId, datos, null);
+    }
+
+    // total: lo que se va a cobrar, para revisar el plazo elegido ("meses").
+    public Map<String, Object> consumir(String userId, Map<String, Object> datos, Double total) {
+        int meses = meses(datos);
         Object valor = datos == null ? null : datos.get("token");
         TokenTarjeta token = valor == null ? null : tokens.findById(valor.toString()).orElse(null);
         if (token == null || token.getUsadoEn() != null || !token.getUserId().equals(userId)) {
             throw new TiendaException(HttpStatus.BAD_REQUEST, "Vuelve a capturar los datos de la tarjeta.");
+        }
+        // El plazo se revisa antes de gastar el token: si no aplica, se puede elegir otro.
+        String tipo = token.getTipo() == null ? CREDITO : token.getTipo();
+        if (meses > 1) {
+            if (!CREDITO.equals(tipo)) {
+                throw error("Los meses sin intereses son solo con tarjeta de crédito.");
+            }
+            Double minimo = MESES_SIN_INTERESES.get(meses);
+            if (minimo == null) throw error("Elige pagar de contado o a 3, 6, 9 o 12 meses sin intereses.");
+            if (total == null || total + 0.009 < minimo) {
+                throw error(meses + " meses sin intereses aplican en compras desde $" + String.format("%,.2f", minimo) + ".");
+            }
         }
         token.setUsadoEn(Instant.now());
         tokens.save(token);
@@ -110,8 +142,26 @@ public class SimuladorStripeService {
         seguros.put("ultimos4", token.getUltimos4());
         seguros.put("vencimiento", token.getVencimiento());
         seguros.put("titular", token.getTitular());
+        seguros.put("tipo", tipo);
+        seguros.put("banco", BANCO);
+        if (meses > 1) {
+            seguros.put("meses", meses);
+            seguros.put("mensualidad", Math.round(total / meses * 100) / 100.0);
+        }
         seguros.put("resultado", token.getResultado());
         return seguros;
+    }
+
+    // "meses" que eligió el comprador: 1 (o nada) = de contado.
+    private static int meses(Map<String, Object> datos) {
+        Object v = datos == null ? null : datos.get("meses");
+        if (v == null || v.toString().isBlank()) return 1;
+        try {
+            int m = (int) Double.parseDouble(v.toString());
+            return Math.max(1, m);
+        } catch (NumberFormatException e) {
+            throw error("Elige pagar de contado o a meses sin intereses.");
+        }
     }
 
     // Algoritmo de Luhn: el último dígito de toda tarjeta es una suma de control.

@@ -134,3 +134,5 @@ ok(compras === 2, 'compra: un correo automático + el reenvío pedido', compras)
 ok(lineasLog('La plantilla de correo').length === 0, 'las plantillas se arman sin errores', lineasLog('La plantilla de correo').slice(-1)[0]);
 
 console.log(fallos ? `\n${fallos} prueba(s) fallaron` : '\nTodo bien');
+// Código de salida 1 si algo falló: así correr-todas.mjs y la CI lo marcan en rojo.
+if (fallos) process.exitCode = 1;

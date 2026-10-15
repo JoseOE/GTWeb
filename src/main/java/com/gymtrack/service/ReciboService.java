@@ -33,6 +33,8 @@ import com.itextpdf.layout.properties.HorizontalAlignment;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import com.itextpdf.layout.properties.VerticalAlignment;
+import com.itextpdf.svg.converter.SvgConverter;
+import com.gymtrack.util.MetodosPago;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -43,6 +45,7 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -59,6 +62,12 @@ import java.util.Map;
 //
 // Los precios ya incluyen IVA; el recibo lo desglosa (16 %) para que se vea
 // cuánto es impuesto.
+//
+// Cada forma de pago tiene su propio comprobante: título, color y logo, y los
+// datos de ese pago (ver bloquePago): tarjeta (marca, tipo, autorización y
+// plazo), efectivo del mostrador (recibido y cambio), tiendas (referencia y
+// dónde se pagó) y PayPal (cuenta y transacción). Los logos son los mismos SVG
+// de la página (static/img/pagos).
 @Service
 public class ReciboService {
 
@@ -91,7 +100,7 @@ public class ReciboService {
     public byte[] reciboPedido(Pedido p) {
         return generar(PageSize.LETTER, 40, (doc, pdf, f) -> {
             Gym gym = gym(p.getGymId());
-            encabezado(doc, pdf, f, gym, "RECIBO DE COMPRA", "Pedido #" + p.getFolio(),
+            encabezado(doc, pdf, f, gym, tituloComprobante(p), "Pedido #" + p.getFolio(),
                     fechaHora(p.getPagadoEn() != null ? p.getPagadoEn() : p.getCreadoEn()), estadoTexto(p.getEstado()));
 
             doc.add(new Paragraph()
@@ -124,8 +133,7 @@ public class ReciboService {
             doc.add(partidas);
             doc.add(totales(f, p.getSubtotal(), p.getIva(), p.getTotal()).setMarginTop(8));
 
-            doc.add(new Paragraph().add(new Text("Pago: ").setFont(f.negrita())).add(PedidoService.detallePago(p))
-                    .setFontSize(10).setMarginTop(14));
+            doc.add(bloquePago(pdf, f, p, false).setMarginTop(16));
             pie(doc, pdf, f, "GymTrack · " + nombre(gym) + " · Pedido #" + p.getFolio() + " · " + p.getOrderId(), 80);
         });
     }
@@ -133,12 +141,17 @@ public class ReciboService {
     // Ticket de 80 mm para la impresora térmica del mostrador. El alto se
     // calcula con el número de partidas para que no quede una hoja en blanco.
     public byte[] ticketPedido(Pedido p) {
-        float alto = 300 + p.getPartidas().size() * 30f;
+        float alto = 450 + p.getPartidas().size() * 30f;
         return generar(new PageSize(ANCHO_TICKET, alto), 12, (doc, pdf, f) -> {
             Gym gym = gym(p.getGymId());
             doc.add(new Paragraph(nombre(gym)).setFont(f.negrita()).setFontSize(12).setTextAlignment(TextAlignment.CENTER).setMarginBottom(0));
             if (gym != null && gym.getDireccion() != null) {
                 doc.add(new Paragraph(gym.getDireccion()).setFontSize(7.5f).setFontColor(GRIS).setTextAlignment(TextAlignment.CENTER).setMarginTop(0));
+            }
+            if (gym != null && ((gym.getRazonSocial() != null && !gym.getRazonSocial().isBlank()) || (gym.getRfc() != null && !gym.getRfc().isBlank()))) {
+                String vende = (gym.getRazonSocial() == null ? "" : gym.getRazonSocial())
+                        + (gym.getRfc() == null || gym.getRfc().isBlank() ? "" : (gym.getRazonSocial() == null ? "" : "\n") + "RFC " + gym.getRfc());
+                doc.add(new Paragraph(vende).setFontSize(7).setFontColor(GRIS).setTextAlignment(TextAlignment.CENTER).setMarginTop(0));
             }
             doc.add(new Paragraph("Ticket #" + p.getFolio() + "\n" + fechaHora(p.getPagadoEn() != null ? p.getPagadoEn() : p.getCreadoEn()))
                     .setFontSize(8.5f).setTextAlignment(TextAlignment.CENTER));
@@ -156,13 +169,7 @@ public class ReciboService {
             }
             doc.add(new LineSeparator(new com.itextpdf.kernel.pdf.canvas.draw.DashedLine(0.6f)));
             doc.add(totales(f, p.getSubtotal(), p.getIva(), p.getTotal(), true));
-            Map<String, Object> d = p.getDatosPago() == null ? Map.of() : p.getDatosPago();
-            if (d.get("recibido") != null) {
-                doc.add(new Paragraph("Efectivo recibido: " + dinero(numero(d.get("recibido")))
-                        + "\nCambio: " + dinero(numero(d.get("cambio")))).setFontSize(8.5f).setFont(f.negrita()));
-            } else {
-                doc.add(new Paragraph("Pago: " + PedidoService.detallePago(p)).setFontSize(8));
-            }
+            doc.add(bloquePago(pdf, f, p, true).setMarginTop(6));
             Image qr = qr(pdf, "GymTrack · Ticket #" + p.getFolio() + " · " + p.getOrderId(), 70);
             qr.setHorizontalAlignment(HorizontalAlignment.CENTER);
             doc.add(qr);
@@ -290,6 +297,125 @@ public class ReciboService {
         });
     }
 
+    // ═══════════════════════════ COMPROBANTE POR FORMA DE PAGO ═══════════════════════════
+
+    private static final Color VISA = new DeviceRgb(0x1a, 0x1f, 0x71);
+    private static final Color MASTERCARD = new DeviceRgb(0xeb, 0x00, 0x1b);
+    private static final Color AMEX = new DeviceRgb(0x00, 0x6f, 0xcf);
+    private static final Color EFECTIVO = new DeviceRgb(0x2e, 0x7d, 0x4f);
+    private static final Color TIENDAS = new DeviceRgb(0xe2, 0x1d, 0x24);
+    private static final Color PAYPAL = new DeviceRgb(0x00, 0x30, 0x87);
+    private static final Map<String, String> NOMBRES_MARCA = Map.of("visa", "Visa", "mastercard", "Mastercard", "amex", "American Express");
+    private static final Map<String, String> TIPOS_TARJETA = Map.of("credito", "crédito", "debito", "débito");
+
+    private static String tituloComprobante(Pedido p) {
+        String proveedor = p.getProveedorPago() == null ? "" : p.getProveedorPago();
+        return switch (proveedor) {
+            case MetodosPago.STRIPE -> "COMPROBANTE DE PAGO CON TARJETA";
+            case MetodosPago.PAYNET -> "COMPROBANTE DE PAGO EN TIENDA";
+            case MetodosPago.PAYPAL -> "COMPROBANTE DE PAGO CON PAYPAL";
+            case MetodosPago.EFECTIVO -> "COMPROBANTE DE PAGO EN EFECTIVO";
+            default -> "RECIBO DE COMPRA";
+        };
+    }
+
+    // Recuadro con el pago: franja del color de la forma de pago, su logo y sus datos.
+    private Table bloquePago(PdfDocument pdf, Fuentes f, Pedido p, boolean compacto) {
+        Map<String, Object> d = p.getDatosPago() == null ? Map.of() : p.getDatosPago();
+        String proveedor = p.getProveedorPago() == null ? "" : p.getProveedorPago();
+        java.util.List<String[]> filas = new java.util.ArrayList<>();
+        java.util.List<String> logos = new java.util.ArrayList<>();
+        String titulo;
+        Color color;
+        switch (proveedor) {
+            case MetodosPago.STRIPE -> {
+                String marca = String.valueOf(d.getOrDefault("marca", ""));
+                titulo = "Pago con tarjeta";
+                color = "mastercard".equals(marca) ? MASTERCARD : "amex".equals(marca) ? AMEX : VISA;
+                if (!marca.isEmpty()) logos.add(marca);
+                String tipo = TIPOS_TARJETA.get(String.valueOf(d.get("tipo")));
+                filas.add(new String[]{"Tarjeta", NOMBRES_MARCA.getOrDefault(marca, marca) + (tipo != null ? " " + tipo : "") + " •••• " + d.getOrDefault("ultimos4", "")});
+                agregar(filas, "Titular", d.get("titular"));
+                agregar(filas, "Banco emisor", d.get("banco"));
+                Object meses = d.get("meses");
+                filas.add(new String[]{"Plazo", meses == null ? "De contado"
+                        : meses + " meses sin intereses de " + dinero(numero(d.get("mensualidad")))});
+                agregar(filas, "Autorización", d.get("autorizacion"));
+                agregar(filas, "Operación", d.get("operacion"));
+            }
+            case MetodosPago.EFECTIVO -> {
+                titulo = "Pago en efectivo";
+                color = EFECTIVO;
+                logos.add("efectivo");
+                agregar(filas, "Recibido", d.get("recibido") == null ? null : dinero(numero(d.get("recibido"))));
+                agregar(filas, "Cambio", d.get("cambio") == null ? null : dinero(numero(d.get("cambio"))));
+                agregar(filas, "Atendió", p.getVendedorId() == null ? null
+                        : userRepository.findById(p.getVendedorId()).map(ReciboService::nombreDe).orElse(null));
+                filas.add(new String[]{"Lugar", "Mostrador del gimnasio"});
+            }
+            case MetodosPago.PAYNET -> {
+                titulo = "Pago en efectivo en tienda";
+                color = TIENDAS;
+                logos.add("oxxo");
+                agregar(filas, "Referencia", d.get("referencia") == null ? null : PedidoService.referenciaLegible(String.valueOf(d.get("referencia"))));
+            }
+            case MetodosPago.PAYPAL -> {
+                titulo = "Pago con PayPal";
+                color = PAYPAL;
+                logos.add("paypal");
+                agregar(filas, "Cuenta", d.get("cuenta"));
+                agregar(filas, "Transacción", d.get("captura"));
+            }
+            default -> {
+                titulo = "Pago";
+                color = TINTA;
+                filas.add(new String[]{"Forma de pago", PedidoService.detallePago(p)});
+            }
+        }
+        filas.add(new String[]{"Fecha del pago", p.getPagadoEn() != null ? fechaHora(p.getPagadoEn()) : estadoTexto(p.getEstado())});
+        agregar(filas, "Importe", dinero(p.getTotal()));
+
+        float letra = compacto ? 7.5f : 9.5f;
+        Table caja = new Table(UnitValue.createPercentArray(new float[]{compacto ? 42 : 30, compacto ? 58 : 70})).useAllAvailableWidth()
+                .setBorder(new SolidBorder(LINEA, 0.8f)).setBorderLeft(new SolidBorder(color, compacto ? 3 : 4));
+        Paragraph cabeza = new Paragraph(titulo).setFont(f.negrita()).setFontSize(compacto ? 9 : 11).setFontColor(color).setMarginBottom(0);
+        Cell encabezado = new Cell(1, 2).setBorder(Border.NO_BORDER).setPadding(compacto ? 4 : 8).setPaddingBottom(2);
+        Table linea = new Table(UnitValue.createPercentArray(new float[]{60, 40})).useAllAvailableWidth();
+        linea.addCell(new Cell().add(cabeza).setBorder(Border.NO_BORDER).setPadding(0).setVerticalAlignment(VerticalAlignment.MIDDLE));
+        Paragraph marcas = new Paragraph().setTextAlignment(TextAlignment.RIGHT).setMargin(0);
+        for (String l : logos) {
+            Image img = logoPago(pdf, l, compacto ? 12 : 18);
+            if (img != null) marcas.add(img.setMarginLeft(3));
+        }
+        linea.addCell(new Cell().add(marcas).setBorder(Border.NO_BORDER).setPadding(0).setVerticalAlignment(VerticalAlignment.MIDDLE));
+        encabezado.add(linea);
+        caja.addCell(encabezado);
+        for (String[] fila : filas) {
+            caja.addCell(new Cell().add(new Paragraph(fila[0]).setFontSize(letra).setFontColor(GRIS))
+                    .setBorder(Border.NO_BORDER).setPaddingLeft(compacto ? 4 : 8).setPaddingTop(1).setPaddingBottom(1));
+            caja.addCell(new Cell().add(new Paragraph(fila[1]).setFontSize(letra).setFont(f.negrita()))
+                    .setBorder(Border.NO_BORDER).setPaddingRight(compacto ? 4 : 8).setPaddingTop(1).setPaddingBottom(1));
+        }
+        caja.addCell(new Cell(1, 2).setBorder(Border.NO_BORDER).setHeight(compacto ? 3 : 6));
+        return caja;
+    }
+
+    private static void agregar(java.util.List<String[]> filas, String etiqueta, Object valor) {
+        if (valor != null && !String.valueOf(valor).isBlank()) filas.add(new String[]{etiqueta, String.valueOf(valor)});
+    }
+
+    // Logo de static/img/pagos/<nombre>.svg con la altura indicada; null si no se pudo leer.
+    private Image logoPago(PdfDocument pdf, String nombre, float alto) {
+        try (InputStream svg = getClass().getResourceAsStream("/static/img/pagos/" + nombre + ".svg")) {
+            if (svg == null) return null;
+            Image img = SvgConverter.convertToImage(svg, pdf);
+            return img.scaleToFit(alto * 4, alto);
+        } catch (Exception e) {
+            log.warn("No se pudo dibujar el logo {} en el comprobante: {}", nombre, e.getMessage());
+            return null;
+        }
+    }
+
     // ═══════════════════════════ PIEZAS COMUNES ═══════════════════════════
 
     private record Fuentes(PdfFont normal, PdfFont negrita) {}
@@ -318,7 +444,7 @@ public class ReciboService {
     private void encabezado(Document doc, PdfDocument pdf, Fuentes f, Gym gym, String titulo, String folio,
                             String fecha, String estado) {
         Image logo = logo(gym);
-        Table t = new Table(UnitValue.createPercentArray(logo != null ? new float[]{12, 50, 38} : new float[]{62, 38})).useAllAvailableWidth();
+        Table t = new Table(UnitValue.createPercentArray(logo != null ? new float[]{12, 45, 43} : new float[]{55, 45})).useAllAvailableWidth();
         if (logo != null) {
             t.addCell(new Cell().add(logo).setBorder(Border.NO_BORDER).setVerticalAlignment(VerticalAlignment.MIDDLE).setPaddingLeft(0));
         }
@@ -327,6 +453,10 @@ public class ReciboService {
             StringBuilder extra = new StringBuilder();
             if (gym.getDireccion() != null && !gym.getDireccion().isBlank()) extra.append(gym.getDireccion());
             if (gym.getTelefono() != null && !gym.getTelefono().isBlank()) extra.append(extra.isEmpty() ? "" : "\n").append("Tel. ").append(gym.getTelefono());
+            // Quién vende, como pide la ley de comercio electrónico.
+            String vendedor = (gym.getRazonSocial() != null && !gym.getRazonSocial().isBlank() ? gym.getRazonSocial() : "")
+                    + (gym.getRfc() != null && !gym.getRfc().isBlank() ? (gym.getRazonSocial() != null ? " · " : "") + "RFC " + gym.getRfc() : "");
+            if (!vendedor.isBlank()) extra.append(extra.isEmpty() ? "" : "\n").append(vendedor);
             if (!extra.isEmpty()) datos.add(new Text("\n" + extra).setFont(f.normal()).setFontSize(8.5f).setFontColor(GRIS));
         }
         t.addCell(new Cell().add(datos).setBorder(Border.NO_BORDER).setVerticalAlignment(VerticalAlignment.MIDDLE));
