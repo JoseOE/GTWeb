@@ -83,8 +83,9 @@
                                 <label class="metodo-opcion">
                                     <input type="radio" name="metodo" value="${Tienda.escapar(m.id)}">
                                     <i class="bx ${Tienda.escapar(m.icono || 'bx-wallet')}" aria-hidden="true"></i>
-                                    <span><span class="fw-semibold d-block">${Tienda.escapar(m.nombre)}</span>
-                                    ${m.descripcion ? '<small class="text-body-secondary">' + Tienda.escapar(m.descripcion) + '</small>' : ''}</span>
+                                    <span class="metodo-texto"><span class="fw-semibold d-block">${Tienda.escapar(m.nombre)}</span>
+                                    ${m.descripcion ? '<small class="text-body-secondary">' + Tienda.escapar(m.descripcion) + '</small>' : ''}
+                                    ${(m.logos || []).length ? '<span class="metodo-logos">' + m.logos.map(l => MetodosPago.logo(l)).join('') + '</span>' : ''}</span>
                                 </label>`).join('') + '</div>'
                             : '<div class="estado-vacio"><i class="bx bx-wallet"></i>Todavía no hay formas de pago disponibles. Vuelve pronto.</div>'}
                         <div id="metodo-contenedor" class="metodo-contenedor mt-3"></div>

@@ -86,8 +86,9 @@
     MetodosPago.registrar({
         id: 'paypal',
         nombre: 'PayPal',
-        descripcion: 'Aprueba el pago con una cuenta de prueba',
+        descripcion: 'Paga con tu cuenta PayPal y regresa a la tienda',
         icono: 'bx-wallet',
+        logos: ['paypal'],
         orden: 3,
         montar,
         obtenerDatos

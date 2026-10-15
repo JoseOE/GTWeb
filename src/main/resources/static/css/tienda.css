@@ -815,6 +815,23 @@ body.con-barra-carrito {
 .icono-redondo:hover,
 .icono-redondo:focus-visible { border-color: var(--ink); }
 
+/* ─── Logos de las formas de pago (img/pagos) ─── */
+.logo-pago {
+    height: 24px;
+    width: auto;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: #fff;
+    flex: none;
+}
+.metodo-logos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+.metodo-texto { min-width: 0; }
+
 /* ─── Pie: quién vende y enlaces legales ─── */
 .tienda-pie {
     border-top: 1px solid var(--line);
