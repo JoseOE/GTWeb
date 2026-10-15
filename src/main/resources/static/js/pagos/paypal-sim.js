@@ -90,6 +90,8 @@
         icono: 'bx-wallet',
         logos: ['paypal'],
         orden: 3,
+        // Sale a paypal-sim.html: el checkout pide la confirmación antes de salir.
+        saleDeLaPagina: true,
         montar,
         obtenerDatos
     });

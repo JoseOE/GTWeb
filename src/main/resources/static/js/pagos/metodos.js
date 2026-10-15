@@ -40,6 +40,10 @@
        desmontar() {}
    });
 
+   saleDeLaPagina: true → el checkout pide "¿Confirmas tu compra?" antes de
+   llamar a obtenerDatos(); a los demás se les llama primero, para validar (la
+   tarjeta) antes de pedir la confirmación.
+
    Métodos que salen de la página (PayPal): obtenerDatos() puede navegar a
    otra página. Al volver a checkout.html?metodo=<id>&continuar=1, el checkout
    preselecciona ese método, lo monta y vuelve a pulsar "Pagar" solo; en esa

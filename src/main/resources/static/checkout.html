@@ -30,9 +30,62 @@
         </div>
     </main>
 
+    <!-- Advertencia sanitaria: solo si el carrito trae suplementos marcados por el gimnasio. -->
+    <div class="modal fade" id="modal-advertencia" tabindex="-1" aria-labelledby="advertencia-titulo" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5 fw-bold" id="advertencia-titulo"><i class="bx bx-error text-warning-emphasis" aria-hidden="true"></i> Advertencia sanitaria</h2>
+                    <button type="button" class="btn-close tocable" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Tu compra incluye suplementos alimenticios:</p>
+                    <ul class="mb-3" id="advertencia-productos"></ul>
+                    <p class="legal-leyenda-checkout">Este producto no es un medicamento. El consumo de este producto es responsabilidad de quien lo recomienda y de quien lo usa.</p>
+                    <ul class="small text-body-secondary mb-2">
+                        <li>Consulta a tu médico antes de consumirlo, sobre todo si tienes alguna enfermedad, presión alta o problemas del corazón.</li>
+                        <li>No se recomienda durante el embarazo ni la lactancia, ni para menores de 18 años.</li>
+                        <li>Respeta la porción indicada en la etiqueta.</li>
+                    </ul>
+                    <a class="small" href="terminos.html#suplementos" target="_blank" rel="noopener" id="advertencia-enlace">Leer la advertencia completa</a>
+                    <div class="form-check mt-3">
+                        <input class="form-check-input" type="checkbox" id="advertencia-acepto" aria-label="Leí la advertencia sanitaria y la acepto">
+                        <label class="form-check-label fw-semibold" for="advertencia-acepto">Leí la advertencia sanitaria y la acepto</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary tocable px-3" data-bs-dismiss="modal">Regresar</button>
+                    <button type="button" class="btn btn-primary tocable px-3" id="advertencia-continuar" disabled>Aceptar y continuar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Verificación antes de cobrar: desglose, forma de pago, quién vende y consentimiento. -->
+    <div class="modal fade" id="modal-confirmar" tabindex="-1" aria-labelledby="confirmar-titulo" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5 fw-bold" id="confirmar-titulo">¿Confirmas tu compra?</h2>
+                    <button type="button" class="btn-close tocable" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body" id="confirmar-cuerpo"></div>
+                <div class="modal-footer flex-column align-items-stretch gap-2">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="confirmar-acepto" aria-label="Acepto los Términos y condiciones de compra y el Aviso de privacidad">
+                        <label class="form-check-label small" for="confirmar-acepto">Acepto los <a href="terminos.html" target="_blank" rel="noopener" id="confirmar-terminos">Términos y condiciones de compra</a> y el <a href="privacidad.html" target="_blank" rel="noopener" id="confirmar-privacidad">Aviso de privacidad</a>.</label>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-grande w-100" id="confirmar-pagar" disabled>Confirmar y pagar</button>
+                    <button type="button" class="btn btn-link tocable" data-bs-dismiss="modal">Revisar mi pedido</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/tienda.js"></script>
     <script src="js/pagos/metodos.js"></script>
+    <script src="js/legal.js"></script>
     <script>
         (function () {
             Tienda.exigirSesion();
@@ -46,6 +99,11 @@
             let metodoActual = null;
             let pagando = false;
             let avisos = [];
+            // Quién vende (datos del vendedor del gimnasio) y los enlaces legales con su gimnasio.
+            let vendedor = null;
+            let conGym = '';
+            // El consentimiento de PayPal se guarda antes de salir y se usa al volver.
+            const CLAVE_CONSENTIMIENTO = 'consentimiento-checkout';
 
             function resumen() {
                 const c = Tienda.carrito;
@@ -93,6 +151,7 @@
                     <div class="accion-fija">
                         <div id="error-pago" class="alert alert-danger small py-2 d-none" role="alert"></div>
                         <button type="button" class="btn btn-primary btn-grande w-100" id="pagar" disabled>Pagar</button>
+                        <p class="nota-legal">Al confirmar tu compra aceptas los <a href="terminos.html${conGym}" target="_blank" rel="noopener">Términos y condiciones de compra</a> y el <a href="privacidad.html${conGym}" target="_blank" rel="noopener">Aviso de privacidad</a>${vendedor ? ' de ' + Tienda.escapar(vendedor.nombre.replace(/\.$/, '')) : ''}. Pagos simulados: no se cobra dinero real.</p>
                     </div>`;
 
                 raiz.querySelectorAll('input[name="metodo"]').forEach(r => r.addEventListener('change', () => elegir(r.value)));
@@ -152,44 +211,143 @@
                 document.getElementById('error-pago')?.classList.add('d-none');
             }
 
-            function pagar() {
-                if (!metodoActual || pagando) return;
-                const boton = document.getElementById('pagar');
-                ocultarError();
-                pagando = true;
+            // Productos del carrito que piden aceptar la advertencia sanitaria.
+            function conAdvertencia() {
+                return [...new Set(Tienda.carrito.items.filter(i => i.requiereAdvertencia).map(i => i.titulo))];
+            }
+
+            // Muestra un modal y resuelve true si la persona pulsó su botón de continuar.
+            function preguntar(idModal, idBoton) {
+                return new Promise(resolve => {
+                    const el = document.getElementById(idModal);
+                    const modal = bootstrap.Modal.getOrCreateInstance(el);
+                    let aceptado = false;
+                    const boton = document.getElementById(idBoton);
+                    const alAceptar = () => { aceptado = true; modal.hide(); };
+                    boton.addEventListener('click', alAceptar, { once: true });
+                    el.addEventListener('hidden.bs.modal', () => { boton.removeEventListener('click', alAceptar); resolve(aceptado); }, { once: true });
+                    modal.show();
+                });
+            }
+
+            function pedirAdvertencia(productos) {
+                document.getElementById('advertencia-productos').innerHTML = productos.map(p => '<li class="fw-semibold">' + Tienda.escapar(p) + '</li>').join('');
+                const casilla = document.getElementById('advertencia-acepto');
+                casilla.checked = false;
+                document.getElementById('advertencia-continuar').disabled = true;
+                return preguntar('modal-advertencia', 'advertencia-continuar');
+            }
+
+            function pedirConfirmacion(metodo) {
+                const c = Tienda.carrito;
+                const gym = cuenta.gym || {};
+                document.getElementById('confirmar-cuerpo').innerHTML = `
+                    <ul class="list-unstyled confirmar-lista mb-2">${c.items.map(i => '<li><span>' + i.cantidad + ' × ' + Tienda.escapar(i.titulo) + (i.variante && i.variante !== 'Única' ? ' <small class="text-body-secondary">· ' + Tienda.escapar(i.variante) + '</small>' : '') + '</span><span class="text-nowrap">' + Tienda.dinero(i.total) + '</span></li>').join('')}</ul>
+                    <div class="totales">
+                        <div class="fila text-body-secondary"><span>Subtotal (sin IVA)</span><span>${Tienda.dinero(c.subtotal)}</span></div>
+                        <div class="fila text-body-secondary"><span>IVA 16 %</span><span>${Tienda.dinero(c.iva)}</span></div>
+                        <div class="fila text-body-secondary"><span>Entrega en el gimnasio</span><span>Gratis</span></div>
+                        <div class="fila total"><span>Total a pagar</span><span>${Tienda.dinero(c.total)}</span></div>
+                    </div>
+                    <dl class="confirmar-datos mt-3 mb-0">
+                        <dt>Forma de pago</dt><dd><span class="fw-semibold">${Tienda.escapar(metodo.nombre)}</span>${(metodo.logos || []).length ? '<span class="metodo-logos">' + metodo.logos.slice(0, 3).map(l => MetodosPago.logo(l)).join('') + '</span>' : ''}</dd>
+                        <dt>Entrega</dt><dd>Recoger en ${Tienda.escapar(gym.nombre || 'el gimnasio')}${gym.direccion ? '<br><small class="text-body-secondary">' + Tienda.escapar(gym.direccion) + '</small>' : ''}</dd>
+                        <dt>Vende</dt><dd>${Tienda.escapar(vendedor ? vendedor.nombre : (gym.nombre || 'Tu gimnasio'))}${vendedor && vendedor.rfc ? '<br><small class="text-body-secondary">RFC ' + Tienda.escapar(vendedor.rfc) + '</small>' : ''}</dd>
+                    </dl>`;
+                document.getElementById('confirmar-acepto').checked = false;
+                const boton = document.getElementById('confirmar-pagar');
+                boton.disabled = true;
+                boton.textContent = 'Confirmar y pagar ' + Tienda.dinero(c.total);
+                return preguntar('modal-confirmar', 'confirmar-pagar');
+            }
+
+            function enEspera(boton) {
                 boton.disabled = true;
                 boton.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Procesando…';
-                const metodo = metodoActual;
+            }
 
-                Promise.resolve()
-                    .then(() => metodo.obtenerDatos())
-                    .then(datos => Tienda.api('/api/tienda/carrito/checkout', {
+            // 1. La tarjeta se valida primero (no tiene caso confirmar algo que no se
+            //    puede cobrar). PayPal sale de la página: se confirma antes de salir.
+            // 2. Si hay suplementos marcados, la advertencia sanitaria.
+            // 3. "¿Confirmas tu compra?" con el desglose y el consentimiento.
+            // 4. Se cobra con lo que se aceptó.
+            async function pagar(reanudar) {
+                if (!metodoActual || pagando) return;
+                const boton = document.getElementById('pagar');
+                const metodo = metodoActual;
+                ocultarError();
+                pagando = true;
+                enEspera(boton);
+                try {
+                    let datos = null;
+                    let consentimiento = reanudar ? consentimientoGuardado() : null;
+                    if (!metodo.saleDeLaPagina) datos = (await metodo.obtenerDatos()) || {};
+                    if (!consentimiento) {
+                        const productos = conAdvertencia();
+                        if (productos.length && !(await pedirAdvertencia(productos))) return cancelar();
+                        if (!(await pedirConfirmacion(metodo))) return cancelar();
+                        enEspera(boton);
+                        consentimiento = { terminosVersion: Legal.VERSION, aceptaTerminos: true, aceptaAdvertencia: productos.length > 0 };
+                    }
+                    if (metodo.saleDeLaPagina) {
+                        guardarConsentimiento(consentimiento);
+                        datos = (await metodo.obtenerDatos()) || {};
+                    }
+                    const pedido = await Tienda.api('/api/tienda/carrito/checkout', {
                         method: 'POST',
-                        body: JSON.stringify({ metodo: metodo.id, datos: datos || {}, totalVisto: Tienda.carrito.total })
-                    }))
-                    .then(pedido => Promise.resolve(metodo.despues ? metodo.despues(pedido) : null)
-                        .then(destino => { window.location.href = destino || 'confirmacion.html?pedido=' + encodeURIComponent(pedido.orderId); }))
-                    .catch(err => {
-                        pagando = false;
-                        if (err.status === 409 && err.datos && err.datos.carrito) {
-                            // El carrito cambió (precio, stock, producto oculto): se muestra
-                            // corregido y la persona decide si paga el total nuevo.
-                            avisos = err.datos.avisos || [];
-                            Tienda.cargarCarrito().then(() => {
-                                if (!Tienda.carrito.items.length) return pintarVacio();
-                                pintarResumen();
-                                mostrarError(err.message);
-                            });
-                            return;
-                        }
-                        actualizarBoton();
-                        mostrarError(err.message || 'No se pudo completar el pago.');
+                        body: JSON.stringify({ metodo: metodo.id, datos, totalVisto: Tienda.carrito.total, consentimiento })
                     });
+                    try { sessionStorage.removeItem(CLAVE_CONSENTIMIENTO); } catch (e) { /* sin almacenamiento */ }
+                    const destino = await Promise.resolve(metodo.despues ? metodo.despues(pedido) : null);
+                    window.location.href = destino || 'confirmacion.html?pedido=' + encodeURIComponent(pedido.orderId);
+                } catch (err) {
+                    pagando = false;
+                    if (err.status === 409 && err.datos && err.datos.carrito) {
+                        // El carrito cambió (precio, stock, producto oculto): se muestra
+                        // corregido y la persona decide si paga el total nuevo.
+                        avisos = err.datos.avisos || [];
+                        Tienda.cargarCarrito().then(() => {
+                            if (!Tienda.carrito.items.length) return pintarVacio();
+                            pintarResumen();
+                            mostrarError(err.message);
+                        });
+                        return;
+                    }
+                    actualizarBoton();
+                    mostrarError(err.message || 'No se pudo completar el pago.');
+                }
+            }
+
+            function cancelar() {
+                pagando = false;
+                actualizarBoton();
+            }
+
+            // El consentimiento vale solo para este carrito y este total.
+            function guardarConsentimiento(consentimiento) {
+                try {
+                    sessionStorage.setItem(CLAVE_CONSENTIMIENTO, JSON.stringify({ carrito: Tienda.carrito.id, total: Tienda.carrito.total, consentimiento }));
+                } catch (e) { /* sin almacenamiento: al volver se pide otra vez */ }
+            }
+
+            function consentimientoGuardado() {
+                try {
+                    const g = JSON.parse(sessionStorage.getItem(CLAVE_CONSENTIMIENTO) || 'null');
+                    if (g && g.carrito === Tienda.carrito.id && g.total === Tienda.carrito.total) return g.consentimiento;
+                } catch (e) { /* dañado o sin almacenamiento */ }
+                return null;
             }
 
             function pintarVacio() {
                 raiz.innerHTML = '<div class="estado-vacio"><i class="bx bx-shopping-bag"></i>Tu carrito está vacío.<div class="mt-3"><a class="btn btn-primary tocable px-4" href="tienda.html">Ver la tienda</a></div></div>';
             }
+
+            document.getElementById('advertencia-acepto').addEventListener('change', (e) => {
+                document.getElementById('advertencia-continuar').disabled = !e.target.checked;
+            });
+            document.getElementById('confirmar-acepto').addEventListener('change', (e) => {
+                document.getElementById('confirmar-pagar').disabled = !e.target.checked;
+            });
 
             // Cualquier cambio desde el mini-carrito se refleja en el resumen.
             document.addEventListener('carrito', () => {
@@ -206,7 +364,18 @@
                             : 'Podrás comprar cuando el gimnasio apruebe tu solicitud.');
                         return;
                     }
-                    return Promise.all([Tienda.cargarCarrito(), MetodosPago.cargar()]).then(() => {
+                    const gymId = c.gymId || Tienda.sesion.gymId;
+                    conGym = gymId ? '?gym=' + encodeURIComponent(gymId) : '';
+                    const datosVendedor = gymId
+                        ? fetch('/api/gyms/' + encodeURIComponent(gymId)).then(r => r.ok ? r.json() : null).catch(() => null)
+                        : Promise.resolve(null);
+                    return Promise.all([Tienda.cargarCarrito(), MetodosPago.cargar(), datosVendedor]).then(([, , g]) => {
+                        if (g) vendedor = { nombre: g.razonSocial || g.nombre, rfc: g.rfc };
+                        ['confirmar-terminos', 'advertencia-enlace'].forEach(id => {
+                            const a = document.getElementById(id);
+                            a.href = a.getAttribute('href').replace(/^terminos\.html/, 'terminos.html' + conGym);
+                        });
+                        document.getElementById('confirmar-privacidad').href = 'privacidad.html' + conGym;
                         if (!Tienda.carrito.items.length) return pintarVacio();
                         avisos = Tienda.carrito.avisos || [];
                         pintarEsqueleto();
@@ -220,7 +389,7 @@
                                 // lo demás de la URL lo lee obtenerDatos() del método.
                                 params.delete('continuar');
                                 history.replaceState(null, '', 'checkout.html' + (params.toString() ? '?' + params : ''));
-                                pagar();
+                                pagar(true);
                             }
                         }
                     });
