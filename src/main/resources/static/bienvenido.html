@@ -666,6 +666,17 @@
                     </select>
                 </div>
                 <div id="productos-container"></div>
+
+                <section class="dash-empty text-start p-0 overflow-hidden mt-4" aria-labelledby="resenas-panel-titulo">
+                    <div class="p-4 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div>
+                            <h4 class="fw-bold mb-0 fs-6" id="resenas-panel-titulo"><i class='bx bx-star text-primary me-1'></i> Reseñas de tus productos</h4>
+                            <small class="text-body-secondary">Las dejan miembros que compraron el producto. Oculta las ofensivas o las que no hablan del producto: dejan de contar en el promedio.</small>
+                        </div>
+                        <small class="text-body-secondary" id="resenas-panel-conteo" aria-live="polite"></small>
+                    </div>
+                    <ul class="list-unstyled mb-0" id="resenas-panel"></ul>
+                </section>
             </div>
 
             <!-- ─── MODAL: PRODUCTO ─── -->
@@ -2655,6 +2666,19 @@
 
         /* ─── Productos ─── */
         function initProductos() {
+            document.getElementById('resenas-panel').addEventListener('click', (e) => {
+                const boton = e.target.closest('[data-resena-id]');
+                if (!boton) return;
+                const gymId = localStorage.getItem('gymId');
+                boton.disabled = true;
+                apiTienda('/api/gyms/' + gymId + '/resenas/' + encodeURIComponent(boton.dataset.resenaId) + '/visibilidad', {
+                    method: 'POST',
+                    body: JSON.stringify({ oculta: boton.dataset.oculta === 'true' })
+                })
+                    .then(() => loadResenasPanel(gymId))
+                    .catch(err => { boton.disabled = false; alert(err.message); });
+            });
+
             const modal = new bootstrap.Modal(document.getElementById('productoModal'));
             const form = document.getElementById('producto-form');
             const alertBox = document.getElementById('producto-alert');
@@ -2847,6 +2871,38 @@
                     renderProductos();
                 })
                 .catch(err => estadoError(container, err.message, () => loadProductos(gymId)));
+            loadResenasPanel(gymId);
+        }
+
+        // ─── Reseñas: el dueño las revisa y oculta las que no deben mostrarse ───
+        function loadResenasPanel(gymId) {
+            const lista = document.getElementById('resenas-panel');
+            const conteo = document.getElementById('resenas-panel-conteo');
+            apiTienda('/api/gyms/' + gymId + '/resenas')
+                .then(resenas => {
+                    const ocultas = resenas.filter(r => r.oculta).length;
+                    conteo.textContent = resenas.length
+                        ? resenas.length + (resenas.length === 1 ? ' reseña' : ' reseñas') + (ocultas ? ' · ' + ocultas + (ocultas === 1 ? ' oculta' : ' ocultas') : '')
+                        : '';
+                    lista.innerHTML = resenas.length
+                        ? resenas.map(r => `
+                            <li class="d-flex flex-wrap justify-content-between align-items-start gap-2 px-4 py-3 border-bottom${r.oculta ? ' opacity-75' : ''}">
+                                <div style="min-width:0;flex:1 1 280px">
+                                    <div class="d-flex flex-wrap align-items-center gap-2">
+                                        <span class="text-warning-emphasis" role="img" aria-label="${r.estrellas} de 5 estrellas">${'★'.repeat(r.estrellas)}<span class="text-body-tertiary">${'★'.repeat(5 - r.estrellas)}</span></span>
+                                        <strong class="small">${escapeHtml(r.producto)}</strong>
+                                        ${r.oculta ? '<span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis">Oculta</span>' : ''}
+                                    </div>
+                                    <div class="small text-body-secondary">${escapeHtml(r.autor)} · ${new Date(r.fecha).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                                    ${r.comentario ? '<p class="small mb-0 mt-1" style="overflow-wrap:anywhere">' + escapeHtml(r.comentario) + '</p>' : ''}
+                                </div>
+                                <button type="button" class="btn btn-sm rounded-pill px-3 ${r.oculta ? 'btn-outline-primary' : 'btn-outline-secondary'}" data-resena-id="${escapeHtml(r.id)}" data-oculta="${r.oculta ? 'false' : 'true'}">
+                                    <i class='bx ${r.oculta ? 'bx-show' : 'bx-hide'}' aria-hidden="true"></i> ${r.oculta ? 'Mostrar' : 'Ocultar'}
+                                </button>
+                            </li>`).join('')
+                        : '<li class="text-center text-body-secondary py-4 px-4 small">Todavía no hay reseñas. Aparecen cuando tus miembros califican lo que compraron.</li>';
+                })
+                .catch(err => { lista.innerHTML = '<li class="text-danger small px-4 py-3">' + escapeHtml(err.message) + '</li>'; });
         }
 
         function renderProductos() {
