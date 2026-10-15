@@ -45,9 +45,12 @@
         cargarEstilos();
         contenedor.innerHTML = `
             <div class="pp-caja">
-                <span class="pp-simulacion">Simulación</span>
+                <div class="pp-caja-cabeza">
+                    <img src="img/pagos/paypal.svg" alt="PayPal" width="78" height="26">
+                    <span class="pp-simulacion">Simulación</span>
+                </div>
                 ${cancelado ? '<div class="alert alert-warning small py-2 mt-2 mb-0" role="status">Cancelaste el pago en PayPal. Tu carrito sigue igual: vuelve a intentarlo o elige otro método.</div>' : ''}
-                <p class="mt-2 mb-2">Al pagar te llevamos al <strong>Simulador PayPal</strong> para aprobar
+                <p class="mt-3 mb-2">Al pagar te llevamos al <strong>Simulador PayPal</strong> para aprobar
                     <strong>${dinero(resumen && resumen.total)}</strong> con una cuenta de prueba. Después regresas aquí y tu pedido queda pagado.</p>
                 <ul class="small text-body-secondary mb-0 ps-3">
                     <li>No se pide contraseña ni se usa tu cuenta real de PayPal.</li>

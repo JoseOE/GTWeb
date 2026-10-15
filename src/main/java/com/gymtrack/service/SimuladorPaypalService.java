@@ -177,6 +177,9 @@ public class SimuladorPaypalService {
         seguros.put("orden", orden.getId());
         seguros.put("payerId", orden.getPayerId());
         seguros.put("cuenta", orden.getCuenta());
+        // Titular de la cuenta, como lo muestra el recibo de PayPal (solo las cuentas de la lista).
+        CUENTAS.stream().filter(c -> c.correo().equals(orden.getCuenta()) && APROBADA.equals(c.resultado()))
+                .findFirst().ifPresent(c -> seguros.put("nombre", c.nombre()));
         seguros.put("resultado", orden.getResultado());
         return seguros;
     }
