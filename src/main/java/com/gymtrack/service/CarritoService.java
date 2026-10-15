@@ -54,15 +54,18 @@ public class CarritoService {
     private final SimuladorStripeService stripe;
     private final SimuladorPaypalService paypal;
     private final MongoTemplate mongo;
+    private final ConsentimientoService consentimientos;
 
     public CarritoService(CarritoRepository carritos, ProductoRepository productos, PedidoService pedidos,
-                          SimuladorStripeService stripe, SimuladorPaypalService paypal, MongoTemplate mongo) {
+                          SimuladorStripeService stripe, SimuladorPaypalService paypal, MongoTemplate mongo,
+                          ConsentimientoService consentimientos) {
         this.carritos = carritos;
         this.productos = productos;
         this.pedidos = pedidos;
         this.stripe = stripe;
         this.paypal = paypal;
         this.mongo = mongo;
+        this.consentimientos = consentimientos;
     }
 
     // Lo publicado en la tienda de un gimnasio, por id de variante: una sola consulta.
@@ -219,12 +222,14 @@ public class CarritoService {
     //
     // datos es lo que armó el módulo JS del método (js/pagos/*-sim.js).
     // totalVisto es el total que la persona tenía en pantalla al pulsar "Pagar".
-    public Pedido checkout(User user, String gymId, String canal, String metodo, Map<String, Object> datos, Double totalVisto) {
+    public Pedido checkout(User user, String gymId, String canal, String metodo, Map<String, Object> datos, Double totalVisto,
+                           ConsentimientoService.Solicitud aceptado) {
         String proveedor = proveedorDe(metodo);
         Carrito c = carrito(user, gymId, canal);
         exigirLibre(c);
         Map<String, Elegible> cat = catalogo(gymId);
         revisarParaCobrar(c, cat, totalVisto);
+        Pedido.Consentimiento consentimiento = consentimientos.revisar(c.getCanal(), aceptado, conAdvertencia(c, cat));
         double total = total(c);
         Instant cobro = tomarCobro(c);
         Pedido pedido;
@@ -239,7 +244,7 @@ public class CarritoService {
             if (MetodosPago.STRIPE.equals(proveedor)) datos = stripe.consumir(user.getId(), datos);
 
             pedido = pedidos.cobrar(new PedidoService.Venta(gymId, c.getCanal(), user.getId(), user.getEmail(),
-                    null, null, lineas(c, cat), proveedor, datos, false, null));
+                    null, null, lineas(c, cat), proveedor, datos, false, null, consentimiento));
         } catch (RuntimeException e) {
             // No se cobró: el carrito queda como estaba para intentar con otro método.
             soltarCobro(c, cobro, new Update());
@@ -266,6 +271,16 @@ public class CarritoService {
             throw new TiendaException(HttpStatus.CONFLICT, "El total cambió a " + dinero(total) + ". Revísalo antes de cobrar.",
                     Map.of("carrito", vista(c, List.of(), cat)));
         }
+    }
+
+    // Productos del carrito que piden aceptar la advertencia sanitaria.
+    private static List<String> conAdvertencia(Carrito c, Map<String, Elegible> cat) {
+        List<String> titulos = new ArrayList<>();
+        for (Carrito.Partida x : enOrden(c)) {
+            Elegible e = cat.get(x.getVarianteId());
+            if (e != null && e.producto().conAdvertencia() && !titulos.contains(x.getTitulo())) titulos.add(x.getTitulo());
+        }
+        return titulos;
     }
 
     private List<PedidoService.Linea> lineas(Carrito c, Map<String, Elegible> cat) {
@@ -504,6 +519,8 @@ public class CarritoService {
             x.put("variante", p.isEsPlan() ? textoDelPlan(p) : p.getVariante());
             x.put("imagen", p.getImagen());
             x.put("esPlan", p.isEsPlan());
+            // El checkout muestra la advertencia sanitaria antes de pagar.
+            x.put("requiereAdvertencia", e != null && e.producto().conAdvertencia());
             x.put("cantidad", p.getCantidad());
             x.put("maximo", p.isEsPlan() ? Integer.valueOf(1) : maximo == null ? Integer.valueOf(MAX_POR_PARTIDA) : Integer.valueOf(Math.min(maximo, MAX_POR_PARTIDA)));
             x.put("precioUnitario", p.getPrecioUnitario());

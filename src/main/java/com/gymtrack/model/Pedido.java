@@ -76,8 +76,41 @@ public class Pedido {
     // Piezas que este pedido tomó del inventario y cómo. Con esto se regresan,
     // una sola vez, si se cancela, vence o se reembolsa (InventarioService).
     private Inventario inventario;
+    // Lo que el comprador aceptó antes de pagar (ConsentimientoService). null en
+    // los pedidos de antes y en las ventas de mostrador.
+    private Consentimiento consentimiento;
 
     public Pedido() {}
+
+    public static class Consentimiento {
+        // false = la app todavía no lo manda (transición).
+        private boolean enviado;
+        private String terminosVersion;
+        private boolean aceptaTerminos;
+        private boolean aceptaAdvertencia;
+        // Los productos que pedían aceptar la advertencia sanitaria.
+        private List<String> productosConAdvertencia = new ArrayList<>();
+        // Hora del servidor al cobrar.
+        private Instant registradoEn;
+
+        public boolean isEnviado() { return enviado; }
+        public void setEnviado(boolean enviado) { this.enviado = enviado; }
+
+        public String getTerminosVersion() { return terminosVersion; }
+        public void setTerminosVersion(String terminosVersion) { this.terminosVersion = terminosVersion; }
+
+        public boolean isAceptaTerminos() { return aceptaTerminos; }
+        public void setAceptaTerminos(boolean aceptaTerminos) { this.aceptaTerminos = aceptaTerminos; }
+
+        public boolean isAceptaAdvertencia() { return aceptaAdvertencia; }
+        public void setAceptaAdvertencia(boolean aceptaAdvertencia) { this.aceptaAdvertencia = aceptaAdvertencia; }
+
+        public List<String> getProductosConAdvertencia() { return productosConAdvertencia; }
+        public void setProductosConAdvertencia(List<String> productosConAdvertencia) { this.productosConAdvertencia = productosConAdvertencia; }
+
+        public Instant getRegistradoEn() { return registradoEn; }
+        public void setRegistradoEn(Instant registradoEn) { this.registradoEn = registradoEn; }
+    }
 
     public boolean incluyePlan() {
         return partidas.stream().anyMatch(Partida::esPlan);
@@ -239,4 +272,7 @@ public class Pedido {
 
     public Inventario getInventario() { return inventario; }
     public void setInventario(Inventario inventario) { this.inventario = inventario; }
+
+    public Consentimiento getConsentimiento() { return consentimiento; }
+    public void setConsentimiento(Consentimiento consentimiento) { this.consentimiento = consentimiento; }
 }

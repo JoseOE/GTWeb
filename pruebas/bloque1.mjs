@@ -1,6 +1,6 @@
 // Prueba de punta a punta del bloque 1 contra Spring (8080) y MongoDB locales.
 import fs from 'node:fs';
-import { API, ESTADO, leerLog } from './entorno.mjs';
+import { API, ESTADO, leerLog, CONSENTIMIENTO } from './entorno.mjs';
 
 let fallos = 0;
 const TOKENS = {};
@@ -99,7 +99,7 @@ async function comprar(items, metodo, numero) {
   if (numero) {
     datos = { token: (await api('POST', '/api/simuladores/stripe/tokens', { numero, titular: 'Miembro Prueba', mes: '12', anio: '30', cvc: '123' }, member.id)).body.token };
   }
-  return api('POST', '/api/tienda/carrito/checkout', { metodo, datos, totalVisto: carrito.total }, member.id);
+  return api('POST', '/api/tienda/carrito/checkout', { metodo, datos, totalVisto: carrito.total, consentimiento: CONSENTIMIENTO }, member.id);
 }
 const antes = (await api('GET', `/api/users/${member.id}/me`)).body;
 r = await comprar([{ varianteId: planes.Mensual.varianteId }, { varianteId: bote.id, cantidad: 2 }], 'stripe', '4242424242424242');

@@ -66,7 +66,7 @@ public class MostradorService {
                 cliente == null ? null : cliente.getId(),
                 cliente == null ? dueno.getEmail() : cliente.getEmail(),
                 cliente == null ? "Público en general" : cliente.getNombre(),
-                dueno.getId(), lineas, proveedor, datos, true, extras));
+                dueno.getId(), lineas, proveedor, datos, true, extras, null));
         return new VentaMostrador(pedido, cambio);
     }
 

@@ -1,6 +1,6 @@
 // Prueba del bloque 5 (simulador de PayPal y dashboard de ventas) contra Spring y MongoDB locales.
 import fs from 'node:fs';
-import { API, ESTADO } from './entorno.mjs';
+import { API, ESTADO, CONSENTIMIENTO } from './entorno.mjs';
 
 const n = JSON.parse(fs.readFileSync(ESTADO, 'utf8'));
 const TOKENS = n.tokens || {};
@@ -27,7 +27,7 @@ const crearOrden = (cuerpo = { returnUrl: RETORNO, cancelUrl: CANCELA }, canal =
 const aprobar = (id, cuenta = 'ana.compradora@sim-paypal.test') => api('POST', `/api/simuladores/paypal/ordenes/${id}/aprobar`, { cuenta });
 const payerDe = redirect => new URL(redirect.replace(/^gymtrack:\/\//, 'http://app/')).searchParams.get('PayerID');
 const pagar = (datos, total, canal = 'web', quien = member) =>
-  api('POST', `/api/tienda/carrito/checkout?canal=${canal}`, { metodo: 'paypal', datos, totalVisto: total }, quien);
+  api('POST', `/api/tienda/carrito/checkout?canal=${canal}`, { metodo: 'paypal', datos, totalVisto: total, consentimiento: CONSENTIMIENTO }, quien);
 
 console.log('\n1. Orden de PayPal');
 let r = await crearOrden({ returnUrl: RETORNO, cancelUrl: CANCELA }, 'web', null);
@@ -240,7 +240,7 @@ ok(r.body.membresia && r.body.membresia.ajustada === true && trasDos === antesDe
 
 // Paynet pendiente: simular el pago desde Ventas y cancelar otra ficha.
 c = await carritoCon(aguaV.id, 1);
-const ficha = (await api('POST', '/api/tienda/carrito/checkout', { metodo: 'paynet', datos: {}, totalVisto: c.total }, member)).body;
+const ficha = (await api('POST', '/api/tienda/carrito/checkout', { metodo: 'paynet', datos: {}, totalVisto: c.total, consentimiento: CONSENTIMIENTO }, member)).body;
 r = await api('GET', `/api/gyms/${gymId}/ventas/pedidos/${ficha.orderId}`, null, owner);
 ok(r.body.estado === 'pendiente_pago' && r.body.acciones.simularPaynet && r.body.acciones.cancelar && r.body.acciones.ficha && !r.body.acciones.reembolsar, 'ficha Paynet: simular pago, ficha y cancelar', r.body.acciones);
 r = await api('POST', `/api/gyms/${gymId}/ventas/pedidos/${ficha.orderId}/reembolsar`, null, owner);
@@ -250,7 +250,7 @@ ok(r.status === 200, 'simular pago en tienda desde Ventas', r.body && r.body.est
 r = await api('GET', `/api/gyms/${gymId}/ventas/pedidos/${ficha.orderId}`, null, owner);
 ok(r.body.estado === 'pagado' && r.body.acciones.reembolsar, 'la ficha quedó pagada');
 c = await carritoCon(aguaV.id, 1);
-const ficha2 = (await api('POST', '/api/tienda/carrito/checkout', { metodo: 'paynet', datos: {}, totalVisto: c.total }, member)).body;
+const ficha2 = (await api('POST', '/api/tienda/carrito/checkout', { metodo: 'paynet', datos: {}, totalVisto: c.total, consentimiento: CONSENTIMIENTO }, member)).body;
 r = await api('POST', `/api/gyms/${gymId}/ventas/pedidos/${ficha2.orderId}/cancelar`, null, owner);
 ok(r.status === 200 && r.body.estado === 'cancelado' && !r.body.acciones.cancelar, 'cancelar una ficha pendiente', r.body.estado || r.body.error);
 r = await api('POST', `/api/gyms/${gymId}/ventas/pedidos/${ficha2.orderId}/cancelar`, null, owner);

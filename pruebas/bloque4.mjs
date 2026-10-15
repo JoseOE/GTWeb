@@ -1,7 +1,7 @@
 // Prueba del bloque 4 (Paynet, recibos iText y correos) contra Spring y MongoDB locales.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
-import { API, ESTADO, MONGO, leerLog } from './entorno.mjs';
+import { API, ESTADO, MONGO, leerLog, CONSENTIMIENTO } from './entorno.mjs';
 
 const require = createRequire(import.meta.url);
 const { MongoClient } = require('mongodb');
@@ -40,7 +40,7 @@ await api('POST', '/api/tienda/carrito/items', { varianteId: agua.id, cantidad: 
 await api('POST', '/api/tienda/carrito/items', { varianteId: planes.Mensual.varianteId }, member);
 let c = (await api('GET', '/api/tienda/carrito', null, member)).body;
 const tok = (await api('POST', '/api/simuladores/stripe/tokens', { numero: '4242424242424242', titular: 'Ana', mes: '12', anio: '30', cvc: '123' }, member)).body.token;
-let r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: tok }, totalVisto: c.total }, member);
+let r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'stripe', datos: { token: tok }, totalVisto: c.total, consentimiento: CONSENTIMIENTO }, member);
 const pagado = r.body;
 ok(r.status === 200 && pagado.estado === 'pagado', 'compra con tarjeta', pagado.folio);
 let b = await binario(`/api/recibos/pedidos/${pagado.orderId}.pdf`, member);
@@ -62,7 +62,7 @@ await api('POST', '/api/tienda/carrito/items', { varianteId: agua.id, cantidad: 
 await api('POST', '/api/tienda/carrito/items', { varianteId: planes.Visita.varianteId }, member);
 c = (await api('GET', '/api/tienda/carrito', null, member)).body;
 const dispAntes = (await api('GET', `/api/tienda/${gymId}/productos`, null, member)).body.find(p => p.nombre.startsWith('Agua')).variantes[0].disponible;
-r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'paynet', datos: {}, totalVisto: c.total }, member);
+r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'paynet', datos: {}, totalVisto: c.total, consentimiento: CONSENTIMIENTO }, member);
 const ficha = r.body;
 const ref = (ficha.paynet?.referencia || '').replace(/\s/g, '');
 ok(r.status === 200 && ficha.estado === 'pendiente_pago', 'pedido Paynet pendiente', ficha.detallePago);
@@ -94,7 +94,7 @@ ok(b.status === 200, 'ahora sí tiene recibo');
 
 console.log('\n3. Fichas vencidas');
 c = (await api('POST', '/api/tienda/carrito/items', { varianteId: agua.id, cantidad: 4 }, member)).body;
-r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'paynet', datos: {}, totalVisto: c.total }, member);
+r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'paynet', datos: {}, totalVisto: c.total, consentimiento: CONSENTIMIENTO }, member);
 const vieja = r.body;
 const conApartado = (await api('GET', `/api/tienda/${gymId}/productos`, null, member)).body.find(p => p.nombre.startsWith('Agua')).variantes[0].disponible;
 const mongo = await MongoClient.connect(MONGO);
