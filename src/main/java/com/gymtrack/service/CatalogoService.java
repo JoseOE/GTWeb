@@ -217,6 +217,10 @@ public class CatalogoService {
         v.put("imagen", vacio(p.getImagen()));
         v.put("activo", p.isActivo());
         v.put("categoria", vistaCategoria(p.getCategoria()));
+        v.put("marca", p.getMarca());
+        v.put("proveedor", p.getProveedor());
+        v.put("sitioProveedor", p.getSitioProveedor());
+        v.put("requiereAdvertencia", p.conAdvertencia());
 
         List<Map<String, Object>> variantes = new ArrayList<>();
         Double desde = null;
@@ -328,6 +332,32 @@ public class CatalogoService {
         p.setImagen(r.getImagen() == null || r.getImagen().isBlank() ? null : r.getImagen());
         p.setActivo(!Boolean.FALSE.equals(r.getActivo()));
         p.setCategoria(categoria);
+        p.setMarca(texto(r.getMarca(), 80, "La marca"));
+        p.setProveedor(texto(r.getProveedor(), 120, "El proveedor"));
+        p.setSitioProveedor(sitioWeb(r.getSitioProveedor()));
+        // Sin respuesta del panel, los suplementos llevan advertencia y lo demás no.
+        p.setRequiereAdvertencia(r.getRequiereAdvertencia() != null
+                ? r.getRequiereAdvertencia() : "suplementos".equals(categoria));
+    }
+
+    private static String texto(String valor, int maximo, String campo) {
+        if (valor == null || valor.isBlank()) return null;
+        String limpio = valor.trim();
+        if (limpio.length() > maximo) {
+            throw new TiendaException(HttpStatus.BAD_REQUEST, campo + " puede tener hasta " + maximo + " caracteres.");
+        }
+        return limpio;
+    }
+
+    // "marca.com" → "https://marca.com". Solo http(s): el enlace se muestra en la tienda.
+    private static String sitioWeb(String valor) {
+        if (valor == null || valor.isBlank()) return null;
+        String url = valor.trim();
+        if (!url.matches("(?i)^https?://.*")) url = "https://" + url;
+        if (url.length() > 200 || !url.matches("(?i)^https?://[a-z0-9.-]+\\.[a-z]{2,}(:\\d+)?(/\\S*)?$")) {
+            throw new TiendaException(HttpStatus.BAD_REQUEST, "El sitio del proveedor debe ser una dirección web, por ejemplo https://marca.com.");
+        }
+        return url;
     }
 
     private static Producto.Variante nuevaVariante(VarianteLimpia limpia, int orden) {
@@ -484,7 +514,25 @@ public class CatalogoService {
         // URL que devolvió POST /api/gyms/{gymId}/imagenes
         private String imagen;
         private Boolean activo;
+        private String marca;
+        private String proveedor;
+        // https://... del proveedor o de la tienda oficial de la marca.
+        private String sitioProveedor;
+        // null = lo decide la categoría (suplementos sí).
+        private Boolean requiereAdvertencia;
         private List<VarianteRequest> variantes;
+
+        public String getMarca() { return marca; }
+        public void setMarca(String marca) { this.marca = marca; }
+
+        public String getProveedor() { return proveedor; }
+        public void setProveedor(String proveedor) { this.proveedor = proveedor; }
+
+        public String getSitioProveedor() { return sitioProveedor; }
+        public void setSitioProveedor(String sitioProveedor) { this.sitioProveedor = sitioProveedor; }
+
+        public Boolean getRequiereAdvertencia() { return requiereAdvertencia; }
+        public void setRequiereAdvertencia(Boolean requiereAdvertencia) { this.requiereAdvertencia = requiereAdvertencia; }
 
         public String getNombre() { return nombre; }
         public void setNombre(String nombre) { this.nombre = nombre; }

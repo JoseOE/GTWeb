@@ -1,0 +1,212 @@
+/* ═══════════════════════════════════════
+   PÁGINAS LEGALES (términos de compra y aviso de privacidad)
+   Hechas para leerse: una columna de ~68 caracteres, índice al inicio y
+   secciones numeradas que se pueden enlazar (terminos.html#suplementos).
+   Usa los tokens de marca de editorial.css.
+═══════════════════════════════════════ */
+
+.legal {
+    background: var(--paper);
+    color: var(--ink);
+}
+
+.legal-barra {
+    background: var(--ink);
+    padding-top: env(safe-area-inset-top);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+.legal-barra .contenedor {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 60px;
+}
+.legal-barra .marca {
+    font-family: var(--identity);
+    font-weight: 800;
+    color: #fff;
+    text-decoration: none;
+    font-size: 1.15rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+}
+.legal-barra .marca i { color: var(--brand); font-size: 1.6rem; }
+.legal-barra .marca span span { color: var(--brand); }
+.legal-barra .volver {
+    color: #e9e8e1;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 44px;
+    padding-inline: 8px;
+    border-radius: 8px;
+    font-weight: 600;
+}
+.legal-barra .volver:hover,
+.legal-barra .volver:focus-visible { color: #fff; background: rgba(255, 255, 255, 0.08); }
+
+.legal .contenedor {
+    max-width: 760px;
+    margin-inline: auto;
+    padding-inline: 16px;
+}
+
+.legal-portada {
+    padding: 40px 0 24px;
+    border-bottom: 1px solid var(--line);
+}
+.legal-portada .eyebrow {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--brand-dark);
+    margin-bottom: 8px;
+}
+.legal-portada h1 {
+    font-family: var(--display);
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: clamp(2.1rem, 8vw, 3.2rem);
+    line-height: 0.95;
+    margin: 0 0 12px;
+}
+.legal-portada .version {
+    color: var(--muted);
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+/* Proyecto académico: se dice antes que nada. */
+.legal-aviso {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--brand);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 20px 0 0;
+    font-size: 0.95rem;
+}
+.legal-aviso i { color: var(--brand-dark); font-size: 1.3rem; flex: none; margin-top: 1px; }
+
+/* Quién vende: lo llena js/legal.js con los datos del gimnasio. */
+.legal-vendedor {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px;
+    margin: 16px 0 0;
+}
+.legal-vendedor h2 {
+    font-family: var(--identity);
+    font-size: 1rem;
+    font-weight: 800;
+    margin: 0 0 12px;
+}
+.legal-vendedor dl {
+    display: grid;
+    grid-template-columns: minmax(96px, max-content) 1fr;
+    gap: 6px 16px;
+    margin: 0;
+    font-size: 0.95rem;
+}
+.legal-vendedor dt { color: var(--muted); font-weight: 500; }
+.legal-vendedor dd { margin: 0; overflow-wrap: anywhere; }
+.legal-vendedor .sin-datos { color: var(--muted); font-size: 0.95rem; margin: 0; }
+
+.legal-indice {
+    margin: 28px 0 8px;
+    padding: 0;
+    list-style: none;
+    counter-reset: indice;
+    columns: 2 260px;
+    column-gap: 24px;
+}
+.legal-indice li {
+    counter-increment: indice;
+    break-inside: avoid;
+    margin-bottom: 2px;
+}
+.legal-indice a {
+    display: flex;
+    gap: 8px;
+    padding: 6px 0;
+    color: var(--ink);
+    text-decoration: none;
+    min-height: 32px;
+}
+.legal-indice a::before {
+    content: counter(indice, decimal-leading-zero);
+    color: var(--brand-dark);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+}
+.legal-indice a:hover,
+.legal-indice a:focus-visible { color: var(--brand-dark); text-decoration: underline; }
+
+.legal-cuerpo {
+    counter-reset: seccion;
+    padding-bottom: 56px;
+}
+.legal-cuerpo section {
+    counter-increment: seccion;
+    padding-top: 28px;
+    scroll-margin-top: 72px;
+}
+.legal-cuerpo h2 {
+    font-family: var(--identity);
+    font-weight: 800;
+    font-size: 1.2rem;
+    margin: 0 0 10px;
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+}
+.legal-cuerpo h2::before {
+    content: counter(seccion, decimal-leading-zero);
+    color: var(--brand-dark);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.95rem;
+}
+.legal-cuerpo p,
+.legal-cuerpo li {
+    font-size: 1rem;
+    line-height: 1.65;
+    max-width: 68ch;
+}
+.legal-cuerpo ul { padding-left: 1.2rem; }
+.legal-cuerpo li { margin-bottom: 4px; }
+.legal-cuerpo a { color: var(--brand-dark); }
+
+/* La leyenda sanitaria se cita tal cual: tiene que destacar. */
+.legal-leyenda {
+    background: var(--ink);
+    color: #fff;
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-weight: 700;
+    line-height: 1.5;
+    margin: 12px 0;
+    max-width: 68ch;
+}
+.legal-pie {
+    border-top: 1px solid var(--line);
+    padding: 20px 0 32px;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+.legal-pie a { color: var(--ink); font-weight: 600; }
+
+@media print {
+    .legal-barra, .legal-indice { display: none; }
+    .legal { background: #fff; }
+}

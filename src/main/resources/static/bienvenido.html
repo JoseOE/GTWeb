@@ -225,6 +225,25 @@
                             <small class="text-body-secondary d-block">Si lo apagas, solo se pueden unir con tu código.</small>
                         </div>
 
+                        <div class="col-12"><hr class="my-2"></div>
+                        <div class="col-12">
+                            <h4 class="fw-bold fs-6 mb-1"><i class='bx bx-id-card text-primary me-1'></i> Datos del vendedor</h4>
+                            <p class="text-body-secondary small mb-0">Tus clientes los ven en la tienda, en los términos de compra y en sus recibos. La ley de comercio electrónico pide mostrar quién vende antes de cobrar.</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="gym-razon" class="form-label fw-semibold small">Nombre o razón social</label>
+                            <input type="text" id="gym-razon" class="form-control" maxlength="120" placeholder="Ej. PowerFit Pachuca S.A. de C.V." aria-describedby="gym-razon-ayuda">
+                            <small class="text-body-secondary d-block mt-1" id="gym-razon-ayuda">Si lo dejas vacío, se usa el nombre del gimnasio.</small>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="gym-rfc" class="form-label fw-semibold small">RFC <span class="fw-normal text-body-secondary">(opcional)</span></label>
+                            <input type="text" id="gym-rfc" class="form-control text-uppercase" maxlength="13" placeholder="XAXX010101000" autocomplete="off">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="gym-correo-contacto" class="form-label fw-semibold small">Correo de atención</label>
+                            <input type="email" id="gym-correo-contacto" class="form-control" maxlength="120" placeholder="ventas@tugimnasio.mx">
+                        </div>
+
                         <div id="gym-alert" class="col-12 alert alert-danger d-none py-2 small mb-0" role="alert"></div>
                         <div class="col-12 pt-2">
                             <button type="submit" class="btn btn-primary rounded-pill px-4" id="gym-save-btn"><i class='bx bx-save'></i> Guardar cambios</button>
@@ -702,6 +721,26 @@
                                     <div class="col-12">
                                         <label for="producto-descripcion" class="form-label fw-semibold small">Descripción (opcional)</label>
                                         <textarea id="producto-descripcion" class="form-control" rows="2" placeholder="Ej. 24 g de proteína por porción"></textarea>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="producto-marca" class="form-label fw-semibold small">Marca</label>
+                                        <input type="text" id="producto-marca" class="form-control" maxlength="80" placeholder="Ej. Optimum Nutrition">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="producto-proveedor" class="form-label fw-semibold small">Proveedor</label>
+                                        <input type="text" id="producto-proveedor" class="form-control" maxlength="120" placeholder="Ej. Distribuidora oficial ON México">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="producto-sitio" class="form-label fw-semibold small">Sitio del proveedor <span class="fw-normal text-body-secondary">(opcional)</span></label>
+                                        <input type="url" id="producto-sitio" class="form-control" maxlength="200" placeholder="https://marca.com.mx" inputmode="url">
+                                    </div>
+                                    <div class="col-12">
+                                        <small class="text-body-secondary d-block mb-2">Tus clientes ven la marca y el proveedor en el detalle del producto, como pide la ley de comercio electrónico.</small>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" role="switch" id="producto-advertencia" aria-describedby="producto-advertencia-ayuda">
+                                            <label class="form-check-label small fw-semibold" for="producto-advertencia">Requiere advertencia sanitaria</label>
+                                        </div>
+                                        <small class="text-body-secondary d-block" id="producto-advertencia-ayuda">Para preentreno, proteína, creatina, quemadores y otros suplementos: antes de pagar, el cliente lee y acepta la <a href="terminos.html#suplementos" target="_blank" rel="noopener">advertencia sanitaria</a>.</small>
                                     </div>
                                     <div class="col-md-8">
                                         <label for="producto-imagen-input" class="form-label fw-semibold small">Foto</label>
@@ -1319,7 +1358,10 @@
                 direccion: document.getElementById('gym-direccion'),
                 horario: document.getElementById('gym-horario'),
                 equipamiento: document.getElementById('gym-equipamiento'),
-                maquinas: document.getElementById('gym-maquinas')
+                maquinas: document.getElementById('gym-maquinas'),
+                razonSocial: document.getElementById('gym-razon'),
+                rfc: document.getElementById('gym-rfc'),
+                correoContacto: document.getElementById('gym-correo-contacto')
             };
 
             // ─── Identidad visual ───
@@ -1423,6 +1465,9 @@
                         fields.horario.value = gym.horario || '';
                         fields.equipamiento.value = gym.equipamiento || '';
                         fields.maquinas.value = (gym.maquinas || []).join('\n');
+                        fields.razonSocial.value = gym.razonSocial || '';
+                        fields.rfc.value = gym.rfc || '';
+                        fields.correoContacto.value = gym.correoContacto || '';
                         if (gym.colorPrimario) { colorInput.value = gym.colorPrimario; colorHex.value = gym.colorPrimario.toUpperCase(); }
                         cuotaInput.value = gym.cuotaMensual != null ? gym.cuotaMensual : '';
                         directorioInput.checked = !!gym.enDirectorio;
@@ -1453,6 +1498,9 @@
                         colorPrimario: colorInput.value,
                         enDirectorio: directorioInput.checked,
                         cuotaMensual: cuotaInput.value === '' ? null : parseFloat(cuotaInput.value),
+                        razonSocial: fields.razonSocial.value.trim(),
+                        rfc: fields.rfc.value.trim(),
+                        correoContacto: fields.correoContacto.value.trim(),
                         ownerUserId: userId
                     })
                 })
@@ -2376,7 +2424,9 @@
                     </div>
                 </div>`).join('');
 
-            document.getElementById('ventas-periodo-texto').textContent = (r.desde === r.hasta ? diaCorto(r.hasta) : 'Del ' + diaCorto(r.desde) + ' al ' + diaCorto(r.hasta))
+            // Con 12 meses el periodo cruza de año: "Del 15 oct 2025 al 14 oct 2026".
+            const fecha = r.desde.slice(0, 4) === r.hasta.slice(0, 4) ? diaCorto : diaConAnio;
+            document.getElementById('ventas-periodo-texto').textContent = (r.desde === r.hasta ? diaCorto(r.hasta) : 'Del ' + fecha(r.desde) + ' al ' + fecha(r.hasta))
                 + ' · ' + dinero(r.periodo.total) + ' en ' + textoPedidos(r.periodo.pedidos);
             pintarBarrasVentas(document.getElementById('ventas-top'), r.topProductos.map(p => ({
                 nombre: p.titulo, total: p.total,
@@ -2660,6 +2710,10 @@
             return new Date(iso + 'T12:00:00Z').toLocaleDateString('es-MX', { day: 'numeric', month: 'short', timeZone: 'UTC' });
         }
 
+        function diaConAnio(iso) {
+            return new Date(iso + 'T12:00:00Z').toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+        }
+
         function fechaHoraVenta(instante) {
             return instante ? new Date(instante).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'America/Mexico_City' }) : '';
         }
@@ -2681,6 +2735,7 @@
 
             const modal = new bootstrap.Modal(document.getElementById('productoModal'));
             const form = document.getElementById('producto-form');
+            let advertenciaTocada = false;
             const alertBox = document.getElementById('producto-alert');
             const saveBtn = document.getElementById('producto-guardar-btn');
             const rows = document.getElementById('variantes-rows');
@@ -2774,13 +2829,23 @@
                 document.getElementById('producto-nombre').value = p ? p.nombre : '';
                 document.getElementById('producto-descripcion').value = p && p.descripcion ? p.descripcion : '';
                 document.getElementById('producto-activo').checked = p ? p.activo : true;
+                document.getElementById('producto-marca').value = p && p.marca ? p.marca : '';
+                document.getElementById('producto-proveedor').value = p && p.proveedor ? p.proveedor : '';
+                document.getElementById('producto-sitio').value = p && p.sitioProveedor ? p.sitioProveedor : '';
                 const cat = document.getElementById('producto-categoria');
                 if (p && p.categoria) cat.value = p.categoria.handle;
+                // Un producto nuevo sigue a su categoría (suplementos sí) hasta que el dueño toque la casilla.
+                advertenciaTocada = !!p;
+                document.getElementById('producto-advertencia').checked = p ? !!p.requiereAdvertencia : cat.value === 'suplementos';
                 (p ? p.variantes : [null]).forEach(agregarVariante);
                 modal.show();
             }
 
             document.getElementById('producto-nuevo-btn').addEventListener('click', () => abrir(null));
+            document.getElementById('producto-advertencia').addEventListener('change', () => { advertenciaTocada = true; });
+            document.getElementById('producto-categoria').addEventListener('change', (e) => {
+                if (!advertenciaTocada) document.getElementById('producto-advertencia').checked = e.target.value === 'suplementos';
+            });
             document.getElementById('productos-buscar').addEventListener('input', renderProductos);
             document.getElementById('productos-categoria').addEventListener('change', renderProductos);
 
@@ -2831,6 +2896,10 @@
                             categoria: document.getElementById('producto-categoria').value,
                             imagen: url,
                             activo: document.getElementById('producto-activo').checked,
+                            marca: document.getElementById('producto-marca').value.trim(),
+                            proveedor: document.getElementById('producto-proveedor').value.trim(),
+                            sitioProveedor: document.getElementById('producto-sitio').value.trim(),
+                            requiereAdvertencia: document.getElementById('producto-advertencia').checked,
                             variantes
                         })
                     }))

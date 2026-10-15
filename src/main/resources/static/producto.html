@@ -43,6 +43,8 @@
             let presentacion = null;
             let sabor = null;
             let cantidad = 1;
+            // Quién vende: el nombre o razón social del gimnasio.
+            let vendedor = '';
 
             if (!productoId) {
                 Tienda.pintarEstado(detalle, 'vacio', 'No encontramos ese producto.');
@@ -52,6 +54,24 @@
             function varianteElegida() {
                 return producto.variantes.find(v => v.presentacion === presentacion && (v.sabor || null) === (sabor || null))
                     || producto.variantes.find(v => v.presentacion === presentacion);
+            }
+
+            // Marca, proveedor y advertencia sanitaria: la información que pide la
+            // ley de comercio electrónico antes de comprar.
+            function infoProducto(p) {
+                const filas = [];
+                if (p.marca) filas.push(['Marca', Tienda.escapar(p.marca)]);
+                if (p.proveedor || p.sitioProveedor) {
+                    const nombre = Tienda.escapar(p.proveedor || p.sitioProveedor.replace(/^https?:\/\//, ''));
+                    filas.push(['Proveedor', p.sitioProveedor
+                        ? '<a href="' + Tienda.escapar(p.sitioProveedor) + '" target="_blank" rel="noopener nofollow">' + nombre + ' <i class="bx bx-link-external" aria-hidden="true"></i><span class="visually-hidden"> (abre otra pestaña)</span></a>'
+                        : nombre]);
+                }
+                filas.push(['Vende', Tienda.escapar(vendedor || 'Tu gimnasio')]);
+                return '<dl class="info-producto mt-3 mb-0">' + filas.map(f => '<dt>' + f[0] + '</dt><dd>' + f[1] + '</dd>').join('') + '</dl>'
+                    + (p.requiereAdvertencia
+                        ? '<div class="aviso-sanitario mt-3" role="note"><i class="bx bx-error" aria-hidden="true"></i><div><strong>Suplemento con advertencia sanitaria.</strong> Este producto no es un medicamento. El consumo de este producto es responsabilidad de quien lo recomienda y de quien lo usa. <a href="terminos.html#suplementos">Lee la advertencia completa</a></div></div>'
+                        : '');
             }
 
             function maximo(v) {
@@ -94,6 +114,7 @@
                                 ${(plan.beneficios || []).length ? '<ul class="list-unstyled mt-3 mb-0">' + plan.beneficios.map(b => '<li class="d-flex gap-2 py-1"><i class="bx bx-check text-primary fs-5"></i><span>' + Tienda.escapar(b) + '</span></li>').join('') + '</ul>' : ''}`
                                 : '<p class="mt-2 mb-0">' + existencias + '</p>'}
                             ${p.descripcion ? '<p class="mt-3 mb-0" style="max-width:60ch">' + Tienda.escapar(p.descripcion) + '</p>' : ''}
+                            ${plan ? '' : infoProducto(p)}
 
                             ${mostrarPresentaciones ? `
                                 <fieldset class="mt-4">
@@ -201,6 +222,14 @@
                 comprador = Tienda.puedeComprar(cuenta);
                 if (comprador) Tienda.cargarCarrito().catch(() => {});
                 cargar(gymId);
+                fetch('/api/gyms/' + encodeURIComponent(gymId))
+                    .then(res => res.ok ? res.json() : null)
+                    .then(g => {
+                        if (!g) return;
+                        vendedor = g.razonSocial || g.nombre || '';
+                        if (producto) pintar();
+                    })
+                    .catch(() => {});
             });
         })();
     </script>
