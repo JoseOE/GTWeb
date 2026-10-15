@@ -597,6 +597,50 @@ body.con-barra-carrito {
     body.con-barra-carrito { padding-bottom: 0; }
 }
 
+/* ─── Pie: quién vende y enlaces legales ─── */
+.tienda-pie {
+    border-top: 1px solid var(--line);
+    margin-top: 32px;
+    padding: 20px 0 28px;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+.tienda-pie-vendedor {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 8px;
+    color: var(--ink);
+}
+.tienda-pie-vendedor:empty { display: none; }
+.tienda-pie-titulo {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+.tienda-pie-datos {
+    flex-basis: 100%;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+}
+.tienda-pie-datos a,
+.tienda-pie-enlaces a { color: var(--ink); }
+.tienda-pie-enlaces {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 18px;
+    margin-top: 10px;
+}
+.tienda-pie-enlaces a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-weight: 600;
+}
+.tienda-pie-nota { margin: 4px 0 0; }
+
 /* ─── Botón fijo inferior (producto y checkout) ─── */
 .accion-fija {
     position: sticky;

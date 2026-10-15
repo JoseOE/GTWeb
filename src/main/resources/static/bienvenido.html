@@ -225,6 +225,25 @@
                             <small class="text-body-secondary d-block">Si lo apagas, solo se pueden unir con tu código.</small>
                         </div>
 
+                        <div class="col-12"><hr class="my-2"></div>
+                        <div class="col-12">
+                            <h4 class="fw-bold fs-6 mb-1"><i class='bx bx-id-card text-primary me-1'></i> Datos del vendedor</h4>
+                            <p class="text-body-secondary small mb-0">Tus clientes los ven en la tienda, en los términos de compra y en sus recibos. La ley de comercio electrónico pide mostrar quién vende antes de cobrar.</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="gym-razon" class="form-label fw-semibold small">Nombre o razón social</label>
+                            <input type="text" id="gym-razon" class="form-control" maxlength="120" placeholder="Ej. PowerFit Pachuca S.A. de C.V." aria-describedby="gym-razon-ayuda">
+                            <small class="text-body-secondary d-block mt-1" id="gym-razon-ayuda">Si lo dejas vacío, se usa el nombre del gimnasio.</small>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="gym-rfc" class="form-label fw-semibold small">RFC <span class="fw-normal text-body-secondary">(opcional)</span></label>
+                            <input type="text" id="gym-rfc" class="form-control text-uppercase" maxlength="13" placeholder="XAXX010101000" autocomplete="off">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="gym-correo-contacto" class="form-label fw-semibold small">Correo de atención</label>
+                            <input type="email" id="gym-correo-contacto" class="form-control" maxlength="120" placeholder="ventas@tugimnasio.mx">
+                        </div>
+
                         <div id="gym-alert" class="col-12 alert alert-danger d-none py-2 small mb-0" role="alert"></div>
                         <div class="col-12 pt-2">
                             <button type="submit" class="btn btn-primary rounded-pill px-4" id="gym-save-btn"><i class='bx bx-save'></i> Guardar cambios</button>
@@ -1328,7 +1347,10 @@
                 direccion: document.getElementById('gym-direccion'),
                 horario: document.getElementById('gym-horario'),
                 equipamiento: document.getElementById('gym-equipamiento'),
-                maquinas: document.getElementById('gym-maquinas')
+                maquinas: document.getElementById('gym-maquinas'),
+                razonSocial: document.getElementById('gym-razon'),
+                rfc: document.getElementById('gym-rfc'),
+                correoContacto: document.getElementById('gym-correo-contacto')
             };
 
             // ─── Identidad visual ───
@@ -1432,6 +1454,9 @@
                         fields.horario.value = gym.horario || '';
                         fields.equipamiento.value = gym.equipamiento || '';
                         fields.maquinas.value = (gym.maquinas || []).join('\n');
+                        fields.razonSocial.value = gym.razonSocial || '';
+                        fields.rfc.value = gym.rfc || '';
+                        fields.correoContacto.value = gym.correoContacto || '';
                         if (gym.colorPrimario) { colorInput.value = gym.colorPrimario; colorHex.value = gym.colorPrimario.toUpperCase(); }
                         cuotaInput.value = gym.cuotaMensual != null ? gym.cuotaMensual : '';
                         directorioInput.checked = !!gym.enDirectorio;
@@ -1462,6 +1487,9 @@
                         colorPrimario: colorInput.value,
                         enDirectorio: directorioInput.checked,
                         cuotaMensual: cuotaInput.value === '' ? null : parseFloat(cuotaInput.value),
+                        razonSocial: fields.razonSocial.value.trim(),
+                        rfc: fields.rfc.value.trim(),
+                        correoContacto: fields.correoContacto.value.trim(),
                         ownerUserId: userId
                     })
                 })

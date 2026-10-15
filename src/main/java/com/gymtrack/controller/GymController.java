@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/gyms")
@@ -66,6 +67,25 @@ public class GymController {
         gym.setColorPrimario(request.getColorPrimario());
         gym.setEnDirectorio(Boolean.TRUE.equals(request.getEnDirectorio()));
         gym.setCuotaMensual(request.getCuotaMensual());
+        // Datos del vendedor: solo se tocan si vienen (la app no los manda).
+        if (request.getRfc() != null) {
+            String rfc = request.getRfc().trim().toUpperCase();
+            if (!rfc.isEmpty() && !RFC.matcher(rfc).matches()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "El RFC no es válido. Revisa que tenga 12 o 13 caracteres, por ejemplo XAXX010101000."));
+            }
+            gym.setRfc(rfc.isEmpty() ? null : rfc);
+        }
+        if (request.getCorreoContacto() != null) {
+            String correo = request.getCorreoContacto().trim().toLowerCase();
+            if (!correo.isEmpty() && !CORREO.matcher(correo).matches()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "El correo de atención a clientes no es válido."));
+            }
+            gym.setCorreoContacto(correo.isEmpty() ? null : correo);
+        }
+        if (request.getRazonSocial() != null) {
+            String razon = request.getRazonSocial().trim();
+            gym.setRazonSocial(razon.isEmpty() ? null : razon);
+        }
         gym.setOwnerId(owner.getId());
         if (gym.getCodigo() == null || gym.getCodigo().isBlank()) {
             gym.setCodigo(generarCodigoUnico());
@@ -134,6 +154,10 @@ public class GymController {
         v.put("logo", gym.getLogo());
         v.put("colorPrimario", gym.getColorPrimario());
         v.put("cuotaMensual", gym.getCuotaMensual());
+        // Quién vende: la tienda lo muestra antes de comprar.
+        v.put("razonSocial", gym.getRazonSocial());
+        v.put("rfc", gym.getRfc());
+        v.put("correoContacto", gym.getCorreoContacto());
         return v;
     }
 
@@ -158,6 +182,10 @@ public class GymController {
         throw new IllegalStateException("No se pudo generar un código de gimnasio único.");
     }
 
+    // RFC de persona moral (3 letras) o física (4), fecha AAMMDD y homoclave.
+    private static final Pattern RFC = Pattern.compile("^[A-ZÑ&]{3,4}\\d{6}[A-Z\\d]{3}$");
+    private static final Pattern CORREO = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+
     public static class GymRequest {
         private String nombre;
         private String telefono;
@@ -169,7 +197,19 @@ public class GymController {
         private String colorPrimario;
         private Boolean enDirectorio;
         private Double cuotaMensual;
+        private String razonSocial;
+        private String rfc;
+        private String correoContacto;
         private String ownerUserId;
+
+        public String getRazonSocial() { return razonSocial; }
+        public void setRazonSocial(String razonSocial) { this.razonSocial = razonSocial; }
+
+        public String getRfc() { return rfc; }
+        public void setRfc(String rfc) { this.rfc = rfc; }
+
+        public String getCorreoContacto() { return correoContacto; }
+        public void setCorreoContacto(String correoContacto) { this.correoContacto = correoContacto; }
 
         public String getLogo() { return logo; }
         public void setLogo(String logo) { this.logo = logo; }

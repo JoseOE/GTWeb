@@ -38,6 +38,16 @@ public class Gym {
     // Cuota mensual sugerida, para prellenar el registro de pagos.
     private Double cuotaMensual;
 
+    // ─── Datos del vendedor ───
+    // Quién vende en la tienda del gimnasio. La ley de comercio electrónico pide
+    // mostrarlo antes de comprar: aparece en la tienda, los términos y los recibos.
+    // Nombre o razón social; si falta, se usa el nombre del gimnasio.
+    private String razonSocial;
+    // Opcional: no todos los gimnasios facturan.
+    private String rfc;
+    // Correo para dudas, cancelaciones y aclaraciones de compras.
+    private String correoContacto;
+
     public Gym() {}
 
     public String getId() { return id; }
@@ -78,5 +88,14 @@ public class Gym {
 
     public Double getCuotaMensual() { return cuotaMensual; }
     public void setCuotaMensual(Double cuotaMensual) { this.cuotaMensual = cuotaMensual; }
+
+    public String getRazonSocial() { return razonSocial; }
+    public void setRazonSocial(String razonSocial) { this.razonSocial = razonSocial; }
+
+    public String getRfc() { return rfc; }
+    public void setRfc(String rfc) { this.rfc = rfc; }
+
+    public String getCorreoContacto() { return correoContacto; }
+    public void setCorreoContacto(String correoContacto) { this.correoContacto = correoContacto; }
 
 }
