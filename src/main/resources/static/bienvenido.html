@@ -1157,7 +1157,7 @@
                 window.location.href = 'tienda.html';
                 return;
             }
-            document.getElementById('nav-user-name').innerHTML = `<i class='bx bx-user-circle'></i> ${userName}`;
+            document.getElementById('nav-user-name').innerHTML = `<i class='bx bx-user-circle'></i> ${escapeHtml(userName)}`;
             document.getElementById('dash-user-name').textContent = userName;
 
             const navLinks = document.querySelectorAll('.dash-nav-link');
