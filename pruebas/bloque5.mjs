@@ -43,6 +43,12 @@ r = await crearOrden({ returnUrl: 'https://otro-sitio.example/robar', cancelUrl:
 ok(r.status === 400 && r.body.error.includes('returnUrl'), 'returnUrl de otro sitio → 400', r.body.error);
 r = await crearOrden({ returnUrl: 'javascript:alert(1)', cancelUrl: CANCELA });
 ok(r.status === 400, 'returnUrl javascript: → 400', r.body.error);
+r = await crearOrden({ returnUrl: 'intent://robar#Intent;scheme=https;end', cancelUrl: CANCELA });
+ok(r.status === 400, 'returnUrl intent: (u otro esquema que no es de la app) → 400', r.body.error);
+r = await crearOrden({ returnUrl: 'gymtrack://pago-paypal', cancelUrl: 'gymtrack://pago-paypal-cancelado' });
+ok(r.status === 200, 'la app vuelve con gymtrack://', r.body.error);
+r = await crearOrden({ returnUrl: 'exp://192.168.1.5:8081/--/pago-paypal', cancelUrl: 'exp://192.168.1.5:8081/--/pago-paypal-cancelado' });
+ok(r.status === 200, 'y en Expo Go con exp://', r.body.error);
 r = await crearOrden({ returnUrl: RETORNO });
 ok(r.status === 400 && r.body.error.includes('cancelUrl'), 'sin cancelUrl → 400', r.body.error);
 r = await crearOrden({ returnUrl: '/checkout.html?metodo=paypal&continuar=1', cancelUrl: '/checkout.html' });
