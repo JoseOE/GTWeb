@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.UrlPathHelper;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -135,16 +136,41 @@ public class SesionFilter extends OncePerRequestFilter {
         }
     }
 
+    // La ruta tal como la enruta Spring: sin ";parametros" y con los %xx ya
+    // decodificados. Las reglas se comparan contra esta, nunca contra la URI
+    // cruda: "/api;x/users/..." o "/%61pi/..." llegan al mismo controlador que
+    // "/api/users/..." y no pueden saltarse el filtro.
+    private static final UrlPathHelper RUTA_REAL = new UrlPathHelper();
+
+    private static String ruta(HttpServletRequest request) {
+        return RUTA_REAL.getPathWithinApplication(request);
+    }
+
+    // Una ruta de la API escrita de otra forma (con ";", "%xx", "//", "." o "..")
+    // no la usa ni la página ni la app: se rechaza en lugar de interpretarla.
+    private static boolean esCanonica(HttpServletRequest request, String ruta) {
+        String cruda = request.getRequestURI().substring(request.getContextPath().length());
+        if (!cruda.equals(ruta)) return false;
+        for (String parte : ruta.split("/", -1)) {
+            if (parte.equals(".") || parte.equals("..")) return false;
+        }
+        return true;
+    }
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().startsWith("/api/") || "OPTIONS".equals(request.getMethod());
+        return "OPTIONS".equals(request.getMethod()) || !ruta(request).startsWith("/api/");
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         String metodo = request.getMethod();
-        String ruta = request.getRequestURI();
+        String ruta = ruta(request);
+        if (!esCanonica(request, ruta)) {
+            responder(response, HttpServletResponse.SC_BAD_REQUEST, "Ruta no válida.", false);
+            return;
+        }
         boolean publica = PUBLICAS.stream().anyMatch(r -> r.aplica(metodo, ruta));
 
         String token = token(request);
@@ -152,8 +178,9 @@ public class SesionFilter extends OncePerRequestFilter {
         String encabezado = request.getHeader(AccesoService.ENCABEZADO);
 
         if (publica) {
-            // Un token viejo no estorba en lo público: simplemente se ignora.
-            chain.doFilter(usuario == null ? request : conUsuario(request, usuario), response);
+            // Un token viejo no estorba en lo público: simplemente se ignora. Sin
+            // sesión, un X-User-Id suelto tampoco cuenta: lo público no tiene usuario.
+            chain.doFilter(usuario == null ? sinUsuario(request) : conUsuario(request, usuario), response);
             return;
         }
         if (token != null && usuario == null) {
@@ -247,7 +274,12 @@ public class SesionFilter extends OncePerRequestFilter {
         return new ConUsuario(request, usuario);
     }
 
-    // La petición con X-User-Id = usuario de la sesión, para los controladores de siempre.
+    private static HttpServletRequest sinUsuario(HttpServletRequest request) {
+        return request.getHeader(AccesoService.ENCABEZADO) == null ? request : new ConUsuario(request, null);
+    }
+
+    // La petición con X-User-Id = usuario de la sesión, para los controladores
+    // de siempre (o sin X-User-Id, si usuario es null).
     private static final class ConUsuario extends HttpServletRequestWrapper {
         private final String usuario;
 
@@ -263,15 +295,15 @@ public class SesionFilter extends OncePerRequestFilter {
 
         @Override
         public Enumeration<String> getHeaders(String nombre) {
-            return AccesoService.ENCABEZADO.equalsIgnoreCase(nombre)
-                    ? Collections.enumeration(List.of(usuario))
-                    : super.getHeaders(nombre);
+            if (!AccesoService.ENCABEZADO.equalsIgnoreCase(nombre)) return super.getHeaders(nombre);
+            return Collections.enumeration(usuario == null ? List.of() : List.of(usuario));
         }
 
         @Override
         public Enumeration<String> getHeaderNames() {
             Set<String> nombres = new LinkedHashSet<>(Collections.list(super.getHeaderNames()));
-            nombres.add(AccesoService.ENCABEZADO);
+            nombres.removeIf(AccesoService.ENCABEZADO::equalsIgnoreCase);
+            if (usuario != null) nombres.add(AccesoService.ENCABEZADO);
             return Collections.enumeration(nombres);
         }
     }
