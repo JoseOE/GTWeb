@@ -68,10 +68,14 @@ public class CorreoService {
                 "saludo", saludo(user), "esMiembro", "member".equals(user.getRole()), "enlace", enlace("login.html")));
     }
 
-    public boolean recuperarContrasena(User user, String enlace, long minutos) {
-        if (!configurado()) log.warn("Correo sin configurar: el enlace para restablecer la contraseña de {} es {}", user.getEmail(), enlace);
+    // Lleva el código (para escribirlo en la app) y el enlace (para la página).
+    public boolean recuperarContrasena(User user, String codigo, String enlace, long minutos) {
+        if (!configurado()) {
+            log.warn("Correo sin configurar: el código para restablecer la contraseña de {} es {}", user.getEmail(), codigo);
+            log.warn("Correo sin configurar: el enlace para restablecer la contraseña de {} es {}", user.getEmail(), enlace);
+        }
         return enviar(user.getEmail(), "Restablece tu contraseña de GymTrack", "recuperar-contrasena", Map.of(
-                "saludo", saludo(user), "enlace", enlace, "minutos", minutos));
+                "saludo", saludo(user), "codigo", codigo, "enlace", enlace, "minutos", minutos));
     }
 
     public boolean contrasenaCambiada(User user) {

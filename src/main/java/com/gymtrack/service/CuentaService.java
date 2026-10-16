@@ -91,7 +91,7 @@ public class CuentaService {
         if (user == null) return;
         try {
             Emitido emitido = emitir(user, TokenCuenta.RECUPERAR_CONTRASENA, VIGENCIA_RECUPERACION, null);
-            correoService.recuperarContrasena(user,
+            correoService.recuperarContrasena(user, emitido.codigo(),
                     correoService.enlace("restablecer.html?token=" + emitido.enlace()), VIGENCIA_RECUPERACION.toMinutes());
         } catch (CuentaException pedidoRepetido) {
             // Ya se mandó un enlace hace menos de un minuto.
@@ -113,6 +113,34 @@ public class CuentaService {
         // Quien conociera la contraseña anterior deja de estar dentro.
         sesiones.cerrarTodas(user.getId());
         correoService.contrasenaCambiada(user);
+    }
+
+    // Desde la app: el código de 6 dígitos del mismo correo en lugar del enlace.
+    // Sirve igual para "¿Olvidaste tu contraseña?", para cambiarla desde Mi
+    // cuenta y para dejar la temporal que dio recepción. Si quien la cambia
+    // tiene la sesión abierta en ese teléfono (tokenActual), esa sigue; las
+    // demás sesiones de la cuenta se cierran.
+    public User restablecerConCodigo(String email, String codigo, String nueva, String tokenActual) {
+        String error = "El código es incorrecto o ya venció. Pide uno nuevo.";
+        // Primero la contraseña: una débil no gasta un intento del código.
+        exigirSegura(nueva);
+        User user = userRepository.findByEmail(limpiar(email))
+                .orElseThrow(() -> new CuentaException(HttpStatus.BAD_REQUEST, error));
+        TokenCuenta token = tokenRepository.findFirstByUserIdAndTipoOrderByCreadoDesc(user.getId(), TokenCuenta.RECUPERAR_CONTRASENA)
+                .filter(TokenCuenta::vigente)
+                .orElseThrow(() -> new CuentaException(HttpStatus.BAD_REQUEST, error));
+        comprobarCodigo(token, codigo);
+
+        user.cambiarContrasena(PasswordUtil.hash(nueva));
+        // El código llegó a su correo: si faltaba verificarlo, queda verificado.
+        if (user.correoPendienteDeVerificar()) user.setEmailVerificado(true);
+        userRepository.save(user);
+        tokenRepository.deleteByUserIdAndTipo(user.getId(), TokenCuenta.RECUPERAR_CONTRASENA);
+        boolean suSesion = tokenActual != null && sesiones.usuarioDe(tokenActual).filter(user.getId()::equals).isPresent();
+        if (suSesion) sesiones.cerrarOtras(user.getId(), tokenActual);
+        else sesiones.cerrarTodas(user.getId());
+        correoService.contrasenaCambiada(user);
+        return user;
     }
 
     // ─── Mi cuenta ───

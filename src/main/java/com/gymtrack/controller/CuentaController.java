@@ -69,6 +69,17 @@ public class CuentaController {
         return ResponseEntity.ok(Map.of("message", "Tu contraseña se actualizó. Ya puedes iniciar sesión."));
     }
 
+    // POST /api/cuenta/restablecer/codigo → {email, codigo, password} desde la app,
+    // con el código que llegó en el correo de /recuperar. Si llega con la sesión
+    // de esa misma cuenta, la sesión sigue abierta.
+    @PostMapping("/restablecer/codigo")
+    public ResponseEntity<?> restablecerConCodigo(@RequestBody Map<String, String> body,
+                                                  @RequestHeader(value = "Authorization", required = false) String autorizacion) {
+        String tokenActual = autorizacion != null && autorizacion.regionMatches(true, 0, "Bearer ", 0, 7) ? autorizacion.substring(7).trim() : null;
+        cuentaService.restablecerConCodigo(body.get("email"), body.get("codigo"), body.get("password"), tokenActual);
+        return ResponseEntity.ok(Map.of("message", "Tu contraseña se actualizó."));
+    }
+
     // POST /api/cuenta/contrasena → {userId, actual, nueva} desde Mi cuenta.
     // Las demás sesiones de la cuenta se cierran; la de quien la cambió sigue.
     @PostMapping("/contrasena")
