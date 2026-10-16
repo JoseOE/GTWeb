@@ -122,5 +122,28 @@ ok(r.status === 401 && !r.body.sesionVencida, 'un token falso no estorba en el l
 r = await api('GET', `/api/gyms/${gymA}/members`, null, { token: 'token-falso' });
 ok(r.status === 401 && r.body.sesionVencida === true, 'token falso en el panel → 401 sesionVencida');
 
+console.log('\n9. Rutas escritas de otra forma');
+// Spring enruta "/api;x/..." y "/%61pi/..." igual que "/api/...": el filtro no
+// puede dejarlas pasar sin revisar la sesión ni a quién le pertenece el recurso.
+for (const [ruta, que] of [
+  [`/api;x/gyms/${gymA}/members`, '";" antes de la ruta'],
+  [`/%61pi/gyms/${gymA}/members`, '"api" codificado'],
+  [`/api/gyms;x=1/${gymA}/members`, '";" en un segmento'],
+  [`/api/%67yms/${gymA}/members`, 'un segmento codificado'],
+]) {
+  r = await api('GET', ruta, null, { userId: a.id });
+  ok(r.status === 400, `sin token, con el X-User-Id del dueño, ${que} → 400`, r.status);
+  r = await api('GET', ruta, null, { token: b.token });
+  ok(r.status === 400, `el dueño B, ${que} → 400 (no ve los miembros de A)`, r.status);
+}
+r = await api('GET', `/api/users;x/${a.id}/me`, null, { token: b.token });
+ok(r.status === 400, 'B no lee la cuenta de A con ";" en la ruta → 400', r.status);
+r = await api('POST', `/api/gyms;x/${gymA}/codigo`, null, { token: b.token });
+ok(r.status === 400, 'B no regenera el código de A con ";" en la ruta → 400', r.status);
+r = await api('GET', '/api/tienda;x/estado');
+ok(r.status === 400, 'tampoco en una ruta pública', r.status);
+r = await api('GET', `/api/gyms/${gymA}/members`, null, { token: l1 });
+ok(r.status === 200, 'la ruta normal sigue igual');
+
 console.log(fallos ? `\n${fallos} prueba(s) fallaron` : '\nTodo bien');
 process.exit(fallos ? 1 : 0);
