@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 // Usuarios (miembros) de un gimnasio: el dueño los aprueba, da de alta y de baja
 // desde el panel web. Un miembro llega aquí de dos maneras: o se registró en la
@@ -25,6 +26,10 @@ import java.util.Set;
 @RestController
 @RequestMapping("/api/gyms/{gymId}/members")
 public class MemberController {
+
+    private static final Pattern CORREO_VALIDO = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    static final int USUARIO_MIN = 3;
+    static final int USUARIO_MAX = 40;
 
     private static final Set<String> ESTADOS_VALIDOS =
             Set.of(User.STATUS_PENDING, User.STATUS_ACTIVE, User.STATUS_INACTIVE);
@@ -57,27 +62,34 @@ public class MemberController {
                 .toList();
     }
 
-    // POST → Alta directa desde recepción: el dueño crea la cuenta ya activa.
+    // POST → Alta directa desde recepción: el dueño crea la cuenta ya activa
+    // con solo el correo y un nombre de usuario ({"nombre", "email"}).
+    // El nombre de usuario es también su contraseña temporal: el miembro entra
+    // a la app con su correo y ese nombre, y la app le pide cambiarla (con un
+    // código que le llega al correo) en cuanto entra.
     @PostMapping
     public ResponseEntity<?> darDeAlta(@PathVariable String gymId, @RequestBody User request) {
-        if (request.getNombre() == null || request.getNombre().isBlank()
-                || request.getEmail() == null || request.getEmail().isBlank()
-                || request.getPassword() == null || request.getPassword().isBlank()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Nombre, correo y contraseña son obligatorios."));
+        String usuario = request.getNombre() == null ? "" : request.getNombre().trim();
+        String email = request.getEmail() == null ? "" : request.getEmail().trim();
+        if (usuario.isEmpty() || email.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "El correo y el nombre de usuario son obligatorios."));
         }
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Ese correo ya está registrado."));
+        if (!CORREO_VALIDO.matcher(email).matches()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Escribe un correo válido."));
         }
-        if (!PasswordUtil.esSegura(request.getPassword())) {
+        if (usuario.length() < USUARIO_MIN || usuario.length() > USUARIO_MAX) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error",
-                    "La contraseña temporal necesita 8+ caracteres, una letra, un número y un símbolo. Usa \"Generar otra\"."));
+                    "El nombre de usuario debe tener de " + USUARIO_MIN + " a " + USUARIO_MAX + " caracteres."));
+        }
+        if (userRepository.findByEmail(email).isPresent()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Ese correo ya está registrado."));
         }
 
         User member = new User();
-        member.setNombre(request.getNombre());
-        member.setEmail(request.getEmail());
-        member.setPassword(PasswordUtil.hash(request.getPassword()));
-        // La eligió el dueño: el miembro la cambia en cuanto entra.
+        member.setNombre(usuario);
+        member.setEmail(email);
+        // Si llega una contraseña se ignora: la temporal es el nombre de usuario.
+        member.setPassword(PasswordUtil.hash(usuario));
         member.setContrasenaTemporal(true);
         member.setGymId(gymId);
         member.setRole("member");
