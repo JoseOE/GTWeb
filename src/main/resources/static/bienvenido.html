@@ -1821,7 +1821,7 @@
                 alertBox.classList.add('d-none');
                 document.getElementById('payment-user-id').value = btn.dataset.payUser;
                 document.getElementById('payment-user-label').textContent = 'Pago de ' + btn.dataset.payName;
-                fechaInput.value = new Date().toISOString().slice(0, 10);
+                fechaInput.value = fechaMx(new Date());
                 llenarPlanes();
                 const cuota = document.getElementById('gym-cuota').value;
                 if (cuota) document.getElementById('payment-monto').value = cuota;

@@ -4,6 +4,7 @@ import com.gymtrack.model.User;
 import com.gymtrack.model.WorkoutSession;
 import com.gymtrack.repository.UserRepository;
 import com.gymtrack.repository.WorkoutRepository;
+import com.gymtrack.util.Fechas;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -71,7 +72,7 @@ public class WorkoutController {
     @GetMapping("/stats")
     public Map<String, Object> estadisticas(@PathVariable String userId) {
         List<WorkoutSession> historial = workoutRepository.findByUserIdOrderByFechaDesc(userId);
-        ZoneId zona = ZoneId.systemDefault();
+        ZoneId zona = Fechas.ZONA_MX;
         LocalDate hoy = LocalDate.now(zona);
 
         double volumenSemana = 0;

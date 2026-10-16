@@ -10,6 +10,7 @@ import com.gymtrack.service.BillingService;
 import com.gymtrack.service.CatalogoService;
 import com.gymtrack.service.PlanPagado;
 import com.gymtrack.service.TiendaException;
+import com.gymtrack.util.Fechas;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
@@ -113,7 +114,7 @@ public class PaymentController {
         LocalDate fecha;
         try {
             fecha = request.getFechaPago() == null || request.getFechaPago().isBlank()
-                    ? LocalDate.now()
+                    ? Fechas.hoy()
                     : LocalDate.parse(request.getFechaPago());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Fecha de pago inválida (usa AAAA-MM-DD)."));

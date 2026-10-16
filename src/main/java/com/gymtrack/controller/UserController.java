@@ -7,6 +7,7 @@ import com.gymtrack.repository.UserRepository;
 import com.gymtrack.service.CorreoService;
 import com.gymtrack.service.CuentaService;
 import com.gymtrack.service.SesionService;
+import com.gymtrack.util.Fechas;
 import com.gymtrack.util.PasswordUtil;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -154,7 +155,7 @@ public class UserController {
         // Datos de cobranza: la app los usa para avisar "te quedan N días".
         view.put("fechaProximoPago", user.getFechaProximoPago());
         view.put("diaDePago", user.getDiaDePago());
-        view.put("diasParaVencer", user.diasParaVencer(LocalDate.now()));
+        view.put("diasParaVencer", user.diasParaVencer(Fechas.hoy()));
         view.put("planActual", user.getPlanActual());
 
         Map<String, Object> gymView = null;
