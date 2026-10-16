@@ -6,6 +6,7 @@ import com.gymtrack.model.User;
 import com.gymtrack.repository.GymRepository;
 import com.gymtrack.repository.PaymentRepository;
 import com.gymtrack.repository.UserRepository;
+import com.gymtrack.util.Fechas;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
@@ -63,7 +64,7 @@ public class BillingService {
     // la membresía. La segunda recibe el pago que ya existía.
     public Payment registrarPago(User member, String gymId, Double monto, String metodo,
                                  LocalDate fechaPago, String nota, PlanPagado plan, String orderId) {
-        LocalDate pago = fechaPago == null ? LocalDate.now() : fechaPago;
+        LocalDate pago = fechaPago == null ? Fechas.hoy() : fechaPago;
         PlanPagado duracion = plan == null ? PlanPagado.MENSUAL : plan;
 
         Payment payment = new Payment();
@@ -177,7 +178,7 @@ public class BillingService {
             vence = corteAntesDe(previo);
         }
         member.setFechaProximoPago(vence);
-        if (vence.isBefore(LocalDate.now()) && User.STATUS_ACTIVE.equals(member.getMembershipStatus())) {
+        if (vence.isBefore(Fechas.hoy()) && User.STATUS_ACTIVE.equals(member.getMembershipStatus())) {
             member.setMembershipStatus(User.STATUS_INACTIVE);
         }
         userRepository.save(member);
@@ -194,9 +195,9 @@ public class BillingService {
     // Corre todos los días a las 6:00 de la mañana: da de baja a los vencidos y
     // avisa a quienes les faltan 5 días. Es lo que hace que la baja sea automática
     // aunque nadie abra el panel web.
-    @Scheduled(cron = "0 0 6 * * *")
+    @Scheduled(cron = "0 0 6 * * *", zone = "America/Mexico_City")
     public void revisarMembresias() {
-        LocalDate hoy = LocalDate.now();
+        LocalDate hoy = Fechas.hoy();
         List<User> miembros = userRepository.findByRoleAndFechaProximoPagoNotNull("member");
         int dadosDeBaja = 0, avisados = 0;
 

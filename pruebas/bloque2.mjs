@@ -95,7 +95,7 @@ ok(r.body.items.find(i => i.varianteId === bote.id)?.requiereAdvertencia === tru
 r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'paynet', datos: {}, totalVisto: totalCorregido }, member);
 ok(r.status === 400 && r.body.error.includes('términos'), 'sin aceptar los términos → 400', r.body.error);
 r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'paynet', datos: {}, totalVisto: totalCorregido, consentimiento: { ...CONSENTIMIENTO, terminosVersion: '0' } }, member);
-ok(r.status === 409, 'términos de una versión vieja → 409', r.body.error);
+ok(r.status === 409 && r.body.terminosCambiaron === true, 'términos de una versión vieja → 409 con terminosCambiaron', r.body);
 r = await api('POST', '/api/tienda/carrito/checkout', { metodo: 'paynet', datos: {}, totalVisto: totalCorregido, consentimiento: { ...CONSENTIMIENTO, aceptaAdvertencia: false } }, member);
 ok(r.status === 400 && r.body.error.includes('advertencia sanitaria'), 'suplemento sin aceptar la advertencia → 400', r.body.error);
 const tok = (await api('POST', '/api/simuladores/stripe/tokens', { numero: '4242424242424242', titular: 'Ana', mes: '12', anio: '30', cvc: '123' }, member)).body.token;

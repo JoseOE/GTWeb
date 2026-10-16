@@ -6,6 +6,7 @@ import com.gymtrack.repository.GymRepository;
 import com.gymtrack.repository.UserRepository;
 import com.gymtrack.service.CorreoService;
 import com.gymtrack.service.PushService;
+import com.gymtrack.util.Fechas;
 import com.gymtrack.util.PasswordUtil;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -176,7 +177,7 @@ public class MemberController {
         view.put("fechaProximoPago", user.getFechaProximoPago());
         view.put("diaDePago", user.getDiaDePago());
         view.put("planActual", user.getPlanActual());
-        view.put("diasParaVencer", user.diasParaVencer(LocalDate.now()));
+        view.put("diasParaVencer", user.diasParaVencer(Fechas.hoy()));
         view.put("tienePush", user.getPushToken() != null && !user.getPushToken().isBlank());
         view.put("contrasenaTemporal", user.tieneContrasenaTemporal());
         return view;

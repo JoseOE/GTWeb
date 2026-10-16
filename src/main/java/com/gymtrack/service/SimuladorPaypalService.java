@@ -46,7 +46,8 @@ public class SimuladorPaypalService {
     private static final Duration VIGENCIA = Duration.ofHours(3);
     private static final String LETRAS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final SecureRandom AZAR = new SecureRandom();
-    private static final Set<String> ESQUEMAS_PROHIBIDOS = Set.of("javascript", "data", "vbscript", "file", "blob", "about");
+    // Los enlaces de la app: gymtrack:// en una build y exp:// (o exps://) en Expo Go.
+    private static final Set<String> ESQUEMAS_APP = Set.of("gymtrack", "exp", "exps");
 
     // Cuentas que ofrece paypal-sim.html. Cualquier otro correo también aprueba;
     // la cuenta sin saldo aprueba, pero PayPal rechaza el cobro (como una
@@ -292,15 +293,15 @@ public class SimuladorPaypalService {
             if (valor.startsWith("//")) throw new TiendaException(HttpStatus.BAD_REQUEST, campo + " no es una dirección válida.");
             return valor;
         }
-        if (ESQUEMAS_PROHIBIDOS.contains(esquema)) {
+        if (ESQUEMAS_APP.contains(esquema)) return valor;
+        if (!esquema.equals("http") && !esquema.equals("https")) {
+            // javascript:, data:, intent:... nada que no sea una página o la app.
             throw new TiendaException(HttpStatus.BAD_REQUEST, campo + " no es una dirección válida.");
         }
-        if (esquema.equals("http") || esquema.equals("https")) {
-            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
-            String hostApp = URI.create(urlPublica).getHost();
-            if (!host.equals(hostPropio == null ? "" : hostPropio.toLowerCase(Locale.ROOT)) && !host.equalsIgnoreCase(hostApp)) {
-                throw new TiendaException(HttpStatus.BAD_REQUEST, campo + " debe ser una página de GymTrack o un enlace de la app.");
-            }
+        String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+        String hostApp = URI.create(urlPublica).getHost();
+        if (!host.equals(hostPropio == null ? "" : hostPropio.toLowerCase(Locale.ROOT)) && !host.equalsIgnoreCase(hostApp)) {
+            throw new TiendaException(HttpStatus.BAD_REQUEST, campo + " debe ser una página de GymTrack o un enlace de la app.");
         }
         return valor;
     }

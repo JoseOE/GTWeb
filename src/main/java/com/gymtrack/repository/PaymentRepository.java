@@ -10,6 +10,7 @@ import java.util.Optional;
 
 public interface PaymentRepository extends MongoRepository<Payment, String> {
     List<Payment> findByUserIdOrderByFechaPagoDesc(String userId);
+    List<Payment> findByUserIdAndGymIdOrderByFechaPagoDesc(String userId, String gymId);
     List<Payment> findByGymIdOrderByFechaPagoDesc(String gymId);
     // Los pagos más recientes del gimnasio (el orden y el tope los pone el Pageable).
     List<Payment> findByGymId(String gymId, Pageable pagina);
