@@ -36,6 +36,22 @@ ok(r.status === 200 && r.body.fechaProximoPago === null && r.body.planActual ===
 ok(typeof r.body.token === 'string' && r.body.token.length >= 40, 'el miembro que se registra en la app recibe su token');
 const colado = r.body;
 
+console.log('\n1b. El correo no distingue mayúsculas; el login frena a quien adivina');
+const correoMixto = `Mixto.${sufijo}@Prueba.mx`;
+r = await api('POST', '/api/users/register', { nombre: 'Mixto', email: correoMixto, password: 'Clave#2026', role: 'member' });
+ok(r.status === 200, 'registro con mayúsculas en el correo');
+r = await api('POST', '/api/users/register', { nombre: 'Copia', email: correoMixto.toLowerCase(), password: 'Clave#2026', role: 'member' });
+ok(r.status === 400, 'el mismo correo en minúsculas ya está registrado → 400', r.body.error);
+r = await api('POST', '/api/users/login', { email: ' ' + correoMixto.toUpperCase() + ' ', password: 'Clave#2026' });
+ok(r.status === 200 && !!r.body.token, 'entra escribiendo el correo en mayúsculas y con espacios');
+r = await api('POST', '/api/users/login', { email: correoMixto.replace('.', 'x'), password: 'Clave#2026' });
+ok(r.status === 401, 'el punto del correo no funciona como comodín', r.status);
+for (let i = 0; i < 10; i++) await api('POST', '/api/users/login', { email: correoMixto, password: 'Incorrecta#' + i });
+r = await api('POST', '/api/users/login', { email: correoMixto.toLowerCase(), password: 'Clave#2026' });
+ok(r.status === 429 && /Espera/.test(r.body.error), '10 contraseñas incorrectas seguidas → 429 aunque la siguiente sea correcta', r.body.error);
+r = await api('POST', '/api/users/login', { email: `colado-${sufijo}@prueba.mx`, password: 'Clave#2026' });
+ok(r.status === 200, 'otra cuenta entra normal');
+
 console.log('\n2. Verificar el correo abre la sesión');
 const a = await duenoNuevo('a');
 ok(typeof a.token === 'string' && a.role === 'owner' && !!a.id, 'verificar devuelve token, id y rol', { role: a.role });

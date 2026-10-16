@@ -6,6 +6,7 @@ import com.gymtrack.repository.GymRepository;
 import com.gymtrack.repository.UserRepository;
 import com.gymtrack.service.CorreoService;
 import com.gymtrack.service.CuentaService;
+import com.gymtrack.service.IntentosLoginService;
 import com.gymtrack.service.SesionService;
 import com.gymtrack.util.Fechas;
 import com.gymtrack.util.PasswordUtil;
@@ -27,14 +28,17 @@ public class UserController {
     private final CuentaService cuentaService;
     private final CorreoService correoService;
     private final SesionService sesiones;
+    private final IntentosLoginService intentos;
 
     public UserController(UserRepository userRepository, GymRepository gymRepository,
-                          CuentaService cuentaService, CorreoService correoService, SesionService sesiones) {
+                          CuentaService cuentaService, CorreoService correoService, SesionService sesiones,
+                          IntentosLoginService intentos) {
         this.userRepository = userRepository;
         this.gymRepository = gymRepository;
         this.cuentaService = cuentaService;
         this.correoService = correoService;
         this.sesiones = sesiones;
+        this.intentos = intentos;
     }
 
     @PostMapping("/register")
@@ -78,11 +82,19 @@ public class UserController {
 
     @PostMapping("/login")
     public ResponseEntity<?> loginUser(@RequestBody User loginRequest) {
+        // Demasiadas contraseñas incorrectas seguidas para ese correo: se espera.
+        long espera = intentos.minutosDeEspera(loginRequest.getEmail());
+        if (espera > 0) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of("error",
+                    "Demasiados intentos fallidos. Espera " + espera + (espera == 1 ? " minuto" : " minutos")
+                            + " o usa «¿Olvidaste tu contraseña?»."));
+        }
         Optional<User> userOpt = userRepository.findByEmail(loginRequest.getEmail());
 
         if (userOpt.isPresent()) {
             User user = userOpt.get();
             if (PasswordUtil.coincide(loginRequest.getPassword(), user.getPassword())) {
+                intentos.exito(loginRequest.getEmail());
                 // Las contraseñas guardadas con el SHA-256 anterior se pasan a BCrypt al entrar.
                 if (PasswordUtil.necesitaActualizarse(user.getPassword())) {
                     user.setPassword(PasswordUtil.hash(loginRequest.getPassword()));
@@ -101,6 +113,7 @@ public class UserController {
                 return ResponseEntity.ok(view);
             }
         }
+        intentos.fallo(loginRequest.getEmail());
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Credenciales incorrectas."));
     }
 
