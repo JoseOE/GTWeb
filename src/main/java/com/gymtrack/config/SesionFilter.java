@@ -73,6 +73,7 @@ public class SesionFilter extends OncePerRequestFilter {
             regla("POST", "/api/cuenta/verificar/reenviar"),
             regla("POST", "/api/cuenta/recuperar"),
             regla("POST", "/api/cuenta/restablecer"),
+            regla("POST", "/api/cuenta/restablecer/codigo"),
             regla("GET", "/api/gyms/lookup"),
             regla("GET", "/api/gyms/directory"),
             regla("GET", "/api/servicios"),

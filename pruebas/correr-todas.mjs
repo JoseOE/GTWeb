@@ -4,7 +4,7 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-const ORDEN = ['bloque1', 'bloque2', 'bloque3', 'bloque4', 'bloque5', 'seguridad', 'visita-mes', 'alta-recepcion'];
+const ORDEN = ['bloque1', 'bloque2', 'bloque3', 'bloque4', 'bloque5', 'seguridad', 'visita-mes', 'alta-recepcion', 'contrasena-codigo'];
 const pedidas = process.argv.slice(2).map(a => /^\d$/.test(a) ? 'bloque' + a : a);
 const lista = pedidas.length ? ORDEN.filter(p => pedidas.includes(p)) : ORDEN;
 const carpeta = fileURLToPath(new URL('.', import.meta.url));
