@@ -32,6 +32,9 @@ import java.util.Optional;
 @RequestMapping("/api/gyms/{gymId}")
 public class PaymentController {
 
+    // Tope de un cobro registrado a mano: evita montos negativos o mal escritos.
+    static final double MONTO_MAXIMO = 100_000;
+
     private final UserRepository userRepository;
     private final PaymentRepository paymentRepository;
     private final BillingService billingService;
@@ -94,9 +97,11 @@ public class PaymentController {
         }).toList();
     }
 
+    // Solo los pagos hechos en este gimnasio: el dueño de un gimnasio no ve lo
+    // que su miembro pagó en otro antes de cambiarse.
     @GetMapping("/members/{userId}/payments")
     public ResponseEntity<?> historial(@PathVariable String gymId, @PathVariable String userId) {
-        return ResponseEntity.ok(paymentRepository.findByUserIdOrderByFechaPagoDesc(userId));
+        return ResponseEntity.ok(paymentRepository.findByUserIdAndGymIdOrderByFechaPagoDesc(userId, gymId));
     }
 
     @PostMapping("/members/{userId}/payments")
@@ -109,6 +114,10 @@ public class PaymentController {
                 .filter(u -> gymId.equals(u.getGymId()) && "member".equals(u.getRole()));
         if (memberOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Usuario no encontrado en este gimnasio."));
+        }
+
+        if (request.getMonto() == null || request.getMonto().isNaN() || request.getMonto() < 0 || request.getMonto() > MONTO_MAXIMO) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Escribe el monto cobrado (de $0 a $100,000)."));
         }
 
         LocalDate fecha;
