@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 // Lo que el comprador acepta antes de pagar, como pide la ley de comercio
 // electrónico: los términos y condiciones de compra vigentes y, si lleva
@@ -69,7 +70,10 @@ public class ConsentimientoService {
             return c;
         }
         if (!VERSION_TERMINOS.equals(s.getTerminosVersion())) {
-            throw new TiendaException(HttpStatus.CONFLICT, "Los términos de compra cambiaron. Revísalos y vuelve a aceptarlos.");
+            // terminosCambiaron distingue este 409 de los del carrito: la web y la app
+            // vuelven a mostrar "¿Confirmas tu compra?" con los términos nuevos.
+            throw new TiendaException(HttpStatus.CONFLICT, "Los términos de compra cambiaron. Revísalos y vuelve a aceptarlos.",
+                    Map.of("terminosCambiaron", true));
         }
         boolean aceptaAdvertencia = Boolean.TRUE.equals(s.getAceptaAdvertencia());
         if (!conAdvertencia.isEmpty() && !aceptaAdvertencia && exigir) {
