@@ -340,7 +340,7 @@ Se envían por la API HTTP de Brevo con plantillas HTML (Thymeleaf). Los código
 
 > Las cuentas creadas desde la app móvil entran sin verificar el correo, porque la app todavía no tiene esa pantalla.
 
-> **Alta en recepción.** En "Mis Usuarios → Agregar usuario" el panel propone una contraseña temporal segura (se puede cambiar o copiar para entregarla). La cuenta queda con `contrasenaTemporal: true`, que viene en el login, en `/api/users/{id}/me` y en la lista de miembros. La tienda y Mi cuenta le muestran al miembro un aviso para cambiarla; al cambiarla o restablecerla vuelve a `false`. La app móvil debe leer el mismo campo para pedir el cambio.
+> **Alta en recepción.** En "Mis Usuarios → Agregar usuario" el dueño solo escribe el correo y un nombre de usuario (de 3 a 40 caracteres). El nombre de usuario es la contraseña temporal: el miembro entra a la app con su correo y ese nombre, tal cual, y la app le pide crear su propia contraseña con un código que le llega al correo. La cuenta queda con `contrasenaTemporal: true`, que viene en el login, en `/api/users/{id}/me` y en la lista de miembros. La tienda y Mi cuenta le muestran al miembro un aviso para cambiarla; al cambiarla o restablecerla vuelve a `false`. La app móvil debe leer el mismo campo para pedir el cambio.
 
 ---
 

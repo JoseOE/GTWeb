@@ -28,9 +28,10 @@ const owner = r.body; ok(owner.role === 'owner' && !!owner.token, 'login del due
 TOKENS[owner.id] = owner.token;
 r = await api('POST', '/api/gyms', { nombre: 'PowerFit Prueba', direccion: 'Av. Juárez 100, Pachuca', cuotaMensual: 450, ownerUserId: owner.id }, owner.id);
 const gymId = r.body.id; ok(!!gymId, 'gimnasio creado', gymId);
-r = await api('POST', `/api/gyms/${gymId}/members`, { nombre: 'Miembro Prueba', email: `miembro-${sufijo}@prueba.mx`, password: 'Clave#2026' }, owner.id);
+r = await api('POST', `/api/gyms/${gymId}/members`, { nombre: 'Miembro Prueba', email: `miembro-${sufijo}@prueba.mx` }, owner.id);
 const member = r.body; ok(member.membershipStatus === 'active', 'miembro dado de alta en recepción');
-TOKENS[member.id] = (await api('POST', '/api/users/login', { email: `miembro-${sufijo}@prueba.mx`, password: 'Clave#2026' })).body.token;
+// Del alta en recepción entra con su nombre de usuario como contraseña temporal.
+TOKENS[member.id] = (await api('POST', '/api/users/login', { email: `miembro-${sufijo}@prueba.mx`, password: 'Miembro Prueba' })).body.token;
 
 console.log('\n2. Acceso');
 r = await api('GET', `/api/gyms/${gymId}/productos`);

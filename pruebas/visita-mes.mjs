@@ -44,7 +44,7 @@ ok(!!semana && !!mensual, 'hay plan Semana y plan Mensual', [semana && semana.no
 const sufijo = Date.now().toString(36);
 const creados = [];
 async function nuevoMiembro(nombre) {
-  const res = await api('POST', `/api/gyms/${gymId}/members`, { nombre, email: `${nombre.toLowerCase().replace(/\s+/g, '.')}.${sufijo}@prueba.test`, password: 'Prueba#2026x' }, owner);
+  const res = await api('POST', `/api/gyms/${gymId}/members`, { nombre, email: `${nombre.toLowerCase().replace(/\s+/g, '.')}.${sufijo}@prueba.test` }, owner);
   const id = res.body && (res.body.id || (res.body.user && res.body.user.id));
   creados.push(id);
   return id;
