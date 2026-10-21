@@ -68,6 +68,9 @@
                         : nombre]);
                 }
                 filas.push(['Vende', Tienda.escapar(vendedor || 'Tu gimnasio')]);
+                // La garantía a la vista antes de comprar (la política completa está en Términos).
+                filas.push(['Garantía', 'Te lo cambiamos o te devolvemos tu dinero si llega defectuoso, caducado o distinto a lo que pediste. '
+                    + 'Si está cerrado y sin usar, tienes 5 días hábiles para cancelar. <a href="terminos.html#cancelaciones">Ver política de devoluciones</a>']);
                 return '<dl class="info-producto mt-3 mb-0">' + filas.map(f => '<dt>' + f[0] + '</dt><dd>' + f[1] + '</dd>').join('') + '</dl>'
                     + (p.requiereAdvertencia
                         ? '<div class="aviso-sanitario mt-3" role="note"><i class="bx bx-error" aria-hidden="true"></i><div><strong>Suplemento con advertencia sanitaria.</strong> Este producto no es un medicamento. El consumo de este producto es responsabilidad de quien lo recomienda y de quien lo usa. <a href="terminos.html#suplementos">Lee la advertencia completa</a></div></div>'
@@ -111,6 +114,7 @@
                             ${plan ? `
                                 <p class="mt-2 mb-0 fw-semibold"><i class="bx bx-calendar text-primary"></i> ${Tienda.escapar(plan.duracionTexto)}</p>
                                 <p class="small text-body-secondary mb-0">${plan.pagoUnico ? 'Pago único: no cambia la fecha en que vence tu membresía.' : 'Al pagarlo, tu acceso se extiende ' + Tienda.escapar(plan.duracionTexto) + ' a partir de tu fecha de corte.'}</p>
+                                <p class="small text-body-secondary mb-0 mt-1"><i class="bx bx-shield-quarter" aria-hidden="true"></i> Puedes cancelarlo antes de que empiece su vigencia. <a href="terminos.html#cancelaciones">Ver política</a></p>
                                 ${(plan.beneficios || []).length ? '<ul class="list-unstyled mt-3 mb-0">' + plan.beneficios.map(b => '<li class="d-flex gap-2 py-1"><i class="bx bx-check text-primary fs-5"></i><span>' + Tienda.escapar(b) + '</span></li>').join('') + '</ul>' : ''}`
                                 : '<p class="mt-2 mb-0">' + existencias + '</p>'}
                             ${p.descripcion ? '<p class="mt-3 mb-0" style="max-width:60ch">' + Tienda.escapar(p.descripcion) + '</p>' : ''}
