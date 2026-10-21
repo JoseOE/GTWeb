@@ -17,7 +17,7 @@ async function api(metodo, ruta, cuerpo, userId) {
 const sufijo = Date.now().toString(36);
 console.log('\n1. Dueño, gimnasio y miembro');
 const correoDueno = `dueno-${sufijo}@prueba.mx`;
-let r = await api('POST', '/api/users/register', { nombre: 'Dueña Prueba', email: correoDueno, password: 'Clave#2026' });
+let r = await api('POST', '/api/users/register', { nombre: 'Dueña Prueba', email: correoDueno, password: 'Clave#2026', aceptaPrivacidad: true, privacidadVersion: '1' });
 ok(r.status === 200, 'registro del dueño', r.status);
 await espera(500);
 const codigo = [...leerLog().matchAll(new RegExp(`verificación de ${correoDueno.replace('.', '\\.')} es (\\d{6})`, 'g'))].pop()?.[1];

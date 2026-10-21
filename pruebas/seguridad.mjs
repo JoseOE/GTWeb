@@ -19,7 +19,7 @@ async function api(metodo, ruta, cuerpo, { token, userId } = {}) {
 const sufijo = Date.now().toString(36);
 async function duenoNuevo(nombre) {
   const correo = `seg-${nombre}-${sufijo}@prueba.mx`;
-  await api('POST', '/api/users/register', { nombre: 'Dueño ' + nombre, email: correo, password: 'Clave#2026' });
+  await api('POST', '/api/users/register', { nombre: 'Dueño ' + nombre, email: correo, password: 'Clave#2026', aceptaPrivacidad: true, privacidadVersion: '1' });
   await espera(400);
   const codigo = [...leerLog().matchAll(new RegExp(`verificación de ${correo.replace(/\./g, '\\.')} es (\\d{6})`, 'g'))].pop()?.[1];
   const v = await api('POST', '/api/cuenta/verificar', { email: correo, codigo });
@@ -35,6 +35,10 @@ ok(r.status === 200 && r.body.fechaProximoPago === null && r.body.planActual ===
   'los campos de cobranza del cliente se ignoran', { fecha: r.body.fechaProximoPago, plan: r.body.planActual, gym: r.body.gymId });
 ok(typeof r.body.token === 'string' && r.body.token.length >= 40, 'el miembro que se registra en la app recibe su token');
 const colado = r.body;
+r = await api('POST', '/api/users/register', { nombre: 'Sin aviso', email: `sin-aviso-${sufijo}@prueba.mx`, password: 'Clave#2026' });
+ok(r.status === 400 && /Aviso de privacidad/.test(r.body.error), 'un dueño sin aceptar el Aviso de privacidad no crea su cuenta → 400', r.body.error);
+r = await api('POST', '/api/users/register', { nombre: 'Aviso viejo', email: `aviso-viejo-${sufijo}@prueba.mx`, password: 'Clave#2026', aceptaPrivacidad: true, privacidadVersion: '0' });
+ok(r.status === 409, 'con una versión vieja del Aviso → 409', r.body.error);
 
 console.log('\n1b. El correo no distingue mayúsculas; el login frena a quien adivina');
 const correoMixto = `Mixto.${sufijo}@Prueba.mx`;

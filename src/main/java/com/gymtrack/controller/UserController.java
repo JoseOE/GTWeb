@@ -5,6 +5,7 @@ import com.gymtrack.model.User;
 import com.gymtrack.repository.GymRepository;
 import com.gymtrack.repository.UserRepository;
 import com.gymtrack.service.CorreoService;
+import com.gymtrack.service.ConsentimientoService;
 import com.gymtrack.service.CuentaService;
 import com.gymtrack.service.IntentosLoginService;
 import com.gymtrack.service.SesionService;
@@ -14,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
@@ -48,6 +50,17 @@ public class UserController {
                 || request.getNombre() == null || request.getNombre().isBlank()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Nombre, correo y contraseña son obligatorios."));
         }
+        boolean esMiembro = "member".equals(request.getRole());
+        boolean aceptaPrivacidad = Boolean.TRUE.equals(request.getAceptaPrivacidad());
+        // En la página web se acepta el Aviso de privacidad al crear la cuenta
+        // (consentimiento expreso). La app todavía no tiene la casilla: ahí se
+        // acepta al pagar, junto con los términos de compra.
+        if (!esMiembro && !aceptaPrivacidad) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Acepta el Aviso de privacidad para crear tu cuenta."));
+        }
+        if (aceptaPrivacidad && !ConsentimientoService.VERSION_TERMINOS.equals(request.getPrivacidadVersion())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "El Aviso de privacidad cambió. Recarga la página y revísalo de nuevo."));
+        }
         if (userRepository.findByEmail(request.getEmail().trim()).isPresent()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "El email ya está registrado."));
         }
@@ -59,7 +72,6 @@ public class UserController {
         user.setEmail(request.getEmail().trim());
         // La app móvil manda role="member" (usuario que se registra por su cuenta);
         // el registro del panel web no manda nada y crea un dueño de gimnasio.
-        boolean esMiembro = "member".equals(request.getRole());
         user.setRole(esMiembro ? "member" : "owner");
         user.setGymId(null);
         user.setMembershipStatus(User.STATUS_NONE);
@@ -67,6 +79,10 @@ public class UserController {
         // todavía no tiene pantalla de verificación: sus miembros entran directo.
         user.setEmailVerificado(esMiembro ? null : false);
         user.setPassword(PasswordUtil.hash(request.getPassword()));
+        if (aceptaPrivacidad) {
+            user.setPrivacidadVersion(request.getPrivacidadVersion());
+            user.setPrivacidadAceptadaEn(Instant.now());
+        }
         userRepository.save(user);
 
         Map<String, Object> view = accountView(user, "Usuario registrado exitosamente");
@@ -205,6 +221,15 @@ public class UserController {
         private String email;
         private String password;
         private String role;
+        // Casilla "Acepto el Aviso de privacidad" de registro.html.
+        private Boolean aceptaPrivacidad;
+        private String privacidadVersion;
+
+        public Boolean getAceptaPrivacidad() { return aceptaPrivacidad; }
+        public void setAceptaPrivacidad(Boolean aceptaPrivacidad) { this.aceptaPrivacidad = aceptaPrivacidad; }
+
+        public String getPrivacidadVersion() { return privacidadVersion; }
+        public void setPrivacidadVersion(String privacidadVersion) { this.privacidadVersion = privacidadVersion; }
 
         public String getNombre() { return nombre; }
         public void setNombre(String nombre) { this.nombre = nombre; }
