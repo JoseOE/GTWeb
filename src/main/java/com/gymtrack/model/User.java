@@ -3,6 +3,7 @@ package com.gymtrack.model;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.time.Instant;
 import java.time.LocalDate;
 
 @Document(collection = "users")
@@ -45,6 +46,11 @@ public class User {
     // true = el dueño creó la cuenta en recepción con una contraseña temporal
     // que el miembro todavía no cambia. La página y la app le piden cambiarla.
     private Boolean contrasenaTemporal;
+    // Consentimiento expreso (opt-in) al crear la cuenta: qué versión del Aviso
+    // de privacidad aceptó y cuándo. null = cuenta creada antes de pedirlo, en
+    // recepción o desde la app.
+    private String privacidadVersion;
+    private Instant privacidadAceptadaEn;
 
     public User() {}
 
@@ -106,6 +112,12 @@ public class User {
 
     public Boolean getContrasenaTemporal() { return contrasenaTemporal; }
     public void setContrasenaTemporal(Boolean contrasenaTemporal) { this.contrasenaTemporal = contrasenaTemporal; }
+
+    public String getPrivacidadVersion() { return privacidadVersion; }
+    public void setPrivacidadVersion(String privacidadVersion) { this.privacidadVersion = privacidadVersion; }
+
+    public Instant getPrivacidadAceptadaEn() { return privacidadAceptadaEn; }
+    public void setPrivacidadAceptadaEn(Instant privacidadAceptadaEn) { this.privacidadAceptadaEn = privacidadAceptadaEn; }
 
     public boolean tieneContrasenaTemporal() {
         return Boolean.TRUE.equals(contrasenaTemporal);

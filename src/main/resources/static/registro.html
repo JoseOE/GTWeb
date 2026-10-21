@@ -113,6 +113,14 @@
                                 </div>
                             </div>
 
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="acepta-privacidad" required>
+                                <label class="form-check-label small" for="acepta-privacidad">
+                                    He leído y acepto el <a href="privacidad.html" target="_blank" rel="noopener">Aviso de privacidad</a>
+                                    y los <a href="terminos.html" target="_blank" rel="noopener">Términos y condiciones</a>.
+                                </label>
+                            </div>
+
                             <div id="alert-error" class="alert alert-danger d-none small py-2" role="alert"></div>
                             <div id="alert-success" class="alert alert-success d-none small py-2" role="alert"></div>
 
@@ -178,11 +186,19 @@
             const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
             const confirmPassword = document.getElementById('confirm-password').value;
+            const aceptaPrivacidad = document.getElementById('acepta-privacidad').checked;
 
             // Validar contraseña
             const passwordRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
             if (!passwordRegex.test(password)) {
                 alertError.innerHTML = '<i class="bx bx-error-circle"></i> La contraseña no cumple los requisitos de seguridad.';
+                alertError.classList.remove('d-none');
+                return;
+            }
+
+            // Consentimiento expreso: sin la casilla no se crea la cuenta.
+            if (!aceptaPrivacidad) {
+                alertError.innerHTML = '<i class="bx bx-error-circle"></i> Acepta el Aviso de privacidad para crear tu cuenta.';
                 alertError.classList.remove('d-none');
                 return;
             }
@@ -201,7 +217,8 @@
             fetch('/api/users/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ nombre, email, password })
+                // privacidadVersion: la del Aviso vigente (Legal.VERSION en js/legal.js).
+                body: JSON.stringify({ nombre, email, password, aceptaPrivacidad, privacidadVersion: '1' })
             })
             .then(res => res.json().then(data => ({ status: res.status, body: data })))
             .then(response => {
