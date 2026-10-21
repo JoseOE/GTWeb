@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="css/editorial.css">
     <link rel="stylesheet" href="css/tienda.css">
     <script src="js/sesion.js" data-protegida></script>
+    <script src="js/analitica.js"></script>
 </head>
 <body class="gym-interior tienda">
 
@@ -378,6 +379,10 @@
                         document.getElementById('confirmar-privacidad').href = 'privacidad.html' + conGym;
                         if (!Tienda.carrito.items.length) return pintarVacio();
                         avisos = Tienda.carrito.avisos || [];
+                        Analitica.evento('begin_checkout', {
+                            currency: 'MXN', value: Tienda.carrito.total,
+                            items: Tienda.carrito.items.map(i => ({ item_id: i.productoId, item_name: i.titulo, item_variant: i.variante, price: i.precioUnitario, quantity: i.cantidad }))
+                        });
                         pintarEsqueleto();
                         // Regreso de un método que salió de la página (PayPal): se
                         // preselecciona y, si lo pide, se vuelve a pulsar "Pagar".
