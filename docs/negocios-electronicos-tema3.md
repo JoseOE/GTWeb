@@ -117,7 +117,7 @@ Antes, la tienda corría en **Medusa.js con PostgreSQL** (modelo relacional, SQL
 | 15 | GitHub Pages | Lo publica `.github/workflows/deploy-pages.yml` en https://joseoe.github.io/GTWeb/. Ver la [decisión 2](#decisiones-de-diseño). |
 | 16 | Métodos seguros para los datos | Ver la sección 3. |
 | 17 | Compatibilidad entre navegadores | Bootstrap 5 y APIs estándar, con alternativas donde un navegador no tiene algo: compartir con Web Share o, si no existe, con WhatsApp o correo; escanear con la cámara o escribir el folio. Ver la tabla de pruebas en la sección 4. |
-| 18 | Google Analytics | GA4 con aviso de cookies (pendiente del ID de medición). |
+| 18 | Google Analytics | GA4 (`G-G24WE0GZ4K`) en `js/analitica.js`, cargado en las páginas públicas y de la tienda. Solo se activa si la persona acepta el aviso de cookies, y se puede cambiar desde el Aviso de privacidad. Además de las visitas, mide el embudo de compra con los eventos de comercio electrónico de GA4: `view_item`, `add_to_cart`, `begin_checkout` y `purchase` (con folio, total, IVA y productos; nunca datos personales). Se revisa en Analytics → Informes → Tiempo real y en Monetización → Compras de comercio electrónico. |
 
 ## 3. Seguridad de los datos (criterio 16)
 

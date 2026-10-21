@@ -288,6 +288,12 @@ const Tienda = (() => {
             method: 'POST',
             body: JSON.stringify({ varianteId, cantidad: cantidad || 1 })
         })).then(c => {
+            const partida = (c.items || []).find(i => i.varianteId === varianteId);
+            if (window.Analitica) Analitica.evento('add_to_cart', {
+                currency: 'MXN', value: partida ? partida.precioUnitario * (cantidad || 1) : undefined,
+                items: [{ item_id: partida ? partida.productoId : varianteId, item_name: partida ? partida.titulo : nombre, item_variant: partida ? partida.variante : undefined,
+                    price: partida ? partida.precioUnitario : undefined, quantity: cantidad || 1 }]
+            });
             avisar('Agregado: ' + (nombre || 'producto'), 'Ver carrito', abrirCarrito);
             return c;
         });
