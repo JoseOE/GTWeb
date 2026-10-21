@@ -32,6 +32,7 @@ GitHub Pages solo sirve archivos estáticos, así que ahí funcionan la página 
 - [Tienda](#-tienda)
 - [Contexto del proyecto](#problemática)
 - [Equipo y sprints](#-equipo-y-flujo-de-trabajo)
+- [Negocios Electrónicos · Tema 3 (análisis, evidencias y decisiones)](docs/negocios-electronicos-tema3.md)
 
 ---
 
