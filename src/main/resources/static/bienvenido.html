@@ -2357,7 +2357,7 @@
         /* ═══════════════════════════════════════
            VENTAS — /api/gyms/{id}/ventas
            KPIs, gráficas y la lista de pedidos del periodo elegido, y el detalle con sus
-           acciones (simular el pago Paynet, cancelar). Todo sale de
+           acciones (entregar, recibos, cancelar). Todo sale de
            la colección de pedidos.
         ═══════════════════════════════════════ */
         const COLORES_VENTAS = ['#f45124', '#20221f', '#8a8c82', '#f2a541', '#5b8def'];
@@ -2649,19 +2649,16 @@
             const a = d.acciones;
             const botones = [
                 a.entregar && ['entregar', 'btn-success', 'bx-package', 'Entregar productos'],
-                a.simularPaynet && ['simular', 'btn-primary', 'bx-store', 'Simular pago en tienda'],
                 a.recibo && ['recibo', 'btn-outline-primary', 'bx-receipt', 'Recibo (PDF)'],
                 a.ficha && ['ficha', 'btn-outline-primary', 'bx-barcode', 'Ficha de pago (PDF)'],
                 (a.recibo || a.ficha) && ['whatsapp', 'btn-outline-success', 'bxl-whatsapp', 'WhatsApp'],
                 a.reenviar && ['reenviar', 'btn-outline-secondary', 'bx-envelope', 'Reenviar correo'],
                 a.cancelar && ['cancelar', 'btn-outline-danger', 'bx-x-circle', 'Cancelar pedido']
             ].filter(Boolean);
-            document.getElementById('venta-detalle-acciones').innerHTML = (a.simularPaynet
-                    ? '<div class="w-100 d-flex flex-wrap align-items-center gap-2 mb-1"><label for="venta-tienda" class="small text-body-secondary">Pagar en</label>'
-                        + '<select id="venta-tienda" class="form-select form-select-sm w-auto">'
-                        + [['oxxo', 'OXXO'], ['7-eleven', '7-Eleven'], ['walmart', 'Walmart'], ['bodega-aurrera', 'Bodega Aurrerá'], ['farmacias-del-ahorro', 'Farmacias del Ahorro'], ['circle-k', 'Circle K']]
-                            .map(([id, nombre]) => '<option value="' + id + '">' + nombre + '</option>').join('')
-                        + '</select></div>'
+            // Ficha de Paynet pendiente: en el sandbox el pago en tienda se simula en el
+            // panel de Openpay y el pedido se actualiza solo al confirmarse.
+            document.getElementById('venta-detalle-acciones').innerHTML = (a.ficha && d.estado === 'pendiente_pago'
+                    ? '<p class="w-100 small text-body-secondary mb-1"><i class="bx bx-info-circle" aria-hidden="true"></i> Para probar el pago en tienda, busca la ficha en el <a href="https://sandbox-dashboard.openpay.mx" target="_blank" rel="noopener">panel de Openpay (sandbox)</a> y simula su pago: este pedido pasa a pagado solo.</p>'
                     : '')
                 + botones.map(([accion, clase, icono, texto]) =>
                 `<button type="button" class="btn ${clase} btn-sm rounded-pill px-3" data-accion="${accion}"><i class='bx ${icono}' aria-hidden="true"></i> ${texto}</button>`).join('');
@@ -2698,7 +2695,6 @@
 
             const rutas = {
                 reenviar: '/api/recibos/pedidos/' + encodeURIComponent(d.orderId) + '/enviar',
-                simular: '/api/simuladores/paynet/' + encodeURIComponent(d.orderId) + '/pagar',
                 entregar: rutaVenta(d.orderId) + '/entregar',
                 cancelar: rutaVenta(d.orderId) + '/cancelar'
             };
@@ -2706,10 +2702,7 @@
             boton.disabled = true;
             boton.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> ' + boton.textContent.trim();
             avisoVenta('');
-            const tienda = document.getElementById('venta-tienda');
-            apiTienda(rutas[accion], accion === 'simular' && tienda
-                ? { method: 'POST', body: JSON.stringify({ tienda: tienda.value }) }
-                : { method: 'POST' })
+            apiTienda(rutas[accion], { method: 'POST' })
                 .then(r => {
                     if (accion === 'reenviar') {
                         avisoVenta(r.message || 'Listo.', r.enviado === false ? 'warning' : 'success');
@@ -2717,15 +2710,10 @@
                         boton.innerHTML = original;
                         return;
                     }
-                    // "Simular pago" responde con el pedido; las demás, con el detalle ya actualizado.
-                    const detalle = accion === 'simular' ? apiTienda(rutaVenta(d.orderId)) : Promise.resolve(r);
-                    return detalle.then(nuevo => {
-                        pintarDetalleVenta(nuevo);
-                        avisoVenta(mensajeDeAccion(accion, r), 'success');
-                        cargarVentas();
-                        const gymId = localStorage.getItem('gymId');
-                        if (accion === 'simular') { loadMembers(gymId); loadBilling(gymId); }
-                    });
+                    // Las acciones responden con el detalle ya actualizado.
+                    pintarDetalleVenta(r);
+                    avisoVenta(mensajeDeAccion(accion, r), 'success');
+                    cargarVentas();
                 })
                 .catch(err => {
                     avisoVenta(err.message, 'danger');
@@ -2736,7 +2724,6 @@
 
         function mensajeDeAccion(accion, r) {
             if (accion === 'entregar') return 'Listo: el pedido quedó entregado y salió del inventario.';
-            if (accion === 'simular') return 'Pago simulado en ' + (r.paynet && r.paynet.tiendaNombre ? r.paynet.tiendaNombre : 'tienda') + ': el pedido quedó pagado.';
             return 'Pedido cancelado.';
         }
 

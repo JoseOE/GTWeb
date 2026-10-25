@@ -4,6 +4,7 @@ import com.gymtrack.model.Pedido;
 import com.gymtrack.model.User;
 import com.gymtrack.service.AccesoService;
 import com.gymtrack.service.CarritoService;
+import com.gymtrack.service.FichasService;
 import com.gymtrack.service.PagosService;
 import com.gymtrack.service.TiendaException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,11 +25,13 @@ public class PagosController {
     private final PagosService pagos;
     private final CarritoService carritos;
     private final AccesoService acceso;
+    private final FichasService fichas;
 
-    public PagosController(PagosService pagos, CarritoService carritos, AccesoService acceso) {
+    public PagosController(PagosService pagos, CarritoService carritos, AccesoService acceso, FichasService fichas) {
         this.pagos = pagos;
         this.carritos = carritos;
         this.acceso = acceso;
+        this.fichas = fichas;
     }
 
     // POST /api/pagos/stripe/sesiones?canal=web|app {returnUrl, cancelUrl} → {id, url, monto}
@@ -62,6 +65,14 @@ public class PagosController {
         Map<String, Object> carrito = carritoSinCambios(comprador, elegido);
         return pagos.crearOrdenPaypal(comprador, elegido, ((Number) carrito.get("total")).doubleValue(),
                 ((Number) carrito.get("articulos")).intValue(), request.getReturnUrl(), request.getCancelUrl(), http.getServerName());
+    }
+
+    // POST /api/webhooks/openpay → avisos de Openpay (ficha pagada). Sin sesión:
+    // el aviso solo dice qué cargo revisar y el estado se pregunta a Openpay.
+    @PostMapping("/api/webhooks/openpay")
+    public Map<String, Object> webhookOpenpay(@RequestBody(required = false) Map<String, Object> cuerpo) {
+        fichas.aviso(cuerpo);
+        return Map.of("recibido", true);
     }
 
     // GET /api/pagos/modo → {modo: "sandbox" | "simulado"}: la página y la app

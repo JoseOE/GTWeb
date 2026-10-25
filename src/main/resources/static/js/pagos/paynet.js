@@ -1,12 +1,13 @@
 /* ═══════════════════════════════════════
-   Efectivo en tiendas (simulador tipo Paynet): OXXO, 7-Eleven, Walmart,
-   Bodega Aurrerá, Farmacias del Ahorro y Circle K.
+   Efectivo en tiendas con Paynet (Openpay): OXXO, 7-Eleven, Walmart,
+   Bodega Aurrerá, Farmacias del Ahorro, Circle K y más.
    ───────────────────────────────────────
-   Al pagar, el pedido queda apartado como "Pendiente de pago" con una
-   referencia de 18 dígitos y 72 h para pagar. La ficha (código de barras,
-   referencia copiable, tiendas e instrucciones) se muestra en
-   confirmacion.html y llega por correo en PDF. Todo es simulado: en la
-   simulación, el dueño marca el pago desde el dashboard de ventas.
+   Al pagar, Openpay genera la referencia y el código de barras de la ficha y
+   el pedido queda apartado como "Pendiente de pago", con 72 h para pagar. La
+   ficha se muestra en confirmacion.html (con la ficha oficial de Paynet en
+   PDF) y llega por correo. Cuando se paga en la tienda, Openpay avisa y el
+   pedido pasa a pagado solo. En el sandbox, el pago en tienda se simula desde
+   el panel de Openpay.
 ═══════════════════════════════════════ */
 (function () {
     const TIENDAS = ['oxxo', '7-eleven', 'walmart', 'bodega-aurrera', 'farmacias-del-ahorro', 'circle-k'];
@@ -16,11 +17,11 @@
     }
 
     function cargarEstilos() {
-        if (document.getElementById('estilos-paynet-sim')) return;
+        if (document.getElementById('estilos-paynet')) return;
         const link = document.createElement('link');
-        link.id = 'estilos-paynet-sim';
+        link.id = 'estilos-paynet';
         link.rel = 'stylesheet';
-        link.href = 'css/pagos/paynet-sim.css';
+        link.href = 'css/pagos/paynet.css';
         document.head.appendChild(link);
     }
 
@@ -42,7 +43,7 @@
         cargarEstilos();
         contenedor.innerHTML = `
             <div class="pn-ficha">
-                <span class="pn-simulacion">Simulación</span>
+                <span class="pn-simulacion">Modo de prueba</span>
                 <p class="mt-2 mb-2">Al confirmar te damos una <strong>referencia</strong> y un <strong>código de barras</strong> para pagar
                     <strong>${dinero(resumen && resumen.total)}</strong> en efectivo en cualquiera de estas tiendas:</p>
                 ${logos()}
@@ -54,7 +55,7 @@
             </div>`;
     }
 
-    // Paynet no pide datos al comprador: la referencia la genera el simulador.
+    // Paynet no pide datos al comprador: la referencia la genera Openpay.
     function obtenerDatos() {
         return Promise.resolve({});
     }
@@ -84,7 +85,7 @@
             <section class="pn-ficha" aria-labelledby="pn-titulo">
                 <div class="d-flex justify-content-between align-items-start gap-2">
                     <h2 class="seccion-titulo fs-5 mb-0" id="pn-titulo">Paga en efectivo</h2>
-                    <span class="pn-simulacion">Simulación</span>
+                    <span class="pn-simulacion">Modo de prueba</span>
                 </div>
                 <div class="pn-monto mt-2">${dinero(pedido.total)}</div>
                 <div class="small text-body-secondary">Monto exacto${vence ? ' · paga antes del <strong>' + escapar(vence) + '</strong>' : ''}</div>
@@ -103,9 +104,10 @@
                     <li>Muestra el código de barras o dicta la referencia.</li>
                     <li>Paga el monto exacto en efectivo y conserva tu comprobante.</li>
                 </ol>
-                <h3 class="fs-6 fw-bold mt-3 mb-2">Dónde pagar <small class="text-body-secondary fw-normal">(red simulada)</small></h3>
+                <h3 class="fs-6 fw-bold mt-3 mb-2">Dónde pagar <small class="text-body-secondary fw-normal">(red Paynet)</small></h3>
                 ${logos('grande')}
-                <p class="small mt-3 mb-3"><strong>Esta ficha es una simulación:</strong> no la presentes en una tienda real.</p>
+                <p class="small mt-3 mb-3"><strong>Ficha de prueba</strong> (sandbox de Openpay): no la presentes en una tienda real. Para probar el pago, el gimnasio lo simula desde el panel de Openpay y tu pedido se actualiza solo.</p>
+                ${pedido.paynet.fichaUrl ? '<a class="btn btn-primary w-100 tocable mb-2" href="' + escapar(pedido.paynet.fichaUrl) + '" target="_blank" rel="noopener"><i class="bx bx-file" aria-hidden="true"></i> Ficha oficial de Paynet (PDF)</a>' : ''}
                 <button type="button" class="btn btn-outline-primary w-100 tocable" id="pn-pdf"><i class="bx bx-download" aria-hidden="true"></i> Descargar ficha (PDF)</button>
                 <div class="small text-danger mt-2" id="pn-error" role="alert"></div>
             </section>`;
