@@ -1,10 +1,11 @@
 /* ═══════════════════════════════════════
    Métodos de pago del checkout
    ───────────────────────────────────────
-   Cada simulador vive en su propio archivo y lo mantiene su dueño:
-     js/pagos/stripe-sim.js  → tarjeta (bloque 3)
-     js/pagos/paynet-sim.js  → efectivo en tiendas (bloque 4)
-     js/pagos/paypal-sim.js  → PayPal (bloque 5)
+   Cada método vive en su propio archivo y lo mantiene su dueño. Todos usan
+   la API real del proveedor en su modo de pruebas (sandbox):
+     js/pagos/stripe.js  → tarjeta en Stripe Checkout
+     js/pagos/paynet.js  → efectivo en tiendas con la ficha de Paynet (Openpay)
+     js/pagos/paypal.js  → PayPal
    checkout.html los carga solos; si un archivo todavía no existe, ese método
    simplemente no aparece.
 
@@ -44,7 +45,7 @@
    llamar a obtenerDatos(); a los demás se les llama primero, para validar (la
    tarjeta) antes de pedir la confirmación.
 
-   Métodos que salen de la página (PayPal): obtenerDatos() puede navegar a
+   Métodos que salen de la página (Stripe, PayPal): obtenerDatos() puede navegar a
    otra página. Al volver a checkout.html?metodo=<id>&continuar=1, el checkout
    preselecciona ese método, lo monta y vuelve a pulsar "Pagar" solo; en esa
    segunda llamada obtenerDatos() lee lo que trae la URL y resuelve.
@@ -90,13 +91,13 @@
             return m ? m[1] : null;
         },
 
-        // Carga js/pagos/<id>-sim.js de cada método conocido. Nunca falla: si un
+        // Carga js/pagos/<id>.js de cada método conocido. Nunca falla: si un
         // archivo no existe todavía, ese método no se ofrece.
         cargar() {
             return Promise.all(CONOCIDOS.map(id => new Promise(resolve => {
                 if (registrados[id]) return resolve();
                 const script = document.createElement('script');
-                script.src = 'js/pagos/' + id + '-sim.js';
+                script.src = 'js/pagos/' + id + '.js';
                 script.onload = resolve;
                 script.onerror = resolve;
                 document.head.appendChild(script);

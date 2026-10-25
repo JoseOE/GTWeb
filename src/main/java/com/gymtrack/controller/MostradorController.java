@@ -6,6 +6,7 @@ import com.gymtrack.service.AccesoService;
 import com.gymtrack.service.MostradorService;
 import com.gymtrack.service.PedidoService;
 import com.gymtrack.service.TiendaException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -67,9 +68,41 @@ public class MostradorController {
         return respuesta;
     }
 
+    // POST /stripe/sesion {"partidas": [...], "totalVisto": 458, "returnUrl": "...", "cancelUrl": "..."}
+    // → {id, url}: la página de pago de Stripe para cobrar el ticket con tarjeta.
+    // Al pagar vuelve a returnUrl con ?session_id=cs_... y el panel cobra con
+    // {"metodo": "tarjeta", "datos": {"sesion": "cs_..."}}.
+    @PostMapping("/stripe/sesion")
+    public Map<String, Object> sesionTarjeta(@PathVariable String gymId,
+                                             @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId,
+                                             @RequestBody SesionRequest request, HttpServletRequest http) {
+        User dueno = dueno(gymId, userId);
+        return mostrador.sesionTarjeta(dueno, gymId, request.getPartidas(), request.getTotalVisto(),
+                request.getReturnUrl(), request.getCancelUrl(), http.getServerName());
+    }
+
     private User dueno(String gymId, String userId) {
         acceso.exigirDueno(gymId, userId);
         return acceso.exigirUsuario(userId);
+    }
+
+    public static class SesionRequest {
+        private List<MostradorService.PartidaTicket> partidas;
+        private Double totalVisto;
+        private String returnUrl;
+        private String cancelUrl;
+
+        public List<MostradorService.PartidaTicket> getPartidas() { return partidas; }
+        public void setPartidas(List<MostradorService.PartidaTicket> partidas) { this.partidas = partidas; }
+
+        public Double getTotalVisto() { return totalVisto; }
+        public void setTotalVisto(Double totalVisto) { this.totalVisto = totalVisto; }
+
+        public String getReturnUrl() { return returnUrl; }
+        public void setReturnUrl(String returnUrl) { this.returnUrl = returnUrl; }
+
+        public String getCancelUrl() { return cancelUrl; }
+        public void setCancelUrl(String cancelUrl) { this.cancelUrl = cancelUrl; }
     }
 
     public static class CobroRequest {
