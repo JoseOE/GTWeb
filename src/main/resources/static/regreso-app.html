@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>Regresando a la app | GymTrack</title>
+    <!--
+    Stripe y PayPal solo regresan a direcciones https. Cuando el pago empezó en
+    la app, Spring les da esta página con ?a=<enlace de la app>; aquí se
+    reenvía a la app con lo que agregó el proveedor (session_id, token,
+    PayerID). Solo se reenvía a enlaces de la app (gymtrack://, exp://), nunca
+    a otro sitio web.
+    -->
+    <style>
+        body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #f5f3ee; color: #20221f; margin: 0; display: grid; place-items: center; min-height: 100vh; text-align: center; padding: 24px; }
+        a { color: #b73511; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <main>
+        <p id="mensaje">Regresando a la app de GymTrack…</p>
+        <p><a id="enlace" href="#" hidden>Abrir la app</a></p>
+    </main>
+    <script>
+        (function () {
+            const params = new URLSearchParams(location.search);
+            const destino = params.get('a') || '';
+            if (!/^(gymtrack|exps?):\/\//i.test(destino)) {
+                document.getElementById('mensaje').textContent = 'Este enlace no es válido. Vuelve a la app de GymTrack.';
+                return;
+            }
+            params.delete('a');
+            const extra = params.toString();
+            const url = destino + (extra ? (destino.includes('?') ? '&' : '?') + extra : '');
+            const enlace = document.getElementById('enlace');
+            enlace.href = url;
+            enlace.hidden = false;
+            location.replace(url);
+        })();
+    </script>
+</body>
+</html>

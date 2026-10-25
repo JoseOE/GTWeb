@@ -11,7 +11,7 @@
    y purchase. Nunca se mandan nombres, correos ni datos de pago.
 
    Se carga en el <head> de las páginas públicas y de la tienda (no en el
-   panel del dueño ni en el simulador de PayPal).
+   panel del dueño).
 ═══════════════════════════════════════ */
 (function () {
     const ID = 'G-G24WE0GZ4K';

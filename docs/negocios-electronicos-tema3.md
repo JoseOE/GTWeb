@@ -86,7 +86,7 @@ Antes, la tienda corría en **Medusa.js con PostgreSQL** (modelo relacional, SQL
 
 - **Objetivo:** cobrar el total que la persona vio, con su consentimiento, y entregarle su comprobante en ese momento.
 - **Flujo:**
-  1. Elegir la forma de pago: tarjeta (con meses sin intereses en crédito), PayPal o efectivo en tiendas.
+  1. Elegir la forma de pago: tarjeta (en la página de Stripe), PayPal o efectivo en tiendas (ficha de Paynet).
   2. Si el carrito lleva suplementos, aceptar la advertencia sanitaria.
   3. En **¿Confirmas tu compra?**, revisar el desglose, la forma de pago, la entrega y quién vende, y aceptar los Términos y el Aviso de privacidad.
   4. Pagar.
@@ -97,7 +97,7 @@ Antes, la tienda corría en **Medusa.js con PostgreSQL** (modelo relacional, SQL
   - el pedido guarda qué versión de los términos se aceptó y cuándo;
   - la ficha de efectivo vence a las 72 horas y libera lo apartado;
   - en recepción solo se entregan pedidos pagados.
-- **API:** `POST /api/simuladores/stripe/tokens`, `POST /api/simuladores/paypal/ordenes`, `POST /api/tienda/carrito/checkout`, `GET /api/recibos/pedidos/{id}.pdf`.
+- **API:** `POST /api/pagos/stripe/sesiones` (Stripe Checkout), `POST /api/pagos/paypal/ordenes` (PayPal Orders v2), `POST /api/tienda/carrito/checkout` (cobra: captura en Stripe o PayPal, o pide la ficha a Openpay), `POST /api/webhooks/openpay`, `GET /api/recibos/pedidos/{id}.pdf`.
 
 ---
 
@@ -108,12 +108,12 @@ Antes, la tienda corría en **Medusa.js con PostgreSQL** (modelo relacional, SQL
 | 06 | Catálogo: precios netos, stock y garantías | Ficha del producto (`producto.html`): precio con la leyenda "IVA incluido", estado Disponible, Quedan N o Agotado, y una fila **Garantía** con la política de cambios y el enlace a Términos. |
 | 07 | Cuenta: aviso de privacidad, opt-in e historial | `privacidad.html` es el aviso integral: responsable, datos, finalidades, transferencias, derechos ARCO y cambios. El opt-in es una casilla obligatoria al crear la cuenta, y el servidor guarda la versión y la fecha (`privacidadVersion`, `privacidadAceptadaEn`); al pagar se acepta otra vez. El historial está en `pedidos.html` (Mis pedidos), con estado, QR y recibos. |
 | 08 | Carrito: desglose, cambios y políticas | Subtotal sin IVA, IVA 16 % y total, con botones + y − que recalculan al momento. El pie de la tienda enlaza a Términos y al Aviso de privacidad. |
-| 09 | Pago: cifrado, PCI-DSS y confirmación | Todo va por HTTPS. La tarjeta se cambia por un token y solo se guardan la marca y los últimos 4 dígitos. La confirmación (`confirmacion.html`) y el recibo por correo llegan al momento. Ver la [decisión 1](#decisiones-de-diseño). |
+| 09 | Pago: cifrado, PCI-DSS y confirmación | Todo va por HTTPS. La tarjeta se escribe en la página de Stripe (Stripe Checkout) y nunca llega a GymTrack: solo se guardan la marca y los últimos 4 dígitos que devuelve Stripe. La confirmación (`confirmacion.html`) y el recibo por correo llegan al momento. Ver la [decisión 1](#decisiones-de-diseño). |
 | 10 | Reseñas después de comprar | "Califica tu compra" en Mis pedidos: de 1 a 5 estrellas y un comentario, solo con una compra pagada de ese producto. Hay una reseña por producto, se puede editar, y el dueño puede ocultarla. |
 | 11 | Frontend + backend + APIs | Spring Boot expone la API REST y sirve las páginas; las páginas usan `fetch`. Se usan MongoDB Atlas, Brevo (correo), iText (PDF) y los simuladores de pago, y la app móvil consume la misma API. |
 | 12 | Repositorio con Git | Una rama por integrante, PRs a `main` y revisión automática en cada PR (`.github/workflows/ci.yml`: compila y corre las pruebas de punta a punta). |
 | 13 | Enlace al hosting | https://gtweb.onrender.com |
-| 14 | Credenciales de APIs | `MONGODB_URI` (MongoDB Atlas) y `BREVO_API_KEY` viven como variables de entorno en Render, nunca en el repositorio (ver `.env.example`). Los pagos usan simuladores propios; ver la [decisión 1](#decisiones-de-diseño). |
+| 14 | Credenciales de APIs | `MONGODB_URI` (MongoDB Atlas), `BREVO_API_KEY`, las llaves de Stripe (`STRIPE_SECRET_KEY`), PayPal (`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`) y Openpay/Paynet (`OPENPAY_MERCHANT_ID`, `OPENPAY_PRIVATE_KEY`) viven como variables de entorno en Render, nunca en el repositorio (ver `.env.example`). Las de pago son del modo de prueba (sandbox) de cada proveedor. |
 | 15 | GitHub Pages | Lo publica `.github/workflows/deploy-pages.yml` en https://joseoe.github.io/GTWeb/. Ver la [decisión 2](#decisiones-de-diseño). |
 | 16 | Métodos seguros para los datos | Ver la sección 3. |
 | 17 | Compatibilidad entre navegadores | Bootstrap 5 y APIs estándar, con alternativas donde un navegador no tiene algo: compartir con Web Share o, si no existe, con WhatsApp o correo; escanear con la cámara o escribir el folio. Ver la tabla de pruebas en la sección 4. |
@@ -149,13 +149,13 @@ Marca ✔ en cada celda y guarda la captura en `docs/capturas/`.
 
 Hay criterios que no se aplican tal cual por la forma en que se usa la página. Estas son las razones.
 
-**1. Pagos simulados en lugar de PayPal, Stripe y Paynet reales (criterios 09 y 14).** Un proyecto escolar no debe mover dinero real, y una cuenta de comercio real pide RFC, cuenta bancaria y verificación del negocio. Por eso cada método es un simulador que sigue el flujo del servicio real:
+**1. Stripe, PayPal y Paynet reales, en su modo de prueba (criterios 09 y 14).** La tienda usa las APIs de los tres proveedores en su ambiente de pruebas (sandbox): un proyecto escolar no debe mover dinero real, y pasar a producción pide RFC, cuenta bancaria y verificación del negocio. Funciona igual que en producción:
 
-- **Tarjeta:** como Stripe, la tarjeta se tokeniza; el token es de un solo uso y de quien lo pidió. Solo acepta tarjetas de prueba, para que nadie escriba una real por error.
-- **PayPal:** una orden que se aprueba en una página aparte y regresa con `token` y `PayerID`. Nunca pide contraseña.
-- **Efectivo en tiendas:** como Paynet, una ficha con referencia, código de barras y vencimiento de 72 horas.
+- **Tarjeta:** Stripe Checkout. La tarjeta se escribe en la página de Stripe; GymTrack recibe la sesión pagada y captura el cargo al crear el pedido.
+- **PayPal:** Orders v2. La orden se aprueba en la página de PayPal (con una cuenta compradora de prueba) y GymTrack la captura.
+- **Efectivo en tiendas:** Openpay genera la referencia y la ficha de Paynet. Cuando se paga (en el sandbox, desde el panel de Openpay), Openpay avisa por webhook y el pedido pasa a pagado.
 
-La certificación PCI-DSS no aplica, porque el sitio nunca guarda, procesa ni transmite números de tarjeta reales. Aun así, el diseño sigue sus principios: tokenizar, guardar solo los últimos 4 dígitos, nada de CVC y solo por HTTPS.
+Como la tarjeta nunca pasa por el servidor de GymTrack, el alcance de PCI-DSS es el más bajo (el que corresponde a usar la página de pago del proveedor). Para las pruebas automáticas del CI siguen los simuladores internos (`PAGOS_MODO=simulado`), sin páginas ni llaves.
 
 **2. Render como hosting principal y GitHub Pages solo estático (criterios 13 y 15).** GitHub Pages solo sirve archivos estáticos (HTML, CSS y JS). La tienda necesita un servidor para el carrito, los pagos, las sesiones, los recibos y la base de datos, así que el sitio completo vive en Render, con Spring Boot en Docker. GitHub Pages está configurado y publica la parte estática (portada, contacto, mapa y WhatsApp) cada vez que cambia `main`.
 

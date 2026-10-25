@@ -476,7 +476,7 @@ const Tienda = (() => {
                         <a href="privacidad.html${conGym}">Aviso de privacidad</a>
                         <a href="https://www.gob.mx/profeco" target="_blank" rel="noopener">Profeco</a>
                     </nav>
-                    <p class="tienda-pie-nota">Precios en pesos mexicanos con IVA incluido. GymTrack es un proyecto académico: los pagos son simulados.</p>
+                    <p class="tienda-pie-nota">Precios en pesos mexicanos con IVA incluido. GymTrack es un proyecto académico: los pagos usan el modo de prueba de Stripe, PayPal y Paynet.</p>
                 </div>
             </footer>`);
         if (!gymId) return;

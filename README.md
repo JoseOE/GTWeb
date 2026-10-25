@@ -52,7 +52,7 @@ GitHub Pages solo sirve archivos estáticos, así que ahí funcionan la página 
 | `producto.html` | Detalle de un producto o plan: presentación, sabor, precio, stock y cantidad. |
 | `checkout.html` | Pagar: resumen, recoger en el gimnasio y forma de pago. |
 | `confirmacion.html` · `pedidos.html` | Confirmación del pedido y "Mis pedidos" con estado y recibo. |
-| `paypal-sim.html` | Simulador PayPal: el comprador aprueba o cancela un pago de prueba (también se abre desde la app). |
+| `regreso-app.html` | Puente de regreso a la app después de pagar en Stripe o PayPal: reenvía a `gymtrack://` o `exp://` con lo que agregó el proveedor. |
 
 ---
 
@@ -166,6 +166,10 @@ Y abre http://localhost:5500. **Ojo:** así no funcionan el catálogo, el regist
 | `APP_URL` | No | Dirección con la que se arman los enlaces de los correos. Por defecto `http://localhost:8080`; en Render debe ser `https://gtweb.onrender.com`. |
 | `PORT` | No | Puerto del servidor. Por defecto `8080`; Render lo asigna solo. |
 | `EXIGIR_TOKEN` | No | `true` para que toda la API exija el token de sesión. Por defecto `false` mientras la app móvil se actualiza (ver [Seguridad y sesiones](#-seguridad-y-sesiones)). |
+| `PAGOS_MODO` | No | `sandbox` para cobrar con las APIs reales de Stripe, PayPal y Openpay en su modo de prueba (lo que usa Render). Por defecto `simulado`: los simuladores internos, sin llaves, solo para las pruebas del CI. Ver [Pagos con Stripe, PayPal y Paynet](#pagos-con-stripe-paypal-y-paynet-sandbox). |
+| `STRIPE_SECRET_KEY` · `STRIPE_PUBLISHABLE_KEY` | Con `sandbox` | Llaves de prueba de Stripe (`sk_test_…`, `pk_test_…`). |
+| `PAYPAL_CLIENT_ID` · `PAYPAL_CLIENT_SECRET` · `PAYPAL_MODO` | Con `sandbox` | App de Sandbox de developer.paypal.com. `PAYPAL_MODO=sandbox`. |
+| `OPENPAY_MERCHANT_ID` · `OPENPAY_PRIVATE_KEY` · `OPENPAY_PUBLIC_KEY` · `OPENPAY_MODO` | Con `sandbox` | Llaves del sandbox de Openpay (Paynet). `OPENPAY_MODO=sandbox`. |
 | `EXIGIR_CONSENTIMIENTO_APP` | No | `true` para exigir también en la app la aceptación de los términos de compra al pagar. En la web se exige siempre. Por defecto `false` hasta que GTApp lo mande (ver "Compras conforme a la ley"). |
 
 \* Sin `BREVO_API_KEY` y `MAIL_USERNAME` la página funciona igual: los códigos de verificación y los enlaces de recuperación se escriben en la consola en lugar de enviarse.
@@ -462,7 +466,7 @@ Respuestas de `/checkout`:
 }
 ```
 
-**Simulador de Stripe y mostrador**
+**Simulador de Stripe y mostrador** (solo con `PAGOS_MODO=simulado`, para el CI; en sandbox se usa [Stripe Checkout](#pagos-con-stripe-paypal-y-paynet-sandbox))
 
 | Método | Ruta | Uso |
 |---|---|---|
@@ -569,7 +573,7 @@ Los rechazos llegan al checkout como 402 con el mensaje para el comprador, y el 
 | POST | `/api/simuladores/paypal/ordenes/{id}/aprobar` | `{cuenta}` → `{redirect}`: `returnUrl` con `token` y `PayerID` |
 | POST | `/api/simuladores/paypal/ordenes/{id}/cancelar` | → `{redirect}`: `cancelUrl` con `token` |
 
-**PayPal.**
+**PayPal (simulador, solo con `PAGOS_MODO=simulado`).** En sandbox se usa la API real de PayPal: ver [Pagos con Stripe, PayPal y Paynet](#pagos-con-stripe-paypal-y-paynet-sandbox).
 
 - **El flujo.** Como en PayPal, el pago se aprueba fuera de la tienda:
   1. Al pulsar "Pagar", Spring crea una orden `PAYID-SIM-...` por el total del carrito y la página va a `paypal-sim.html?token=...`.
@@ -683,7 +687,7 @@ Para crear o editar se manda `nombre`, `descripcion`, `categoria` (el handle), `
 
 `AccesoService.exigirAccesoAPedido(pedido, userId)` deja verlo solo al comprador y al dueño del gimnasio.
 
-**Métodos de pago.** Los simula `SimuladorPagoService` (Java), con los mismos ids de proveedor que usaba Medusa para que los pedidos migrados se lean igual. `MetodosPago` les da nombre en los recibos y el panel.
+**Métodos de pago (modo simulado).** En el CI los simula `SimuladorPagoService` (Java); en sandbox cobra `PagosService` con las APIs reales, con los mismos ids de proveedor que usaba Medusa para que los pedidos migrados se lean igual. `MetodosPago` les da nombre en los recibos y el panel.
 
 | Proveedor | Comportamiento |
 |---|---|
@@ -722,21 +726,40 @@ Lo que pide la ley de comercio electrónico al vender en línea, con los textos 
 - **Carrusel.** Muestra los productos con promedio **mayor a 3.8** estrellas (con una reseña basta), los mejor calificados primero.
 - **Moderación.** El dueño puede ocultar una reseña ofensiva o que no trata del producto: no cuenta en el promedio ni se muestra, pero su autor la sigue viendo.
 
+### Pagos con Stripe, PayPal y Paynet (sandbox)
+
+Con `PAGOS_MODO=sandbox` (Render) se cobra con las APIs reales en su modo de pruebas: no se mueve dinero real y se usan las tarjetas y cuentas de prueba de cada proveedor. En los tres el dinero se cobra en Spring, ya revisado el carrito, así que nunca queda un cobro sin pedido.
+
+| Método | Qué pasa | Cómo se prueba |
+|---|---|---|
+| Tarjeta (Stripe Checkout) | `POST /api/pagos/stripe/sesiones` abre la página de pago de Stripe por el total, con `capture_method=manual`. Stripe regresa con `?session_id=` y el checkout cobra con `{"sesion": ...}`: Spring revisa la sesión y captura el cargo al crear el pedido (si algo cambió, lo libera). La tarjeta nunca pasa por GymTrack. | Tarjeta `4242 4242 4242 4242`, cualquier fecha futura y CVC. Se ve en dashboard.stripe.com (modo de prueba) → Pagos. |
+| PayPal (Orders v2) | `POST /api/pagos/paypal/ordenes` crea la orden y devuelve `aprobarUrl`. PayPal regresa con `?token=&PayerID=` y el checkout cobra con `{"token": ...}`: Spring captura la orden. | Entra en sandbox.paypal.com con la cuenta *Personal* de developer.paypal.com → Sandbox accounts. |
+| Efectivo en tiendas (Paynet / Openpay) | Al pagar, Openpay crea el cargo en tienda y devuelve la referencia, el código de barras y la ficha oficial en PDF. El pedido queda pendiente hasta que se paga. | En sandbox-dashboard.openpay.mx busca el cargo y simula su pago. Spring lo ve por el webhook `POST /api/webhooks/openpay`, cada 2 minutos y al abrir el pedido. |
+| Mostrador con tarjeta | `POST /api/gyms/{gymId}/mostrador/stripe/sesion` abre Stripe en la pantalla del panel; al volver (`?cobro=tarjeta&session_id=`), la venta se cobra sola. | Igual que la tarjeta. |
+
+La app usa los mismos endpoints con `?canal=app` y sus enlaces (`gymtrack://…`, `exp://…`). Como Stripe y PayPal solo regresan a direcciones https, Spring los manda a `regreso-app.html`, que reenvía a la app.
+
+Webhook de Openpay (opcional, recomendado): en el panel de Openpay → Configuración → Webhooks, agrega `https://gtweb.onrender.com/api/webhooks/openpay`. Openpay manda un código de verificación que aparece en el log de Spring.
+
+Prueba manual contra los sandbox (necesita las llaves y `PAGOS_MODO=sandbox`): `node pruebas/sandbox.mjs`. No está en el CI, porque usa las APIs reales.
+
+Con `PAGOS_MODO=simulado` (el CI) siguen los simuladores internos, sin páginas: `/api/simuladores/**` solo existe en ese modo.
+
 ### Formas de pago en el checkout (bloques 3 a 5)
 
-`checkout.html` no sabe cómo cobra cada método: carga `js/pagos/stripe-sim.js`, `paynet-sim.js` y `paypal-sim.js`, y cada uno se registra con `MetodosPago.registrar({...})`. La documentación completa está en `js/pagos/metodos.js`. Si un archivo todavía no existe, ese método no aparece.
+`checkout.html` no sabe cómo cobra cada método: carga `js/pagos/stripe.js`, `paynet.js` y `paypal.js`, y cada uno se registra con `MetodosPago.registrar({...})`. La documentación completa está en `js/pagos/metodos.js`. Si un archivo todavía no existe, ese método no aparece.
 
 | Miembro | Para qué |
 |---|---|
 | `id` · `nombre` · `descripcion` · `icono` · `logos` · `orden` | `id` es lo que Spring recibe en `metodo` (`stripe`, `paynet`, `paypal`); los demás son para el selector. `logos` son nombres de `img/pagos/<logo>.svg` (`MetodosPago.logo(id)` arma el `<img>`) |
-| `saleDeLaPagina` (opcional) | `true` si el pago se aprueba fuera (PayPal): el checkout pide la confirmación antes de salir |
+| `saleDeLaPagina` (opcional) | `true` si el pago se hace fuera (Stripe, PayPal): el checkout pide la confirmación antes de salir |
 | `montar(contenedor, resumen)` | Dibuja el formulario. `resumen` = `{total, subtotal, iva, articulos, items, gym}` |
 | `obtenerDatos(): Promise` | Valida y resuelve con los `datos` que van a Spring. Para un error, rechaza con `new Error("mensaje")` |
 | `despues(pedido)` (opcional) | Ya creado el pedido. Puede devolver otra URL a la que ir en lugar de `confirmacion.html` |
 | `confirmacion(contenedor, pedido)` (opcional) | En `confirmacion.html`, lo propio del método (p. ej. la ficha de Paynet) |
 | `desmontar()` (opcional) | Al cambiar a otro método |
 
-Un método que sale de la página (PayPal) regresa a `checkout.html?metodo=<id>&continuar=1`. El checkout lo preselecciona y vuelve a pulsar "Pagar"; en esa segunda llamada, `obtenerDatos()` lee lo que trae la URL.
+Un método que sale de la página (Stripe, PayPal) regresa a `checkout.html?metodo=<id>&continuar=1`. El checkout lo preselecciona y vuelve a pulsar "Pagar"; en esa segunda llamada, `obtenerDatos()` lee lo que trae la URL.
 
 El recibo se descarga de `GET /api/recibos/pedidos/{orderId}.pdf` con `fetch` y el encabezado `X-User-Id`.
 
