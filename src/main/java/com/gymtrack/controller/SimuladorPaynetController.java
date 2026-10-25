@@ -7,12 +7,16 @@ import com.gymtrack.service.PedidoService;
 import com.gymtrack.service.SimuladorPaynetService;
 import com.gymtrack.service.TiendaException;
 import org.springframework.http.HttpStatus;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
 // Endpoints de prueba del simulador de Paynet. Solo el dueño del gimnasio
 // puede "pagar en tienda" las fichas de su tienda.
+// Solo con PAGOS_MODO=simulado (las pruebas automáticas): en sandbox se paga
+// con las APIs reales y esta ruta no existe.
+@ConditionalOnProperty(name = "pagos.modo", havingValue = "simulado", matchIfMissing = true)
 @RestController
 @RequestMapping("/api/simuladores/paynet")
 public class SimuladorPaynetController {
