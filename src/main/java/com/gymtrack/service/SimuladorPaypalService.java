@@ -11,9 +11,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
-import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
@@ -21,7 +18,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
 // Simulador de PayPal: hace las veces de la API de órdenes de PayPal.
 //
@@ -46,8 +42,6 @@ public class SimuladorPaypalService {
     private static final Duration VIGENCIA = Duration.ofHours(3);
     private static final String LETRAS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final SecureRandom AZAR = new SecureRandom();
-    // Los enlaces de la app: gymtrack:// en una build y exp:// (o exps://) en Expo Go.
-    private static final Set<String> ESQUEMAS_APP = Set.of("gymtrack", "exp", "exps");
 
     // Cuentas que ofrece paypal-sim.html. Cualquier otro correo también aprueba;
     // la cuenta sin saldo aprueba, pero PayPal rechaza el cobro (como una
@@ -63,13 +57,15 @@ public class SimuladorPaypalService {
     private final GymRepository gymRepository;
     private final VinculoPaypalRepository vinculos;
     private final String urlPublica;
+    private final Regresos regresos;
 
     public SimuladorPaypalService(OrdenPaypalRepository ordenes, GymRepository gymRepository, VinculoPaypalRepository vinculos,
-                                  @Value("${app.url-publica:http://localhost:8080}") String urlPublica) {
+                                  @Value("${app.url-publica:http://localhost:8080}") String urlPublica, Regresos regresos) {
         this.ordenes = ordenes;
         this.gymRepository = gymRepository;
         this.vinculos = vinculos;
         this.urlPublica = urlPublica.replaceAll("/+$", "");
+        this.regresos = regresos;
     }
 
     // Crea la orden por el total del carrito. hostPropio es el dominio por el
@@ -273,53 +269,12 @@ public class SimuladorPaypalService {
         return conParametros(orden.getCancelUrl(), Map.of("token", orden.getId()));
     }
 
-    // A dónde se puede volver: una ruta de esta web (relativa o con su dominio)
-    // o un enlace de la app (gymtrack://..., exp://...). Nunca otro sitio web:
-    // la página del simulador no debe servir para mandar a alguien a una página
-    // ajena que se haga pasar por la tienda.
     private String validarRegreso(String url, String campo, String hostPropio) {
-        String valor = url == null ? "" : url.trim();
-        if (valor.isEmpty() || valor.length() > 2000) {
-            throw new TiendaException(HttpStatus.BAD_REQUEST, "Falta " + campo + ": la dirección a la que vuelve el comprador.");
-        }
-        URI uri;
-        try {
-            uri = URI.create(valor);
-        } catch (IllegalArgumentException e) {
-            throw new TiendaException(HttpStatus.BAD_REQUEST, campo + " no es una dirección válida.");
-        }
-        String esquema = uri.getScheme() == null ? null : uri.getScheme().toLowerCase(Locale.ROOT);
-        if (esquema == null) {
-            if (valor.startsWith("//")) throw new TiendaException(HttpStatus.BAD_REQUEST, campo + " no es una dirección válida.");
-            return valor;
-        }
-        if (ESQUEMAS_APP.contains(esquema)) return valor;
-        if (!esquema.equals("http") && !esquema.equals("https")) {
-            // javascript:, data:, intent:... nada que no sea una página o la app.
-            throw new TiendaException(HttpStatus.BAD_REQUEST, campo + " no es una dirección válida.");
-        }
-        String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
-        String hostApp = URI.create(urlPublica).getHost();
-        if (!host.equals(hostPropio == null ? "" : hostPropio.toLowerCase(Locale.ROOT)) && !host.equalsIgnoreCase(hostApp)) {
-            throw new TiendaException(HttpStatus.BAD_REQUEST, campo + " debe ser una página de GymTrack o un enlace de la app.");
-        }
-        return valor;
+        return regresos.validar(url, campo, hostPropio);
     }
 
     private static String conParametros(String url, Map<String, String> params) {
-        String fragmento = "";
-        int almohadilla = url.indexOf('#');
-        if (almohadilla >= 0) {
-            fragmento = url.substring(almohadilla);
-            url = url.substring(0, almohadilla);
-        }
-        StringBuilder sb = new StringBuilder(url);
-        char separador = url.contains("?") ? '&' : '?';
-        for (Map.Entry<String, String> e : params.entrySet()) {
-            sb.append(separador).append(e.getKey()).append('=').append(URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8));
-            separador = '&';
-        }
-        return sb + fragmento;
+        return Regresos.conParametros(url, params);
     }
 
     private static String alAzar(int largo) {

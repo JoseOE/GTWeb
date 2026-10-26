@@ -2,11 +2,15 @@ package com.gymtrack.controller;
 
 import com.gymtrack.service.AccesoService;
 import com.gymtrack.service.SimuladorStripeService;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
 // Simulador de Stripe.js: la tarjeta de prueba entra aquí y sale un token.
+// Solo con PAGOS_MODO=simulado (las pruebas automáticas): en sandbox se paga
+// con las APIs reales y esta ruta no existe.
+@ConditionalOnProperty(name = "pagos.modo", havingValue = "simulado", matchIfMissing = true)
 @RestController
 @RequestMapping("/api/simuladores/stripe")
 public class SimuladorStripeController {

@@ -136,7 +136,7 @@
                     </section>
                     <section class="paso mb-3" aria-labelledby="paso-3">
                         <h2 class="paso-titulo" id="paso-3"><span class="numero">3</span> Forma de pago</h2>
-                        <p class="small text-body-secondary mt-n2">Pagos simulados para pruebas: no se cobra dinero real.</p>
+                        <p class="small text-body-secondary mt-n2">Pagos en modo de prueba (sandbox) de Stripe, PayPal y Paynet: usa sus tarjetas y cuentas de prueba, no las reales.</p>
                         ${metodos.length
                             ? '<div role="radiogroup" aria-label="Forma de pago">' + metodos.map(m => `
                                 <label class="metodo-opcion">
@@ -152,7 +152,7 @@
                     <div class="accion-fija">
                         <div id="error-pago" class="alert alert-danger small py-2 d-none" role="alert"></div>
                         <button type="button" class="btn btn-primary btn-grande w-100" id="pagar" disabled>Pagar</button>
-                        <p class="nota-legal">Al confirmar tu compra aceptas los <a href="terminos.html${conGym}" target="_blank" rel="noopener">Términos y condiciones de compra</a> y el <a href="privacidad.html${conGym}" target="_blank" rel="noopener">Aviso de privacidad</a>${vendedor ? ' de ' + Tienda.escapar(vendedor.nombre.replace(/\.$/, '')) : ''}. Pagos simulados: no se cobra dinero real.</p>
+                        <p class="nota-legal">Al confirmar tu compra aceptas los <a href="terminos.html${conGym}" target="_blank" rel="noopener">Términos y condiciones de compra</a> y el <a href="privacidad.html${conGym}" target="_blank" rel="noopener">Aviso de privacidad</a>${vendedor ? ' de ' + Tienda.escapar(vendedor.nombre.replace(/\.$/, '')) : ''}. Pagos en modo de prueba: no se cobra dinero real.</p>
                     </div>`;
 
                 raiz.querySelectorAll('input[name="metodo"]').forEach(r => r.addEventListener('change', () => elegir(r.value)));

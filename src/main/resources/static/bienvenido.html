@@ -492,8 +492,7 @@
                                 </div>
                             </div>
                             <div id="mostrador-tarjeta" class="mt-3 d-none">
-                                <p class="small text-body-secondary mb-2"><i class='bx bx-info-circle'></i> Terminal simulada: captura una tarjeta de prueba o genera una.</p>
-                                <div id="mostrador-tarjeta-form"></div>
+                                <p class="small text-body-secondary mb-0"><i class='bx bx-info-circle'></i> Al cobrar se abre la página de pago de <strong>Stripe</strong> en esta pantalla para capturar la tarjeta del cliente; al terminar regresas aquí y la venta queda cobrada. Modo de prueba: usa la tarjeta <strong>4242 4242 4242 4242</strong>, cualquier fecha futura y cualquier CVC.</p>
                             </div>
 
                             <div id="mostrador-error" class="alert alert-danger d-none py-2 small mt-3 mb-0" role="alert"></div>
@@ -2358,7 +2357,7 @@
         /* ═══════════════════════════════════════
            VENTAS — /api/gyms/{id}/ventas
            KPIs, gráficas y la lista de pedidos del periodo elegido, y el detalle con sus
-           acciones (simular el pago Paynet, cancelar). Todo sale de
+           acciones (entregar, recibos, cancelar). Todo sale de
            la colección de pedidos.
         ═══════════════════════════════════════ */
         const COLORES_VENTAS = ['#f45124', '#20221f', '#8a8c82', '#f2a541', '#5b8def'];
@@ -2650,19 +2649,16 @@
             const a = d.acciones;
             const botones = [
                 a.entregar && ['entregar', 'btn-success', 'bx-package', 'Entregar productos'],
-                a.simularPaynet && ['simular', 'btn-primary', 'bx-store', 'Simular pago en tienda'],
                 a.recibo && ['recibo', 'btn-outline-primary', 'bx-receipt', 'Recibo (PDF)'],
                 a.ficha && ['ficha', 'btn-outline-primary', 'bx-barcode', 'Ficha de pago (PDF)'],
                 (a.recibo || a.ficha) && ['whatsapp', 'btn-outline-success', 'bxl-whatsapp', 'WhatsApp'],
                 a.reenviar && ['reenviar', 'btn-outline-secondary', 'bx-envelope', 'Reenviar correo'],
                 a.cancelar && ['cancelar', 'btn-outline-danger', 'bx-x-circle', 'Cancelar pedido']
             ].filter(Boolean);
-            document.getElementById('venta-detalle-acciones').innerHTML = (a.simularPaynet
-                    ? '<div class="w-100 d-flex flex-wrap align-items-center gap-2 mb-1"><label for="venta-tienda" class="small text-body-secondary">Pagar en</label>'
-                        + '<select id="venta-tienda" class="form-select form-select-sm w-auto">'
-                        + [['oxxo', 'OXXO'], ['7-eleven', '7-Eleven'], ['walmart', 'Walmart'], ['bodega-aurrera', 'Bodega Aurrerá'], ['farmacias-del-ahorro', 'Farmacias del Ahorro'], ['circle-k', 'Circle K']]
-                            .map(([id, nombre]) => '<option value="' + id + '">' + nombre + '</option>').join('')
-                        + '</select></div>'
+            // Ficha de Paynet pendiente: en el sandbox el pago en tienda se simula en el
+            // panel de Openpay y el pedido se actualiza solo al confirmarse.
+            document.getElementById('venta-detalle-acciones').innerHTML = (a.ficha && d.estado === 'pendiente_pago'
+                    ? '<p class="w-100 small text-body-secondary mb-1"><i class="bx bx-info-circle" aria-hidden="true"></i> Para probar el pago en tienda, busca la ficha en el <a href="https://sandbox-dashboard.openpay.mx" target="_blank" rel="noopener">panel de Openpay (sandbox)</a> y simula su pago: este pedido pasa a pagado solo.</p>'
                     : '')
                 + botones.map(([accion, clase, icono, texto]) =>
                 `<button type="button" class="btn ${clase} btn-sm rounded-pill px-3" data-accion="${accion}"><i class='bx ${icono}' aria-hidden="true"></i> ${texto}</button>`).join('');
@@ -2699,7 +2695,6 @@
 
             const rutas = {
                 reenviar: '/api/recibos/pedidos/' + encodeURIComponent(d.orderId) + '/enviar',
-                simular: '/api/simuladores/paynet/' + encodeURIComponent(d.orderId) + '/pagar',
                 entregar: rutaVenta(d.orderId) + '/entregar',
                 cancelar: rutaVenta(d.orderId) + '/cancelar'
             };
@@ -2707,10 +2702,7 @@
             boton.disabled = true;
             boton.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> ' + boton.textContent.trim();
             avisoVenta('');
-            const tienda = document.getElementById('venta-tienda');
-            apiTienda(rutas[accion], accion === 'simular' && tienda
-                ? { method: 'POST', body: JSON.stringify({ tienda: tienda.value }) }
-                : { method: 'POST' })
+            apiTienda(rutas[accion], { method: 'POST' })
                 .then(r => {
                     if (accion === 'reenviar') {
                         avisoVenta(r.message || 'Listo.', r.enviado === false ? 'warning' : 'success');
@@ -2718,15 +2710,10 @@
                         boton.innerHTML = original;
                         return;
                     }
-                    // "Simular pago" responde con el pedido; las demás, con el detalle ya actualizado.
-                    const detalle = accion === 'simular' ? apiTienda(rutaVenta(d.orderId)) : Promise.resolve(r);
-                    return detalle.then(nuevo => {
-                        pintarDetalleVenta(nuevo);
-                        avisoVenta(mensajeDeAccion(accion, r), 'success');
-                        cargarVentas();
-                        const gymId = localStorage.getItem('gymId');
-                        if (accion === 'simular') { loadMembers(gymId); loadBilling(gymId); }
-                    });
+                    // Las acciones responden con el detalle ya actualizado.
+                    pintarDetalleVenta(r);
+                    avisoVenta(mensajeDeAccion(accion, r), 'success');
+                    cargarVentas();
                 })
                 .catch(err => {
                     avisoVenta(err.message, 'danger');
@@ -2737,7 +2724,6 @@
 
         function mensajeDeAccion(accion, r) {
             if (accion === 'entregar') return 'Listo: el pedido quedó entregado y salió del inventario.';
-            if (accion === 'simular') return 'Pago simulado en ' + (r.paynet && r.paynet.tiendaNombre ? r.paynet.tiendaNombre : 'tienda') + ': el pedido quedó pagado.';
             return 'Pedido cancelado.';
         }
 
@@ -3249,6 +3235,10 @@
         let mostradorMiembros = [];
         let mostradorCliente = null;
         let mostradorOcupado = false;
+        // Al volver de la página de pago de Stripe: la sesión pagada y qué hacer
+        // en cuanto el ticket esté cargado (cobrarlo).
+        let mostradorSesionTarjeta = null;
+        let alCargarMostrador = null;
         let grupoAbierto = null;
 
         function initMostrador() {
@@ -3339,7 +3329,6 @@
                     ? '<i class="bx bx-user-check"></i> ' + escapeHtml(m.nombre) + ' <small class="text-body-secondary">· ' + escapeHtml(m.email) + '</small>'
                     : '<i class="bx bx-user"></i> Público en general';
                 document.getElementById('mostrador-cliente-quitar').classList.toggle('d-none', !m);
-                if (metodoMostrador() === 'tarjeta') montarTerminal();
             }
 
             // ─── Forma de cobro ───
@@ -3347,7 +3336,6 @@
                 const tarjeta = metodoMostrador() === 'tarjeta';
                 document.getElementById('mostrador-efectivo').classList.toggle('d-none', tarjeta);
                 document.getElementById('mostrador-tarjeta').classList.toggle('d-none', !tarjeta);
-                if (tarjeta) montarTerminal();
                 actualizarCobro();
             }));
             recibido.addEventListener('input', actualizarCobro);
@@ -3357,16 +3345,6 @@
                 recibido.value = b.dataset.billete;
                 actualizarCobro();
             });
-
-            // El simulador de Stripe hace de terminal: el mismo formulario de la tienda.
-            function montarTerminal() {
-                MetodosPago.cargar().then(() => {
-                    const stripe = MetodosPago.obtener('stripe');
-                    const destino = document.getElementById('mostrador-tarjeta-form');
-                    if (!stripe) { destino.innerHTML = '<p class="small text-danger mb-0">El simulador de tarjeta no está disponible.</p>'; return; }
-                    stripe.montar(destino, { total: mostradorCarrito ? mostradorCarrito.total : 0, titular: mostradorCliente ? mostradorCliente.nombre : '' });
-                });
-            }
 
             document.getElementById('mostrador-cobrar').addEventListener('click', cobrarMostrador);
 
@@ -3386,8 +3364,26 @@
                     if (!(monto + 0.009 >= mostradorCarrito.total)) return errorMostrador('El efectivo recibido no alcanza para ' + dinero(mostradorCarrito.total) + '.');
                     cuerpo.recibido = monto;
                     preparar = Promise.resolve();
+                } else if (mostradorSesionTarjeta) {
+                    // De regreso de Stripe: se cobra con la sesión que pagó el cliente.
+                    cuerpo.datos = { sesion: mostradorSesionTarjeta };
+                    mostradorSesionTarjeta = null;
+                    preparar = Promise.resolve();
                 } else {
-                    preparar = MetodosPago.obtener('stripe').obtenerDatos().then(datos => { cuerpo.datos = datos; });
+                    // Se abre la página de pago de Stripe; al volver, la venta se cobra sola.
+                    const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+                    try { sessionStorage.setItem('mostradorCliente', JSON.stringify(mostradorCliente)); } catch (e) { /* sin almacenamiento: vuelve como público en general */ }
+                    preparar = apiTienda('/api/gyms/' + gymId + '/mostrador/stripe/sesion', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            partidas: cuerpo.partidas, totalVisto: cuerpo.totalVisto,
+                            returnUrl: base + 'bienvenido.html?cobro=tarjeta',
+                            cancelUrl: base + 'bienvenido.html?cobro=cancelado'
+                        })
+                    }).then(sesion => {
+                        location.href = sesion.url;
+                        return new Promise(() => {});
+                    });
                 }
                 mostradorOcupado = true;
                 boton.disabled = true;
@@ -3450,6 +3446,31 @@
                         aviso.classList.remove('d-none');
                     });
             });
+
+            // Regreso de la página de pago de Stripe (?cobro=tarjeta&session_id=...):
+            // se abre el Mostrador y, con el ticket cargado, se cobra la venta.
+            const regreso = new URLSearchParams(location.search);
+            if (regreso.has('cobro')) {
+                const pagada = regreso.get('cobro') === 'tarjeta' ? regreso.get('session_id') : null;
+                history.replaceState(null, '', location.pathname);
+                const tab = document.getElementById('tab-mostrador');
+                if (tab) tab.click();
+                let cliente = null;
+                try {
+                    cliente = JSON.parse(sessionStorage.getItem('mostradorCliente') || 'null');
+                    sessionStorage.removeItem('mostradorCliente');
+                } catch (e) { /* sin almacenamiento */ }
+                const radio = document.getElementById('mostrador-tarjeta-radio');
+                radio.checked = true;
+                radio.dispatchEvent(new Event('change'));
+                if (cliente) elegirCliente(cliente);
+                if (pagada) {
+                    mostradorSesionTarjeta = pagada;
+                    alCargarMostrador = () => cobrarMostrador();
+                } else {
+                    errorMostrador('Se canceló el pago con tarjeta. El ticket sigue igual: cobra de nuevo o en efectivo.');
+                }
+            }
 
             const gymId = localStorage.getItem('gymId');
             loadMostrador(gymId);
@@ -3627,6 +3648,11 @@
                     mostradorCatalogo = lista;
                     const avisos = reconciliarTicket();
                     pintarTicket(avisos.length ? avisos : avisosDelServidor);
+                    if (alCargarMostrador) {
+                        const accion = alCargarMostrador;
+                        alCargarMostrador = null;
+                        accion();
+                    }
                 })
                 .catch(err => estadoError(catalogo, err.message, () => loadMostrador(gymId)));
             fetch('/api/gyms/' + gymId + '/members').then(r => r.json()).then(m => { mostradorMiembros = m; }).catch(() => {});

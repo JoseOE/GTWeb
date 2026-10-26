@@ -76,7 +76,7 @@ public class ReciboService {
     private static final ZoneId ZONA_MX = ZoneId.of("America/Mexico_City");
     private static final DateTimeFormatter FECHA_HORA = DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy, HH:mm", ES_MX);
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", ES_MX);
-    private static final String LEYENDA = "Comprobante simulado, sin validez fiscal.";
+    private static final String LEYENDA = "Comprobante de un pago de prueba (sandbox), sin validez fiscal.";
 
     // Paleta de la marca (css/editorial.css).
     private static final Color TINTA = new DeviceRgb(0x20, 0x22, 0x1f);
@@ -184,7 +184,7 @@ public class ReciboService {
             encabezado(doc, pdf, f, gym, "FICHA DE PAGO EN EFECTIVO", "Pedido #" + p.getFolio(),
                     fechaHora(p.getCreadoEn()), "Pendiente de pago");
 
-            doc.add(new Paragraph("Efectivo en tiendas · simulación").setFont(f.negrita()).setFontSize(10).setFontColor(MARCA).setMarginTop(18).setMarginBottom(0));
+            doc.add(new Paragraph("Efectivo en tiendas · Paynet").setFont(f.negrita()).setFontSize(10).setFontColor(MARCA).setMarginTop(18).setMarginBottom(0));
             doc.add(new Paragraph(dinero(p.getTotal())).setFont(f.negrita()).setFontSize(34).setFontColor(TINTA).setMarginTop(0).setMarginBottom(0));
             doc.add(new Paragraph("Monto exacto a pagar en efectivo").setFontSize(10).setFontColor(GRIS).setMarginTop(0));
 
@@ -216,14 +216,14 @@ public class ReciboService {
             pasos.add(new ListItem("Recibirás un correo cuando " + nombre(gym) + " reciba tu pago."));
             doc.add(pasos);
 
-            doc.add(new Paragraph("Dónde pagar (red simulada)").setFont(f.negrita()).setFontSize(12).setMarginTop(14).setMarginBottom(4));
+            doc.add(new Paragraph("Dónde pagar (red Paynet)").setFont(f.negrita()).setFontSize(12).setMarginTop(14).setMarginBottom(4));
             Paragraph tiendas = new Paragraph().setMarginTop(2);
             for (String tienda : SimuladorPaynetService.TIENDAS.keySet()) {
                 Image img = logoPago(pdf, tienda, 22);
                 if (img != null) tiendas.add(img.setMarginRight(6));
             }
             doc.add(tiendas);
-            doc.add(new Paragraph("Esta ficha es una simulación para pruebas: no la presentes en una tienda real.")
+            doc.add(new Paragraph("Ficha de prueba (sandbox de Openpay): no la presentes en una tienda real.")
                     .setFont(f.negrita()).setFontSize(10).setFontColor(MARCA).setBackgroundColor(PAPEL).setPadding(8).setMarginTop(10));
             pie(doc, pdf, f, "GymTrack · Ficha de pago · Pedido #" + p.getFolio() + " · " + referencia, 70);
         });

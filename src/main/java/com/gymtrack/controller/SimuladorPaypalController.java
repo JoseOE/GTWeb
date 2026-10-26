@@ -8,6 +8,7 @@ import com.gymtrack.service.SimuladorPaypalService;
 import com.gymtrack.service.TiendaException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,6 +21,9 @@ import java.util.Map;
 // la sesión de la página, y el id de la orden hace de llave (como el token de
 // la URL de PayPal). Pagar con ella sí vuelve a exigir al comprador.
 // La cuenta vinculada (ver y desvincular) es de quien tiene la sesión.
+// Solo con PAGOS_MODO=simulado (las pruebas automáticas): en sandbox se paga
+// con las APIs reales y esta ruta no existe.
+@ConditionalOnProperty(name = "pagos.modo", havingValue = "simulado", matchIfMissing = true)
 @RestController
 @RequestMapping("/api/simuladores/paypal")
 public class SimuladorPaypalController {

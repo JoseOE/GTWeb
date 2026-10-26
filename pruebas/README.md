@@ -16,6 +16,7 @@ Scripts de Node que recorren los flujos reales de GymTrack contra el entorno loc
 | `seguridad` | Sesión con token, permisos por ruta y cierre de sesión. |
 | `visita-mes` | Historial de pagos del gimnasio y la regla "Visita / Semana + mes". |
 | `alta-recepcion` | Contraseña temporal del alta en recepción y su cambio. |
+| `sandbox` (manual) | Los pagos reales en modo de prueba: Stripe Checkout, PayPal, la ficha de Openpay y el cobro con tarjeta del mostrador. Necesita las llaves y `PAGOS_MODO=sandbox`; no corre en el CI. `node sandbox.mjs` |
 
 ## Cómo correrlas
 

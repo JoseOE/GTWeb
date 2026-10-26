@@ -51,19 +51,17 @@ public class CarritoService {
     private final CarritoRepository carritos;
     private final ProductoRepository productos;
     private final PedidoService pedidos;
-    private final SimuladorStripeService stripe;
-    private final SimuladorPaypalService paypal;
+    private final PagosService pagos;
     private final MongoTemplate mongo;
     private final ConsentimientoService consentimientos;
 
     public CarritoService(CarritoRepository carritos, ProductoRepository productos, PedidoService pedidos,
-                          SimuladorStripeService stripe, SimuladorPaypalService paypal, MongoTemplate mongo,
+                          PagosService pagos, MongoTemplate mongo,
                           ConsentimientoService consentimientos) {
         this.carritos = carritos;
         this.productos = productos;
         this.pedidos = pedidos;
-        this.stripe = stripe;
-        this.paypal = paypal;
+        this.pagos = pagos;
         this.mongo = mongo;
         this.consentimientos = consentimientos;
     }
@@ -233,20 +231,21 @@ public class CarritoService {
         double total = total(c);
         Instant cobro = tomarCobro(c);
         Pedido pedido;
+        Map<String, Object> seguros = null;
         try {
-            // PayPal llega como la orden que el comprador aprobó en paypal-sim.html:
-            // se cambia por sus datos guardados, igual que el token de la tarjeta.
-            if (MetodosPago.PAYPAL.equals(proveedor)) {
-                datos = paypal.consumir(user.getId(), gymId, c.getCanal(), total, datos);
-            }
-            // La tarjeta llega como token: se cambia por los datos guardados del token
-            // para que el resultado del cobro no se pueda inventar desde el navegador.
-            if (MetodosPago.STRIPE.equals(proveedor)) datos = stripe.consumir(user.getId(), datos, total);
+            // PayPal llega como la orden que el comprador aprobó en PayPal y la
+            // tarjeta como la sesión que pagó en Stripe (o, en las pruebas, el
+            // token del simulador): se cambian por los datos guardados en el
+            // servidor, para que el cobro no se pueda inventar desde el navegador.
+            if (MetodosPago.PAYPAL.equals(proveedor)) seguros = pagos.consumirPaypal(user.getId(), gymId, c.getCanal(), total, datos);
+            if (MetodosPago.STRIPE.equals(proveedor)) seguros = pagos.consumirStripe(user.getId(), gymId, c.getCanal(), total, datos);
 
             pedido = pedidos.cobrar(new PedidoService.Venta(gymId, c.getCanal(), user.getId(), user.getEmail(),
-                    null, null, lineas(c, cat), proveedor, datos, false, null, consentimiento));
+                    null, null, lineas(c, cat), proveedor, seguros != null ? seguros : datos, false, null, consentimiento));
         } catch (RuntimeException e) {
-            // No se cobró: el carrito queda como estaba para intentar con otro método.
+            // No se cobró: el carrito queda como estaba para intentar con otro
+            // método, y el cargo autorizado de la tarjeta se libera.
+            pagos.liberar(proveedor, seguros);
             soltarCobro(c, cobro, new Update());
             throw e;
         }

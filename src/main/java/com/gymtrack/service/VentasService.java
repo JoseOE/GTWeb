@@ -63,14 +63,16 @@ public class VentasService {
     private final UserRepository userRepository;
     private final BillingService billing;
     private final MongoTemplate mongo;
+    private final boolean sandbox;
 
     public VentasService(PedidoRepository pedidoRepository, PedidoService pedidos, UserRepository userRepository,
-                         BillingService billing, MongoTemplate mongo) {
+                         BillingService billing, MongoTemplate mongo, PagosService pagos) {
         this.pedidoRepository = pedidoRepository;
         this.pedidos = pedidos;
         this.userRepository = userRepository;
         this.billing = billing;
         this.mongo = mongo;
+        this.sandbox = pagos.sandbox();
     }
 
     // ═══════════════════════════ RESUMEN ═══════════════════════════
@@ -366,7 +368,9 @@ public class VentasService {
         acciones.put("ficha", pendiente && paynet);
         // El correo solo va a miembros: una venta al público no tiene a quién escribirle.
         acciones.put("reenviar", p.getUserId() != null && (pagado || (pendiente && paynet)));
-        acciones.put("simularPaynet", pendiente && paynet && !vencida);
+        // El botón del panel solo existe con los simuladores; en sandbox el pago
+        // en tienda se simula desde el panel de Openpay.
+        acciones.put("simularPaynet", !sandbox && pendiente && paynet && !vencida);
         acciones.put("reembolsar", pagado);
         acciones.put("cancelar", pendiente);
         acciones.put("entregar", p.porEntregar());

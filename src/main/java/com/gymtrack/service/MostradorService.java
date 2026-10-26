@@ -22,12 +22,12 @@ public class MostradorService {
 
     private final CarritoService carritos;
     private final PedidoService pedidos;
-    private final SimuladorStripeService stripe;
+    private final PagosService pagos;
 
-    public MostradorService(CarritoService carritos, PedidoService pedidos, SimuladorStripeService stripe) {
+    public MostradorService(CarritoService carritos, PedidoService pedidos, PagosService pagos) {
         this.carritos = carritos;
         this.pedidos = pedidos;
-        this.stripe = stripe;
+        this.pagos = pagos;
     }
 
     // Una partida del ticket del mostrador, tal como la manda el panel.
@@ -35,9 +35,9 @@ public class MostradorService {
 
     public record VentaMostrador(Pedido pedido, Double cambio) {}
 
-    // Venta en el mostrador del panel: la cobra el dueño, en efectivo o con la
-    // tarjeta (el simulador de Stripe hace de terminal), a un miembro o al
-    // público en general, y se entrega en el acto (descuenta existencias).
+    // Venta en el mostrador del panel: la cobra el dueño, en efectivo o con
+    // tarjeta (la página de pago de Stripe en la pantalla del panel), a un
+    // miembro o al público en general, y se entrega en el acto (descuenta existencias).
     public VentaMostrador cobrar(User dueno, String gymId, User cliente, List<PartidaTicket> partidas,
                                 String metodo, Double recibido, Map<String, Object> datos, Double totalVisto) {
         if (!"efectivo".equals(metodo) && !"tarjeta".equals(metodo)) {
@@ -58,16 +58,35 @@ public class MostradorService {
             datos = Map.of();
         } else {
             proveedor = MetodosPago.STRIPE;
-            datos = stripe.consumir(dueno.getId(), datos);
+            datos = pagos.consumirStripe(dueno.getId(), gymId, Pedido.CANAL_MOSTRADOR, total, datos);
         }
         // En una venta al público el correo del pedido es el del dueño y no se
         // manda ningún aviso.
-        Pedido pedido = pedidos.cobrar(new PedidoService.Venta(gymId, Pedido.CANAL_MOSTRADOR,
-                cliente == null ? null : cliente.getId(),
-                cliente == null ? dueno.getEmail() : cliente.getEmail(),
-                cliente == null ? "Público en general" : cliente.getNombre(),
-                dueno.getId(), lineas, proveedor, datos, true, extras, null));
+        Pedido pedido;
+        try {
+            pedido = pedidos.cobrar(new PedidoService.Venta(gymId, Pedido.CANAL_MOSTRADOR,
+                    cliente == null ? null : cliente.getId(),
+                    cliente == null ? dueno.getEmail() : cliente.getEmail(),
+                    cliente == null ? "Público en general" : cliente.getNombre(),
+                    dueno.getId(), lineas, proveedor, datos, true, extras, null));
+        } catch (RuntimeException e) {
+            pagos.liberar(proveedor, datos);
+            throw e;
+        }
         return new VentaMostrador(pedido, cambio);
+    }
+
+    // La página de pago de Stripe para cobrar el ticket con tarjeta. El ticket se
+    // revisa igual que al cobrar; la sesión es del dueño y del canal mostrador.
+    public Map<String, Object> sesionTarjeta(User dueno, String gymId, List<PartidaTicket> partidas, Double totalVisto,
+                                             String returnUrl, String cancelUrl, String hostPropio) {
+        List<PedidoService.Linea> lineas = revisarTicket(carritos.catalogo(gymId), partidas, totalVisto);
+        double total = PedidoService.centavos(lineas.stream().mapToDouble(l -> l.precioUnitario() * l.cantidad()).sum());
+        List<PagosService.Concepto> conceptos = lineas.stream()
+                .map(l -> new PagosService.Concepto(l.titulo() + (l.variante() == null || l.variante().isBlank() || "Única".equals(l.variante()) ? "" : " · " + l.variante()),
+                        l.cantidad(), l.precioUnitario()))
+                .toList();
+        return pagos.crearSesionStripe(dueno, gymId, Pedido.CANAL_MOSTRADOR, total, conceptos, returnUrl, cancelUrl, hostPropio);
     }
 
     // Revisa el ticket del mostrador contra lo que hoy está a la venta: solo lo

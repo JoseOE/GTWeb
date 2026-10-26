@@ -1,6 +1,7 @@
 package com.gymtrack.controller;
 
 import com.gymtrack.service.AccesoService;
+import com.gymtrack.service.FichasService;
 import com.gymtrack.service.TiendaException;
 import com.gymtrack.service.VentasService;
 import org.springframework.http.HttpStatus;
@@ -21,10 +22,12 @@ public class VentasController {
 
     private final VentasService ventas;
     private final AccesoService acceso;
+    private final FichasService fichas;
 
-    public VentasController(VentasService ventas, AccesoService acceso) {
+    public VentasController(VentasService ventas, AccesoService acceso, FichasService fichas) {
         this.ventas = ventas;
         this.acceso = acceso;
+        this.fichas = fichas;
     }
 
     // GET /resumen?desde=2026-09-03&hasta=2026-10-02 (por defecto, los últimos 30 días)
@@ -63,6 +66,7 @@ public class VentasController {
     public Map<String, Object> detalle(@PathVariable String gymId, @PathVariable String orderId,
                                        @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
         acceso.exigirDueno(gymId, userId);
+        fichas.alDia(orderId);
         return ventas.detalle(gymId, orderId);
     }
 

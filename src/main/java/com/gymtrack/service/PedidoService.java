@@ -54,14 +54,14 @@ public class PedidoService {
     private final BillingService billingService;
     private final AvisosPedidoService avisos;
     private final InventarioService inventario;
-    private final SimuladorPagoService simuladores;
+    private final PagosService pagos;
     private final FolioService folios;
     private final ProductoRepository productoRepository;
     private final MongoTemplate mongo;
 
     public PedidoService(PedidoRepository pedidoRepository, GymRepository gymRepository,
                          UserRepository userRepository, BillingService billingService,
-                         AvisosPedidoService avisos, InventarioService inventario, SimuladorPagoService simuladores,
+                         AvisosPedidoService avisos, InventarioService inventario, PagosService pagos,
                          FolioService folios, ProductoRepository productoRepository, MongoTemplate mongo) {
         this.pedidoRepository = pedidoRepository;
         this.gymRepository = gymRepository;
@@ -69,7 +69,7 @@ public class PedidoService {
         this.billingService = billingService;
         this.avisos = avisos;
         this.inventario = inventario;
-        this.simuladores = simuladores;
+        this.pagos = pagos;
         this.folios = folios;
         this.productoRepository = productoRepository;
         this.mongo = mongo;
@@ -92,8 +92,9 @@ public class PedidoService {
 
     // Cobra una venta y guarda su pedido:
     //  1. toma las piezas del inventario (todo o nada, atómico);
-    //  2. cobra con el simulador del método; si lo rechaza, las piezas regresan
-    //     y no queda ningún pedido (402 con su mensaje);
+    //  2. cobra con el método (PagosService: la API en sandbox, el simulador en
+    //     las pruebas); si lo rechaza, las piezas regresan y no queda ningún
+    //     pedido (402 con su mensaje);
     //  3. guarda el pedido con sus partidas congeladas, folio y totales;
     //  4. si quedó pagado, extiende la membresía y manda los avisos; si es una
     //     ficha Paynet, manda la ficha.
@@ -107,9 +108,11 @@ public class PedidoService {
         Pedido.Inventario registro = InventarioService.registro(
                 v.entregaInmediata() ? Pedido.Inventario.DESCONTADO : Pedido.Inventario.APARTADO, piezas);
 
+        // El id va antes del cobro: Openpay lo guarda como order_id de la ficha.
+        String orderId = Ids.nuevo("order");
         SimuladorPagoService.Resultado pago;
         try {
-            pago = simuladores.autorizar(v.proveedor(), v.datos(), total);
+            pago = pagos.autorizar(v, orderId, total);
         } catch (RuntimeException e) {
             inventario.devolver(registro);
             throw e;
@@ -117,7 +120,7 @@ public class PedidoService {
 
         Instant ahora = Instant.now();
         Pedido p = new Pedido();
-        p.setOrderId(Ids.nuevo("order"));
+        p.setOrderId(orderId);
         p.setFolio(folios.siguiente());
         p.setGymId(v.gymId());
         p.setUserId(v.userId());
@@ -159,6 +162,7 @@ public class PedidoService {
             p = pedidoRepository.insert(p);
         } catch (RuntimeException e) {
             inventario.devolver(registro);
+            if (pago.capturado()) log.error("El pedido {} ya se cobró ({}) pero no se pudo guardar: revísalo en el panel del proveedor.", orderId, p.getProveedorPago());
             throw e;
         }
         log.info("Pedido #{} creado ({}, {}, {}).", p.getFolio(), MetodosPago.nombre(p.getProveedorPago()), p.getCanal(), p.getEstado());
@@ -266,13 +270,16 @@ public class PedidoService {
         return cancelado;
     }
 
-    // Reembolso simulado de un pedido pagado: devuelve todo lo cobrado (no se
-    // mueve dinero real). El pedido queda "Reembolsado" con su total y su
+    // Reembolso de un pedido pagado: devuelve todo lo cobrado (con la API del
+    // método en sandbox). El pedido queda "Reembolsado" con su total y su
     // recibo, y lo que vendió regresa al inventario: lo apartado vuelve a estar
     // disponible y lo entregado en el mostrador vuelve a existencias.
     public Pedido reembolsar(Pedido p) {
+        if (!Pedido.ESTADO_PAGADO.equals(p.getEstado())) {
+            throw new TiendaException(HttpStatus.CONFLICT, "Solo se reembolsan pedidos pagados.");
+        }
         Map<String, Object> reembolso = new LinkedHashMap<>();
-        reembolso.put("id", SimuladorPagoService.nuevoId("re_sim"));
+        reembolso.put("id", pagos.reembolsar(p));
         reembolso.put("monto", p.getTotal());
         reembolso.put("fecha", Instant.now().toString());
         Pedido reembolsado = cambiarEstado(p, Pedido.ESTADO_PAGADO, new Update()
@@ -372,6 +379,9 @@ public class PedidoService {
             ficha.put("tienda", p.getDatosPago().get("tienda"));
             ficha.put("tiendaNombre", p.getDatosPago().get("tiendaNombre"));
             ficha.put("folioCaja", p.getDatosPago().get("folioCaja"));
+            // La ficha oficial de Paynet en PDF (la genera Openpay) y si es de prueba.
+            ficha.put("fichaUrl", p.getDatosPago().get("fichaUrl"));
+            ficha.put("prueba", p.getDatosPago().get("modo") != null || p.getDatosPago().get("simulador") != null);
             v.put("paynet", ficha);
         }
         v.put("proveedorPago", p.getProveedorPago());

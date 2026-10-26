@@ -1154,3 +1154,22 @@ body.con-barra-carrito {
     border-radius: 12px;
     background: #fff;
 }
+
+/* Pagos que se hacen en la página del proveedor (Stripe, PayPal): el aviso en el checkout. */
+.pago-externo {
+    background: #fff;
+    border: 1px solid var(--line, #d5d6cc);
+    border-radius: 12px;
+    padding: 16px;
+}
+.pago-prueba {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #fff4d6;
+    color: #7a5600;
+}
