@@ -22,3 +22,6 @@ pruebas/node_modules/
 pruebas/ultima-prueba.json
 pruebas/spring.log
 pruebas/pdfs/
+
+# ─── Hardware (binario de la prueba del protocolo YRM) ───
+hardware/acceso-rfid/pruebas-host/yrm_test
