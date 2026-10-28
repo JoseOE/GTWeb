@@ -445,7 +445,7 @@
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
                     <div>
                         <h3 class="fw-bold mb-1"><i class='bx bx-store text-primary me-1'></i> Mostrador</h3>
-                        <p class="text-body-secondary mb-0">Vende en recepción: toca los productos, elige al cliente y cobra en efectivo o con tarjeta.</p>
+                        <p class="text-body-secondary mb-0">Vende en recepción: toca los productos, elige al cliente y cobra en efectivo, con tarjeta, con PayPal o con pago en tienda.</p>
                     </div>
                 </div>
                 <div class="row g-4">
@@ -471,13 +471,15 @@
                             <div id="mostrador-avisos" class="mt-3"></div>
                             <div id="mostrador-partidas" class="mt-3"></div>
 
-                            <div class="mt-3" role="radiogroup" aria-label="Forma de cobro">
-                                <div class="btn-group w-100" role="group">
-                                    <input type="radio" class="btn-check" name="mostrador-metodo" id="mostrador-efectivo-radio" value="efectivo" checked>
-                                    <label class="btn btn-outline-primary" for="mostrador-efectivo-radio"><i class='bx bx-money'></i> Efectivo</label>
-                                    <input type="radio" class="btn-check" name="mostrador-metodo" id="mostrador-tarjeta-radio" value="tarjeta">
-                                    <label class="btn btn-outline-primary" for="mostrador-tarjeta-radio"><i class='bx bx-credit-card'></i> Tarjeta</label>
-                                </div>
+                            <div class="mt-3 d-grid gap-2" style="grid-template-columns:1fr 1fr" role="radiogroup" aria-label="Forma de cobro">
+                                <input type="radio" class="btn-check" name="mostrador-metodo" id="mostrador-efectivo-radio" value="efectivo" checked>
+                                <label class="btn btn-outline-primary" for="mostrador-efectivo-radio"><i class='bx bx-money'></i> Efectivo</label>
+                                <input type="radio" class="btn-check" name="mostrador-metodo" id="mostrador-tarjeta-radio" value="tarjeta">
+                                <label class="btn btn-outline-primary" for="mostrador-tarjeta-radio"><i class='bx bx-credit-card'></i> Tarjeta</label>
+                                <input type="radio" class="btn-check" name="mostrador-metodo" id="mostrador-paypal-radio" value="paypal">
+                                <label class="btn btn-outline-primary" for="mostrador-paypal-radio"><i class='bx bxl-paypal'></i> PayPal</label>
+                                <input type="radio" class="btn-check" name="mostrador-metodo" id="mostrador-tienda-radio" value="tienda">
+                                <label class="btn btn-outline-primary" for="mostrador-tienda-radio"><i class='bx bx-barcode'></i> Pago en tienda</label>
                             </div>
                             <div id="mostrador-efectivo" class="mt-3">
                                 <label for="mostrador-recibido" class="form-label fw-semibold small">Recibí</label>
@@ -493,6 +495,12 @@
                             </div>
                             <div id="mostrador-tarjeta" class="mt-3 d-none">
                                 <p class="small text-body-secondary mb-0"><i class='bx bx-info-circle'></i> Al cobrar se abre la página de pago de <strong>Stripe</strong> en esta pantalla para capturar la tarjeta del cliente; al terminar regresas aquí y la venta queda cobrada. Modo de prueba: usa la tarjeta <strong>4242 4242 4242 4242</strong>, cualquier fecha futura y cualquier CVC.</p>
+                            </div>
+                            <div id="mostrador-paypal" class="mt-3 d-none">
+                                <p class="small text-body-secondary mb-0"><i class='bx bx-info-circle'></i> Al cobrar se abre la página de <strong>PayPal</strong> en esta pantalla: el cliente entra a su cuenta y aprueba el pago; al terminar regresas aquí y la venta queda cobrada. Modo de prueba: usa la cuenta <em>Personal</em> de developer.paypal.com → Sandbox accounts.</p>
+                            </div>
+                            <div id="mostrador-tienda" class="mt-3 d-none">
+                                <p class="small text-body-secondary mb-0"><i class='bx bx-info-circle'></i> Se genera una <strong>ficha de Paynet</strong> (Openpay) con referencia y código de barras para que el cliente pague en efectivo en una tienda de la red, en 72 horas. Los productos quedan apartados y se entregan cuando se pague: búscalos en <strong>Ventas → Entregar pedido</strong>. Modo de prueba: simula el pago en el panel de Openpay (Paynet → Pagos).</p>
                             </div>
 
                             <div id="mostrador-error" class="alert alert-danger d-none py-2 small mt-3 mb-0" role="alert"></div>
@@ -527,11 +535,21 @@
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content border-0 rounded-4 text-center">
                         <div class="modal-body p-4">
-                            <i class='bx bx-check-circle text-success' style="font-size:64px" aria-hidden="true"></i>
+                            <i class='bx bx-check-circle text-success' style="font-size:64px" aria-hidden="true" id="venta-icono"></i>
                             <h5 class="fw-bold mt-2" id="ventaModalLabel">Venta cobrada</h5>
                             <div id="venta-detalle" class="text-body-secondary"></div>
                             <div id="venta-cambio" class="my-3"></div>
                             <div id="venta-membresia"></div>
+                            <div id="venta-ficha" class="d-none">
+                                <div class="small text-body-secondary mt-3">Referencia de pago</div>
+                                <div class="fs-4 fw-bold font-monospace" id="venta-ficha-referencia"></div>
+                                <div class="small text-body-secondary mb-3" id="venta-ficha-vence"></div>
+                                <div class="alert alert-info small py-2 text-start mb-3" id="venta-ficha-nota"></div>
+                                <div class="d-grid gap-2">
+                                    <a class="btn btn-primary rounded-pill d-none" id="venta-ficha-oficial" target="_blank" rel="noopener"><i class='bx bx-file'></i> Ficha oficial de Paynet (PDF)</a>
+                                    <button type="button" class="btn btn-outline-primary rounded-pill" id="venta-ficha-pdf"><i class='bx bx-download'></i> Descargar ficha (PDF)</button>
+                                </div>
+                            </div>
                             <div id="venta-ticket-error" class="alert alert-warning d-none small py-2 mt-3 mb-0" role="alert"></div>
                             <div class="d-grid gap-2 mt-4">
                                 <button type="button" class="btn btn-outline-primary rounded-pill" id="venta-ticket"><i class='bx bx-printer'></i> Imprimir ticket (80 mm)</button>
@@ -3235,9 +3253,10 @@
         let mostradorMiembros = [];
         let mostradorCliente = null;
         let mostradorOcupado = false;
-        // Al volver de la página de pago de Stripe: la sesión pagada y qué hacer
+        // Al volver de la página de pago de Stripe o de PayPal: con qué método y
+        // qué se le manda al servidor ({sesion} o {token, payerId}), y qué hacer
         // en cuanto el ticket esté cargado (cobrarlo).
-        let mostradorSesionTarjeta = null;
+        let mostradorRegreso = null;
         let alCargarMostrador = null;
         let grupoAbierto = null;
 
@@ -3333,9 +3352,9 @@
 
             // ─── Forma de cobro ───
             document.querySelectorAll('input[name="mostrador-metodo"]').forEach(r => r.addEventListener('change', () => {
-                const tarjeta = metodoMostrador() === 'tarjeta';
-                document.getElementById('mostrador-efectivo').classList.toggle('d-none', tarjeta);
-                document.getElementById('mostrador-tarjeta').classList.toggle('d-none', !tarjeta);
+                const metodo = metodoMostrador();
+                ['efectivo', 'tarjeta', 'paypal', 'tienda'].forEach(m =>
+                    document.getElementById('mostrador-' + m).classList.toggle('d-none', m !== metodo));
                 actualizarCobro();
             }));
             recibido.addEventListener('input', actualizarCobro);
@@ -3364,24 +3383,28 @@
                     if (!(monto + 0.009 >= mostradorCarrito.total)) return errorMostrador('El efectivo recibido no alcanza para ' + dinero(mostradorCarrito.total) + '.');
                     cuerpo.recibido = monto;
                     preparar = Promise.resolve();
-                } else if (mostradorSesionTarjeta) {
-                    // De regreso de Stripe: se cobra con la sesión que pagó el cliente.
-                    cuerpo.datos = { sesion: mostradorSesionTarjeta };
-                    mostradorSesionTarjeta = null;
+                } else if (metodo === 'tienda') {
+                    // Openpay genera la ficha de Paynet; el pedido queda pendiente de pago.
+                    preparar = Promise.resolve();
+                } else if (mostradorRegreso && mostradorRegreso.metodo === metodo) {
+                    // De regreso de Stripe o PayPal: se cobra con lo que aprobó el cliente.
+                    cuerpo.datos = mostradorRegreso.datos;
+                    mostradorRegreso = null;
                     preparar = Promise.resolve();
                 } else {
-                    // Se abre la página de pago de Stripe; al volver, la venta se cobra sola.
+                    // Se abre la página de pago de Stripe o de PayPal; al volver, la venta se cobra sola.
                     const base = location.origin + location.pathname.replace(/[^/]*$/, '');
                     try { sessionStorage.setItem('mostradorCliente', JSON.stringify(mostradorCliente)); } catch (e) { /* sin almacenamiento: vuelve como público en general */ }
-                    preparar = apiTienda('/api/gyms/' + gymId + '/mostrador/stripe/sesion', {
+                    const paypal = metodo === 'paypal';
+                    preparar = apiTienda('/api/gyms/' + gymId + '/mostrador/' + (paypal ? 'paypal/orden' : 'stripe/sesion'), {
                         method: 'POST',
                         body: JSON.stringify({
                             partidas: cuerpo.partidas, totalVisto: cuerpo.totalVisto,
-                            returnUrl: base + 'bienvenido.html?cobro=tarjeta',
-                            cancelUrl: base + 'bienvenido.html?cobro=cancelado'
+                            returnUrl: base + 'bienvenido.html?cobro=' + metodo,
+                            cancelUrl: base + 'bienvenido.html?cobro=cancelado&metodo=' + metodo
                         })
-                    }).then(sesion => {
-                        location.href = sesion.url;
+                    }).then(r => {
+                        location.href = paypal ? r.aprobarUrl : r.url;
                         return new Promise(() => {});
                     });
                 }
@@ -3393,6 +3416,7 @@
                     .then(venta => {
                         ultimaVenta = venta.pedido;
                         const p = venta.pedido;
+                        mostrarFicha(p);
                         document.getElementById('venta-detalle').innerHTML = 'Venta <strong>#' + escapeHtml(p.folio) + '</strong> · ' + dinero(p.total)
                             + '<br>' + escapeHtml(p.cliente || 'Público en general') + ' · ' + escapeHtml(p.detallePago || p.metodo);
                         document.getElementById('venta-cambio').innerHTML = venta.cambio != null
@@ -3426,17 +3450,38 @@
                     });
             }
 
-            // Ticket de 80 mm (lo genera el módulo de recibos). La ventana se abre
-            // antes del fetch para que el navegador no la bloquee como emergente.
-            document.getElementById('venta-ticket').addEventListener('click', () => {
-                if (!ultimaVenta) return;
+            // Con pago en tienda el modal muestra la ficha de Paynet en lugar del
+            // ticket: la venta todavía no está pagada ni entregada.
+            function mostrarFicha(p) {
+                const ficha = p.paynet && p.estado === 'pendiente_pago' ? p.paynet : null;
+                document.getElementById('venta-icono').className = ficha ? 'bx bx-receipt text-primary' : 'bx bx-check-circle text-success';
+                document.getElementById('ventaModalLabel').textContent = ficha ? 'Ficha de pago generada' : 'Venta cobrada';
+                document.getElementById('venta-ficha').classList.toggle('d-none', !ficha);
+                document.getElementById('venta-ticket').classList.toggle('d-none', !!ficha);
+                if (!ficha) return;
+                document.getElementById('venta-ficha-referencia').textContent = ficha.referencia;
+                const vence = ficha.vence ? new Date(ficha.vence) : null;
+                document.getElementById('venta-ficha-vence').textContent = vence && !isNaN(vence)
+                    ? 'Vence el ' + vence.toLocaleString('es-MX', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
+                    : '';
+                document.getElementById('venta-ficha-nota').innerHTML = '<i class="bx bx-info-circle"></i> El cliente paga '
+                    + dinero(p.total) + ' en efectivo en una tienda de la red Paynet con esta referencia. Los productos quedan apartados: entrégalos cuando el pedido aparezca pagado en <strong>Ventas</strong>.'
+                    + (p.cliente && p.cliente !== 'Público en general' ? ' La ficha también le llega por correo.' : ' Dale la ficha impresa o que le tome foto.')
+                    + (ficha.prueba ? '<br><strong>Modo de prueba:</strong> simula el pago en el panel de Openpay (Paynet → Pagos).' : '');
+                const oficial = document.getElementById('venta-ficha-oficial');
+                oficial.classList.toggle('d-none', !ficha.fichaUrl);
+                if (ficha.fichaUrl) oficial.href = ficha.fichaUrl;
+            }
+
+            // Ticket de 80 mm y ficha de Paynet (los genera el módulo de recibos). La
+            // ventana se abre antes del fetch para que el navegador no la bloquee como emergente.
+            function abrirPdf(url, errorFaltante, errorGeneral) {
                 const aviso = document.getElementById('venta-ticket-error');
                 const ventana = window.open('', '_blank');
-                fetch('/api/recibos/pedidos/' + encodeURIComponent(ultimaVenta.orderId) + '.pdf?formato=ticket',
-                    { headers: { 'X-User-Id': localStorage.getItem('userId') || '' } })
+                fetch(url, { headers: { 'X-User-Id': localStorage.getItem('userId') || '' } })
                     .then(res => {
-                        if (res.status === 404) throw new Error('El ticket todavía no está disponible: llega con el módulo de recibos.');
-                        if (!res.ok) throw new Error('No se pudo generar el ticket.');
+                        if (res.status === 404) throw new Error(errorFaltante);
+                        if (!res.ok) throw new Error(errorGeneral);
                         return res.blob();
                     })
                     .then(blob => { if (ventana) ventana.location = URL.createObjectURL(blob); })
@@ -3445,13 +3490,28 @@
                         aviso.textContent = err.message;
                         aviso.classList.remove('d-none');
                     });
+            }
+            document.getElementById('venta-ticket').addEventListener('click', () => {
+                if (!ultimaVenta) return;
+                abrirPdf('/api/recibos/pedidos/' + encodeURIComponent(ultimaVenta.orderId) + '.pdf?formato=ticket',
+                    'El ticket todavía no está disponible: llega con el módulo de recibos.', 'No se pudo generar el ticket.');
+            });
+            document.getElementById('venta-ficha-pdf').addEventListener('click', () => {
+                if (!ultimaVenta) return;
+                abrirPdf('/api/recibos/paynet/' + encodeURIComponent(ultimaVenta.orderId) + '.pdf',
+                    'No se encontró la ficha de este pedido.', 'No se pudo generar la ficha.');
             });
 
-            // Regreso de la página de pago de Stripe (?cobro=tarjeta&session_id=...):
-            // se abre el Mostrador y, con el ticket cargado, se cobra la venta.
+            // Regreso de la página de pago de Stripe (?cobro=tarjeta&session_id=...)
+            // o de PayPal (?cobro=paypal&token=...&PayerID=...): se abre el
+            // Mostrador y, con el ticket cargado, se cobra la venta.
             const regreso = new URLSearchParams(location.search);
             if (regreso.has('cobro')) {
-                const pagada = regreso.get('cobro') === 'tarjeta' ? regreso.get('session_id') : null;
+                const cobro = regreso.get('cobro');
+                const metodo = cobro === 'paypal' || regreso.get('metodo') === 'paypal' ? 'paypal' : 'tarjeta';
+                let pagada = null;
+                if (cobro === 'tarjeta' && regreso.get('session_id')) pagada = { sesion: regreso.get('session_id') };
+                if (cobro === 'paypal' && regreso.get('token')) pagada = { token: regreso.get('token'), payerId: regreso.get('PayerID') };
                 history.replaceState(null, '', location.pathname);
                 const tab = document.getElementById('tab-mostrador');
                 if (tab) tab.click();
@@ -3460,15 +3520,15 @@
                     cliente = JSON.parse(sessionStorage.getItem('mostradorCliente') || 'null');
                     sessionStorage.removeItem('mostradorCliente');
                 } catch (e) { /* sin almacenamiento */ }
-                const radio = document.getElementById('mostrador-tarjeta-radio');
+                const radio = document.getElementById('mostrador-' + metodo + '-radio');
                 radio.checked = true;
                 radio.dispatchEvent(new Event('change'));
                 if (cliente) elegirCliente(cliente);
                 if (pagada) {
-                    mostradorSesionTarjeta = pagada;
+                    mostradorRegreso = { metodo, datos: pagada };
                     alCargarMostrador = () => cobrarMostrador();
                 } else {
-                    errorMostrador('Se canceló el pago con tarjeta. El ticket sigue igual: cobra de nuevo o en efectivo.');
+                    errorMostrador('Se canceló el pago ' + (metodo === 'paypal' ? 'con PayPal' : 'con tarjeta') + '. El ticket sigue igual: cobra de nuevo o con otro método.');
                 }
             }
 
