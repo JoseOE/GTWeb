@@ -11,12 +11,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 // Venta en el mostrador del panel. El ticket se arma en el navegador, así que
 // agregar y quitar productos no espera al servidor; al cobrar llega completo,
 // se revisa contra lo que hoy está a la venta y se cobra de una vez con el
-// mismo PedidoService que la tienda: descuenta existencias en el acto, porque
-// el producto se entrega en recepción.
+// mismo PedidoService que la tienda. En efectivo, con tarjeta o con PayPal
+// descuenta existencias en el acto, porque el producto se entrega en
+// recepción; con pago en tienda (ficha de Paynet) lo aparta hasta que se paga.
 @Service
 public class MostradorService {
 
@@ -35,13 +37,18 @@ public class MostradorService {
 
     public record VentaMostrador(Pedido pedido, Double cambio) {}
 
-    // Venta en el mostrador del panel: la cobra el dueño, en efectivo o con
-    // tarjeta (la página de pago de Stripe en la pantalla del panel), a un
-    // miembro o al público en general, y se entrega en el acto (descuenta existencias).
+    // Cómo se cobra en el mostrador; "tienda" es la ficha de Paynet.
+    private static final Set<String> METODOS = Set.of("efectivo", "tarjeta", "paypal", "tienda");
+
+    // Venta en el mostrador del panel: la cobra el dueño a un miembro o al
+    // público en general. Efectivo, tarjeta (la página de pago de Stripe en la
+    // pantalla del panel) y PayPal (su página, igual) se entregan en el acto.
+    // "tienda" genera la ficha de Paynet con Openpay: el cliente paga en una
+    // tienda de la red y el producto se entrega cuando Openpay confirma el pago.
     public VentaMostrador cobrar(User dueno, String gymId, User cliente, List<PartidaTicket> partidas,
                                 String metodo, Double recibido, Map<String, Object> datos, Double totalVisto) {
-        if (!"efectivo".equals(metodo) && !"tarjeta".equals(metodo)) {
-            throw new TiendaException(HttpStatus.BAD_REQUEST, "Elige cobrar en efectivo o con tarjeta.");
+        if (!METODOS.contains(metodo)) {
+            throw new TiendaException(HttpStatus.BAD_REQUEST, "Elige cobrar en efectivo, con tarjeta, con PayPal o con pago en tienda.");
         }
         List<PedidoService.Linea> lineas = revisarTicket(carritos.catalogo(gymId), partidas, totalVisto);
         double total = PedidoService.centavos(lineas.stream().mapToDouble(l -> l.precioUnitario() * l.cantidad()).sum());
@@ -51,15 +58,27 @@ public class MostradorService {
         String proveedor;
         Double cambio = null;
         Map<String, Object> extras = null;
-        if ("efectivo".equals(metodo)) {
-            proveedor = MetodosPago.EFECTIVO;
-            cambio = PedidoService.centavos(recibido - total);
-            extras = Map.of("recibido", recibido, "cambio", cambio);
-            datos = Map.of();
-        } else {
-            proveedor = MetodosPago.STRIPE;
-            datos = pagos.consumirStripe(dueno.getId(), gymId, Pedido.CANAL_MOSTRADOR, total, datos);
+        switch (metodo) {
+            case "efectivo" -> {
+                proveedor = MetodosPago.EFECTIVO;
+                cambio = PedidoService.centavos(recibido - total);
+                extras = Map.of("recibido", recibido, "cambio", cambio);
+                datos = Map.of();
+            }
+            case "tarjeta" -> {
+                proveedor = MetodosPago.STRIPE;
+                datos = pagos.consumirStripe(dueno.getId(), gymId, Pedido.CANAL_MOSTRADOR, total, datos);
+            }
+            case "paypal" -> {
+                proveedor = MetodosPago.PAYPAL;
+                datos = pagos.consumirPaypal(dueno.getId(), gymId, Pedido.CANAL_MOSTRADOR, total, datos);
+            }
+            default -> {
+                proveedor = MetodosPago.PAYNET;
+                datos = Map.of();
+            }
         }
+        boolean entregaInmediata = !MetodosPago.PAYNET.equals(proveedor);
         // En una venta al público el correo del pedido es el del dueño y no se
         // manda ningún aviso.
         Pedido pedido;
@@ -68,7 +87,7 @@ public class MostradorService {
                     cliente == null ? null : cliente.getId(),
                     cliente == null ? dueno.getEmail() : cliente.getEmail(),
                     cliente == null ? "Público en general" : cliente.getNombre(),
-                    dueno.getId(), lineas, proveedor, datos, true, extras, null));
+                    dueno.getId(), lineas, proveedor, datos, entregaInmediata, extras, null));
         } catch (RuntimeException e) {
             pagos.liberar(proveedor, datos);
             throw e;
@@ -87,6 +106,16 @@ public class MostradorService {
                         l.cantidad(), l.precioUnitario()))
                 .toList();
         return pagos.crearSesionStripe(dueno, gymId, Pedido.CANAL_MOSTRADOR, total, conceptos, returnUrl, cancelUrl, hostPropio);
+    }
+
+    // La orden de PayPal para cobrar el ticket: se aprueba en la página de PayPal
+    // en la pantalla del panel. Es del dueño, de este gimnasio y del canal mostrador.
+    public Map<String, Object> ordenPaypal(User dueno, String gymId, List<PartidaTicket> partidas, Double totalVisto,
+                                           String returnUrl, String cancelUrl, String hostPropio) {
+        List<PedidoService.Linea> lineas = revisarTicket(carritos.catalogo(gymId), partidas, totalVisto);
+        double total = PedidoService.centavos(lineas.stream().mapToDouble(l -> l.precioUnitario() * l.cantidad()).sum());
+        int articulos = lineas.stream().mapToInt(PedidoService.Linea::cantidad).sum();
+        return pagos.crearOrdenPaypal(dueno, gymId, Pedido.CANAL_MOSTRADOR, total, articulos, returnUrl, cancelUrl, hostPropio);
     }
 
     // Revisa el ticket del mostrador contra lo que hoy está a la venta: solo lo

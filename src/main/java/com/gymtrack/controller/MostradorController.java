@@ -35,9 +35,11 @@ public class MostradorController {
 
     // POST /cobrar
     //   {"partidas": [{"varianteId": "variant_...", "cantidad": 2}, ...],
-    //    "clienteId": null | "<userId de un miembro>", "metodo": "efectivo" | "tarjeta",
-    //    "recibido": 500, "datos": {"token": "tok_sim_..."}, "totalVisto": 458}
-    // → {"pedido": {...}, "cambio": 42.0}
+    //    "clienteId": null | "<userId de un miembro>", "metodo": "efectivo" | "tarjeta" | "paypal" | "tienda",
+    //    "recibido": 500, "datos": {"sesion": "cs_..."} | {"token": "<orden de PayPal>", "payerId": "..."},
+    //    "totalVisto": 458}
+    // → {"pedido": {...}, "cambio": 42.0}. Con "tienda" el pedido queda pendiente
+    // de pago y pedido.paynet trae la ficha (referencia, vence, fichaUrl).
     // Si algo del ticket cambió: 409 {"error": "...", "avisos": ["...", ...]}.
     @PostMapping("/cobrar")
     public Map<String, Object> cobrar(@PathVariable String gymId,
@@ -78,6 +80,19 @@ public class MostradorController {
                                              @RequestBody SesionRequest request, HttpServletRequest http) {
         User dueno = dueno(gymId, userId);
         return mostrador.sesionTarjeta(dueno, gymId, request.getPartidas(), request.getTotalVisto(),
+                request.getReturnUrl(), request.getCancelUrl(), http.getServerName());
+    }
+
+    // POST /paypal/orden {"partidas": [...], "totalVisto": 458, "returnUrl": "...", "cancelUrl": "..."}
+    // → {id, monto, moneda, aprobarUrl}: la página de PayPal para aprobar el pago.
+    // Al aprobar vuelve a returnUrl con ?token=<orden>&PayerID=... y el panel
+    // cobra con {"metodo": "paypal", "datos": {"token": ..., "payerId": ...}}.
+    @PostMapping("/paypal/orden")
+    public Map<String, Object> ordenPaypal(@PathVariable String gymId,
+                                           @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId,
+                                           @RequestBody SesionRequest request, HttpServletRequest http) {
+        User dueno = dueno(gymId, userId);
+        return mostrador.ordenPaypal(dueno, gymId, request.getPartidas(), request.getTotalVisto(),
                 request.getReturnUrl(), request.getCancelUrl(), http.getServerName());
     }
 
