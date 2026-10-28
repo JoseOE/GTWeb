@@ -33,6 +33,7 @@ GitHub Pages solo sirve archivos estáticos, así que ahí funcionan la página 
 - [Contexto del proyecto](#problemática)
 - [Equipo y sprints](#-equipo-y-flujo-de-trabajo)
 - [Negocios Electrónicos · Tema 3 (análisis, evidencias y decisiones)](docs/negocios-electronicos-tema3.md)
+- [SGSI · NMX-I-27001-NYCE-2015 / ISO 27001 (riesgos, declaración de aplicabilidad, incidentes)](docs/iso27001/README.md)
 
 ---
 
@@ -322,7 +323,26 @@ Las notificaciones push (solicitud aprobada, pago por vencer, membresía vencida
   2. mandarlo en cada llamada (`Authorization: Bearer <token>`) y llamar a `/api/users/logout` al salir;
   3. con eso publicado, poner `EXIGIR_TOKEN=true` en Render.
 
-  Hasta entonces, las rutas de la app siguen tan abiertas como antes.
+  Hasta entonces, las rutas de la app siguen tan abiertas como antes. La app ya manda el token (GTApp `lib/api.ts`), así que falta el paso 3.
+
+**Cabeceras de seguridad.** `CabecerasSeguridadFilter` las agrega a toda respuesta:
+- `Content-Security-Policy`: scripts, estilos y fuentes solo de este sitio y de los CDN que usan las páginas; `connect-src` solo al router de OSRM del mapa y a Google Analytics; `frame-ancestors 'none'`.
+- `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` y `Referrer-Policy`.
+- `Permissions-Policy`: cámara y ubicación solo en este sitio.
+- `Strict-Transport-Security` cuando llega por HTTPS.
+- `Cache-Control: no-store` en la API.
+
+Un CDN o un servicio nuevo en una página se agrega a la CSP, o el navegador lo bloquea (aparece en la consola).
+
+**Bitácora de seguridad.** Los inicios de sesión (correctos, fallidos y frenados), los cambios de contraseña y correo, los accesos negados (403) y las acciones del dueño en el panel quedan en la colección `bitacora` con la IP y el dispositivo. Se borran solos a los 180 días.
+- Las acciones del panel las anota `BitacoraFilter`, una regla por ruta.
+- El dueño la ve en **Panel → Seguridad → Bitácora** (`GET /api/gyms/{gymId}/bitacora?limite=100`): lo de su gimnasio y su propia cuenta, no los inicios de sesión de sus miembros.
+
+**Respaldo y dependencias.**
+- `.github/workflows/respaldo.yml` respalda la base cada día, cifrada. Necesita los secretos `MONGODB_URI` y `RESPALDO_CLAVE` en GitHub (ver [Operación del SGSI](docs/iso27001/06-operacion.md#respaldos-a1231)).
+- `.github/dependabot.yml` abre PRs con las actualizaciones de seguridad.
+
+Cómo se aplica la norma NMX-I-27001-NYCE-2015 (ISO 27001) a todo esto: [docs/iso27001](docs/iso27001/README.md).
 
 ---
 
