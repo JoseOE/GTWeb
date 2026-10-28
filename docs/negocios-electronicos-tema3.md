@@ -30,7 +30,10 @@ La tienda vive en **MongoDB Atlas** (NoSQL, documentos). Cada documento guarda j
 | `payments` | Mensualidades cobradas | `userId`, `gymId`, `monto`, `metodo`, `cubreHasta`, `orderId` |
 | `sesiones` | Sesiones abiertas | `_id` = SHA-256 del token, `userId`, `expiraEn` (TTL) |
 | `tokens_cuenta` | Códigos y enlaces del correo | `codigoHash`, `enlaceHash`, `intentos`, `expira` (TTL) |
-| `tokens_tarjeta`, `ordenes_paypal`, `vinculos_paypal` | Simuladores de pago | Token de un solo uso, orden aprobada, cuenta vinculada |
+| `sesiones_stripe`, `ordenes_paypal` | Pagos en curso | Sesión de Stripe Checkout y orden de PayPal, ligadas al carrito hasta que se capturan |
+| `opiniones` | Opinión de cada persona sobre su gimnasio | `gymId`, `userId`, `estrellas`, `texto` |
+| `bitacora` | Eventos de seguridad (ISO 27001) | `tipo`, `userId`, `gymId`, `ip`, `fecha` (TTL de 180 días) |
+| `tokens_tarjeta`, `vinculos_paypal` | Solo los simuladores del CI (`PAGOS_MODO=simulado`) | Token de un solo uso, cuenta vinculada |
 
 Antes, la tienda corría en **Medusa.js con PostgreSQL** (modelo relacional, SQL). Se migró a MongoDB sin cambiar la API: la tienda se volvió más rápida y se quitó un servicio que costaba memoria en Render. `MigracionMedusaService` pasa los pedidos de las tablas de Postgres a documentos.
 
@@ -109,11 +112,11 @@ Antes, la tienda corría en **Medusa.js con PostgreSQL** (modelo relacional, SQL
 | 07 | Cuenta: aviso de privacidad, opt-in e historial | `privacidad.html` es el aviso integral: responsable, datos, finalidades, transferencias, derechos ARCO y cambios. El opt-in es una casilla obligatoria al crear la cuenta, y el servidor guarda la versión y la fecha (`privacidadVersion`, `privacidadAceptadaEn`); al pagar se acepta otra vez. El historial está en `pedidos.html` (Mis pedidos), con estado, QR y recibos. |
 | 08 | Carrito: desglose, cambios y políticas | Subtotal sin IVA, IVA 16 % y total, con botones + y − que recalculan al momento. El pie de la tienda enlaza a Términos y al Aviso de privacidad. |
 | 09 | Pago: cifrado, PCI-DSS y confirmación | Todo va por HTTPS. La tarjeta se escribe en la página de Stripe (Stripe Checkout) y nunca llega a GymTrack: solo se guardan la marca y los últimos 4 dígitos que devuelve Stripe. La confirmación (`confirmacion.html`) y el recibo por correo llegan al momento. Ver la [decisión 1](#decisiones-de-diseño). |
-| 10 | Reseñas después de comprar | "Califica tu compra" en Mis pedidos: de 1 a 5 estrellas y un comentario, solo con una compra pagada de ese producto. Hay una reseña por producto, se puede editar, y el dueño puede ocultarla. |
-| 11 | Frontend + backend + APIs | Spring Boot expone la API REST y sirve las páginas; las páginas usan `fetch`. Se usan MongoDB Atlas, Brevo (correo), iText (PDF) y los simuladores de pago, y la app móvil consume la misma API. |
+| 10 | Reseñas después de comprar | "Califica tu compra" en Mis pedidos: de 1 a 5 estrellas y un comentario, solo con una compra pagada de ese producto. Hay una reseña por producto, se puede editar, y el dueño puede ocultarla. Además, dueños y miembros califican a su gimnasio (Mi cuenta → Tu opinión, en la web y en la app): las de 4 estrellas o más salen en el carrusel de opiniones de la portada, con la foto del gimnasio. |
+| 11 | Frontend + backend + APIs | Spring Boot expone la API REST y sirve las páginas; las páginas usan `fetch`. Se usan MongoDB Atlas, las APIs de pago de Stripe (Checkout), PayPal (Orders v2) y Openpay (fichas de Paynet, con webhook), Brevo (correo) e iText (PDF), y la app móvil consume la misma API y paga con los mismos tres métodos. |
 | 12 | Repositorio con Git | Una rama por integrante, PRs a `main` y revisión automática en cada PR (`.github/workflows/ci.yml`: compila y corre las pruebas de punta a punta). |
 | 13 | Enlace al hosting | https://gtweb.onrender.com |
-| 14 | Credenciales de APIs | `MONGODB_URI` (MongoDB Atlas), `BREVO_API_KEY`, las llaves de Stripe (`STRIPE_SECRET_KEY`), PayPal (`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`) y Openpay/Paynet (`OPENPAY_MERCHANT_ID`, `OPENPAY_PRIVATE_KEY`) viven como variables de entorno en Render, nunca en el repositorio (ver `.env.example`). Las de pago son del modo de prueba (sandbox) de cada proveedor. |
+| 14 | Credenciales de APIs | `MONGODB_URI` (MongoDB Atlas), `BREVO_API_KEY`, las llaves de Stripe (`STRIPE_SECRET_KEY`), PayPal (`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`) y Openpay/Paynet (`OPENPAY_MERCHANT_ID`, `OPENPAY_PRIVATE_KEY`) viven como variables de entorno en Render, nunca en el repositorio (ver `.env.example`). Las de pago son del modo de prueba (sandbox) de cada proveedor: Stripe Dashboard en modo de prueba, PayPal Developer Dashboard (aplicación de sandbox, con una cuenta Business que cobra y una Personal que paga) y el panel de sandbox de Openpay. Los casos de prueba están en la sección 5. |
 | 15 | GitHub Pages | Lo publica `.github/workflows/deploy-pages.yml` en https://joseoe.github.io/GTWeb/. Ver la [decisión 2](#decisiones-de-diseño). |
 | 16 | Métodos seguros para los datos | Ver la sección 3. |
 | 17 | Compatibilidad entre navegadores | Bootstrap 5 y APIs estándar, con alternativas donde un navegador no tiene algo: compartir con Web Share o, si no existe, con WhatsApp o correo; escanear con la cámara o escribir el folio. Ver la tabla de pruebas en la sección 4. |
@@ -126,10 +129,16 @@ Antes, la tienda corría en **Medusa.js con PostgreSQL** (modelo relacional, SQL
 - **Permisos en el servidor:** cada ruta revisa que el gimnasio sea de quien lo administra y que el pedido sea del comprador o de su dueño. Las rutas escritas de forma rara (`;`, `%xx`, `..`) se rechazan.
 - **Códigos del correo** de 6 dígitos, de un solo uso: duran de 15 a 30 minutos, permiten 5 intentos y solo se guarda su hash.
 - **Freno a ataques de fuerza bruta** en el login: 10 intentos por correo cada 15 minutos.
-- **Datos de pago:** la tarjeta se valida (Luhn, vencimiento, CVC), se cambia por un token de un solo uso y se olvida. El cobro usa los datos del token, no lo que mande el navegador.
+- **Datos de pago:** la tarjeta se escribe en la página de Stripe y nunca llega a GymTrack; solo se guardan la marca y los últimos 4 dígitos. El cargo se captura en el servidor por el total que calculó GymTrack, no por lo que mande el navegador, El aviso del webhook de Openpay no se toma como prueba de pago: GymTrack siempre le pregunta a Openpay el estado del cargo antes de marcar el pedido como pagado.
 - **Consentimiento registrado:** el pedido guarda la versión de los términos aceptada y la fecha, y la cuenta guarda la del Aviso de privacidad.
 - **Credenciales fuera del código**, en variables de entorno.
 - **Fechas en la zona de la Ciudad de México**, para que los cortes de pago no se adelanten un día.
+- **Controles de NMX-I-27001-NYCE-2015 (ISO 27001)**, documentados en [docs/iso27001](iso27001/README.md):
+  - cabeceras de seguridad en cada respuesta (CSP, HSTS, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`);
+  - bitácora de seguridad: inicios de sesión (exitosos, fallidos y bloqueados), cambios de contraseña y correo, accesos denegados y operaciones del panel (altas y bajas de miembros, pagos, entregas, reembolsos), visible para el dueño en Panel → Seguridad → Bitácora;
+  - respaldo diario de la base, cifrado con AES-256 (`.github/workflows/respaldo.yml`);
+  - Dependabot revisa las dependencias cada semana;
+  - las cuentas de demostración (`@gymtrack.demo`) nunca reciben correo.
 
 ## 4. Pruebas en navegadores (criterio 17)
 
@@ -142,6 +151,31 @@ Antes, la tienda corría en **Medusa.js con PostgreSQL** (modelo relacional, SQL
 | Safari | iPhone | | | | | |
 
 Marca ✔ en cada celda y guarda la captura en `docs/capturas/`.
+
+## 5. Casos de prueba de pago (criterios 09 y 14)
+
+Cada forma de pago se prueba con tres casos: con saldo suficiente, sin saldo y con una tarjeta o cuenta vencida o inválida. En los rechazos no se cobra, no se crea el pedido y el inventario no cambia. Sirven en la tienda web, en el mostrador del panel y en la app.
+
+**Tarjeta (Stripe, modo de prueba).** Cualquier nombre, una fecha futura y cualquier CVC de 3 dígitos.
+
+| Caso | Tarjeta | Resultado |
+|---|---|---|
+| 1. Saldo suficiente | `4242 4242 4242 4242` | Aprobada: se crea el pedido |
+| 2. Sin saldo suficiente | `4000 0000 0000 9995` | Rechazada por fondos insuficientes |
+| 3. Vencida | `4000 0000 0000 0069` | Rechazada por tarjeta vencida |
+| 3. Inválida | `4242 4242 4242 4241` | Stripe no acepta el número |
+
+**PayPal (sandbox).** Se paga con la cuenta compradora Personal del PayPal Developer Dashboard. En sandbox, una cuenta de prueba casi siempre aprueba, aunque tenga saldo en cero, porque PayPal usa su tarjeta ligada como respaldo. Por eso los rechazos se piden con el *negative testing* oficial de PayPal: arriba del botón de PayPal, el selector **Simular el resultado de PayPal** hace que GymTrack capture el pago con el encabezado `PayPal-Mock-Response`, y el sandbox de PayPal responde el error real. El selector solo aparece en modo de prueba; con PayPal en producción se oculta y el servidor lo rechaza.
+
+| Caso | Selector | Respuesta de PayPal |
+|---|---|---|
+| 1. Saldo suficiente | Aprobado | Captura completada: se crea el pedido |
+| 2. Sin saldo suficiente | Sin fondos suficientes | `INSTRUMENT_DECLINED` |
+| 3. Cuenta vencida o inválida | Cuenta inválida o vencida | `PAYER_CANNOT_PAY` |
+
+**Efectivo en tiendas (Openpay / Paynet).** Se genera la ficha con su referencia y código de barras. En el sandbox se paga desde el panel de Openpay (Paynet → Pagos → la ficha → Simular pago), y el pedido pasa a pagado. Si no se paga en 72 horas, la ficha vence y lo apartado se libera.
+
+**Cuentas de demostración.** Seis gimnasios de prueba (Maximus, Alfa, Lunas, Spartans, Vikings y Titanium Sport) con dueños `dueno.<gimnasio>@gymtrack.demo`, entre 6 y 8 miembros cada uno y ventas de los últimos 90 días, para ver el panel con datos. Los crea `pruebas/demo-datos.mjs`; la contraseña no está en el repositorio.
 
 ---
 
