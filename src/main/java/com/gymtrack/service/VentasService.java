@@ -290,13 +290,15 @@ public class VentasService {
         return new Criteria().andOperator(y.toArray(new Criteria[0]));
     }
 
-    // Lo mismo que Pedido.porEntregar(), en la base: pagado, de la tienda o la
-    // app, sin entregar y con al menos un producto (no solo membresía).
+    // Lo mismo que Pedido.porEntregar(), en la base: pagado, de la tienda, la
+    // app o una ficha de Paynet del mostrador, sin entregar y con al menos un
+    // producto (no solo membresía).
     private static Criteria porEntregar() {
         return Criteria.where("estado").is(Pedido.ESTADO_PAGADO)
-                .and("canal").ne(Pedido.CANAL_MOSTRADOR)
                 .and("entregadoEn").is(null)
-                .and("partidas").elemMatch(Criteria.where("tipo").ne(TiendaGymService.TIPO_MEMBRESIA));
+                .and("partidas").elemMatch(Criteria.where("tipo").ne(TiendaGymService.TIPO_MEMBRESIA))
+                .orOperator(Criteria.where("canal").ne(Pedido.CANAL_MOSTRADOR),
+                        Criteria.where("proveedorPago").is(MetodosPago.PAYNET));
     }
 
     private double cobrado(Criteria criterios) {

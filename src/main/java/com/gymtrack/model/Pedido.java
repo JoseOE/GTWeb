@@ -1,5 +1,6 @@
 package com.gymtrack.model;
 
+import com.gymtrack.util.MetodosPago;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
@@ -126,9 +127,16 @@ public class Pedido {
         return partidas.stream().anyMatch(x -> !x.esPlan());
     }
 
-    // Pedido de la tienda o la app, pagado, cuyos productos todavía no se recogen.
+    // Venta de mostrador cobrada en el acto (efectivo, tarjeta o PayPal): se
+    // entregó al cobrarla. Con ficha de Paynet se entrega hasta que se paga.
+    public boolean entregadaAlCobrar() {
+        return CANAL_MOSTRADOR.equals(canal) && !MetodosPago.PAYNET.equals(proveedorPago);
+    }
+
+    // Pedido pagado cuyos productos todavía no se recogen: de la tienda, la app
+    // o una ficha de Paynet del mostrador.
     public boolean porEntregar() {
-        return ESTADO_PAGADO.equals(estado) && !CANAL_MOSTRADOR.equals(canal) && entregadoEn == null && llevaProductos();
+        return ESTADO_PAGADO.equals(estado) && !entregadaAlCobrar() && entregadoEn == null && llevaProductos();
     }
 
     public static class Inventario {

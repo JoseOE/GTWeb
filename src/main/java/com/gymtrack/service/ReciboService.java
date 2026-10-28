@@ -327,7 +327,7 @@ public class ReciboService {
     // Qué pasa con los productos: el mostrador los entrega en el acto; la tienda
     // y la app se recogen en recepción mostrando el QR de este comprobante.
     private static String entregaTexto(Pedido p, Gym gym) {
-        if (Pedido.CANAL_MOSTRADOR.equals(p.getCanal())) return "Entregado en el mostrador de " + nombre(gym);
+        if (p.entregadaAlCobrar()) return "Entregado en el mostrador de " + nombre(gym);
         if (!p.llevaProductos()) return "Membresía: no hay productos que recoger.";
         if (p.getEntregadoEn() != null) return "Entregado en " + nombre(gym) + " el " + fechaHora(p.getEntregadoEn()) + ".";
         String lugar = "Recoger en " + nombre(gym) + (gym != null && gym.getDireccion() != null ? " · " + gym.getDireccion() : "");
