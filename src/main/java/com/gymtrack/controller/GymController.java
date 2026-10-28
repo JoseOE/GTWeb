@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @RestController
@@ -64,6 +65,15 @@ public class GymController {
         gym.setEquipamiento(request.getEquipamiento());
         gym.setMaquinas(request.getMaquinas() == null ? new ArrayList<>() : request.getMaquinas());
         gym.setLogo(request.getLogo());
+        // La foto solo cambia si viene: "" la quita; si no, debe ser una imagen subida a GymTrack.
+        if (request.getFoto() != null) {
+            String foto = request.getFoto().trim();
+            Matcher m = FOTO.matcher(foto);
+            if (!foto.isEmpty() && !m.matches()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "La foto del gimnasio debe subirse desde el panel."));
+            }
+            gym.setFoto(foto.isEmpty() ? null : m.group(1));
+        }
         gym.setColorPrimario(request.getColorPrimario());
         gym.setEnDirectorio(Boolean.TRUE.equals(request.getEnDirectorio()));
         gym.setCuotaMensual(request.getCuotaMensual());
@@ -152,6 +162,7 @@ public class GymController {
         v.put("equipamiento", gym.getEquipamiento());
         v.put("maquinas", gym.getMaquinas());
         v.put("logo", gym.getLogo());
+        v.put("foto", gym.getFoto());
         v.put("colorPrimario", gym.getColorPrimario());
         v.put("cuotaMensual", gym.getCuotaMensual());
         // Quién vende: la tienda lo muestra antes de comprar.
@@ -185,6 +196,8 @@ public class GymController {
     // RFC de persona moral (3 letras) o física (4), fecha AAMMDD y homoclave.
     private static final Pattern RFC = Pattern.compile("^[A-ZÑ&]{3,4}\\d{6}[A-Z\\d]{3}$");
     private static final Pattern CORREO = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    // Una imagen subida con POST /api/gyms/{id}/imagenes, con o sin el dominio.
+    private static final Pattern FOTO = Pattern.compile("^(?:https?://[^/\\s]+)?(/api/imagenes/[A-Za-z0-9]{1,40})$");
 
     public static class GymRequest {
         private String nombre;
@@ -194,6 +207,7 @@ public class GymController {
         private String equipamiento;
         private List<String> maquinas;
         private String logo;
+        private String foto;
         private String colorPrimario;
         private Boolean enDirectorio;
         private Double cuotaMensual;
@@ -210,6 +224,9 @@ public class GymController {
 
         public String getCorreoContacto() { return correoContacto; }
         public void setCorreoContacto(String correoContacto) { this.correoContacto = correoContacto; }
+
+        public String getFoto() { return foto; }
+        public void setFoto(String foto) { this.foto = foto; }
 
         public String getLogo() { return logo; }
         public void setLogo(String logo) { this.logo = logo; }

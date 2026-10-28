@@ -29,6 +29,8 @@ public class Gym {
     // Logo como data URI (data:image/png;base64,...). El panel lo redimensiona
     // antes de subirlo, así no hace falta contratar almacenamiento aparte.
     private String logo;
+    // Foto del gimnasio (/api/imagenes/{id}): sale con las opiniones de la página de inicio.
+    private String foto;
     // Color de acento del gimnasio en hex (#RRGGBB). La app tiñe su interfaz con él.
     private String colorPrimario;
     // Si aparece en el directorio público de gimnasios de la app.
@@ -49,6 +51,9 @@ public class Gym {
     private String correoContacto;
 
     public Gym() {}
+
+    public String getFoto() { return foto; }
+    public void setFoto(String foto) { this.foto = foto; }
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
