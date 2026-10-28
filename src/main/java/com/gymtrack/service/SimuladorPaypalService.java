@@ -73,15 +73,20 @@ public class SimuladorPaypalService {
     // que se puede volver.
     public Map<String, Object> crear(User comprador, String canal, double total, int articulos,
                                      String returnUrl, String cancelUrl, String hostPropio, boolean recordar) {
+        return crear(comprador, comprador.getGymId(), canal, total, articulos, returnUrl, cancelUrl, hostPropio, recordar);
+    }
+
+    public Map<String, Object> crear(User comprador, String gymId, String canal, double total, int articulos,
+                                     String returnUrl, String cancelUrl, String hostPropio, boolean recordar) {
         if (articulos <= 0 || total <= 0) {
             throw new TiendaException(HttpStatus.BAD_REQUEST, "Tu carrito está vacío.");
         }
         OrdenPaypal orden = new OrdenPaypal();
         orden.setId("PAYID-SIM-" + alAzar(16));
         orden.setUserId(comprador.getId());
-        orden.setGymId(comprador.getGymId());
+        orden.setGymId(gymId);
         orden.setCanal(canal);
-        orden.setComercio(gymRepository.findById(comprador.getGymId()).map(Gym::getNombre).orElse("GymTrack"));
+        orden.setComercio(gymRepository.findById(gymId).map(Gym::getNombre).orElse("GymTrack"));
         orden.setMonto(total);
         orden.setMoneda("MXN");
         orden.setArticulos(articulos);

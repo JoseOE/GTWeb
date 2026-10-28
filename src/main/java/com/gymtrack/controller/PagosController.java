@@ -63,7 +63,7 @@ public class PagosController {
         User comprador = acceso.exigirComprador(userId);
         String elegido = canal(canal);
         Map<String, Object> carrito = carritoSinCambios(comprador, elegido);
-        return pagos.crearOrdenPaypal(comprador, elegido, ((Number) carrito.get("total")).doubleValue(),
+        return pagos.crearOrdenPaypal(comprador, comprador.getGymId(), elegido, ((Number) carrito.get("total")).doubleValue(),
                 ((Number) carrito.get("articulos")).intValue(), request.getReturnUrl(), request.getCancelUrl(), http.getServerName());
     }
 
