@@ -375,7 +375,7 @@ Cada variante guarda `existencias` y `apartadas`; `disponible = existencias − 
 | Movimiento | Cuándo | Efecto |
 |---|---|---|
 | Apartar | Cobro en la tienda o la app (también una ficha Paynet pendiente) | disponible −, apartadas + |
-| Descontar | Venta de mostrador (se entrega en el acto) | disponible −, existencias − |
+| Descontar | Venta de mostrador en efectivo, tarjeta o PayPal (se entrega en el acto) | disponible −, existencias − |
 | Devolver | Pago rechazado, ficha vencida o cancelada, pedido reembolsado | Regresa lo que el pedido tomó |
 
 - **Atómico.** Cada movimiento es un `findAndModify` condicionado a `disponible >= cantidad`. Si dos personas compran la última pieza a la vez, solo una pasa; la otra recibe 409 "Ya no hay suficientes piezas de «…»". Un pedido de varias partidas toma todo o nada.
@@ -471,7 +471,7 @@ Respuestas de `/checkout`:
 | Método | Ruta | Uso |
 |---|---|---|
 | POST | `/api/simuladores/stripe/tokens` | Tokenizar una tarjeta de prueba `{numero, titular, mes, anio, cvc}` → `{token, marca, ultimos4, vencimiento}` |
-| POST | `/api/gyms/{gymId}/mostrador/cobrar` | Cobrar el ticket `{partidas: [{varianteId, cantidad}], clienteId, metodo, recibido, datos, totalVisto}` → `{pedido, cambio, cliente}` |
+| POST | `/api/gyms/{gymId}/mostrador/cobrar` | Cobrar el ticket `{partidas: [{varianteId, cantidad}], clienteId, metodo, recibido, datos, totalVisto}` → `{pedido, cambio, cliente}`. `metodo`: `efectivo`, `tarjeta`, `paypal` o `tienda` (ficha de Paynet) |
 
 **Simulador de Stripe.**
 
@@ -736,6 +736,8 @@ Con `PAGOS_MODO=sandbox` (Render) se cobra con las APIs reales en su modo de pru
 | PayPal (Orders v2) | `POST /api/pagos/paypal/ordenes` crea la orden y devuelve `aprobarUrl`. PayPal regresa con `?token=&PayerID=` y el checkout cobra con `{"token": ...}`: Spring captura la orden. | Entra en sandbox.paypal.com con la cuenta *Personal* de developer.paypal.com → Sandbox accounts. |
 | Efectivo en tiendas (Paynet / Openpay) | Al pagar, Openpay crea el cargo en tienda y devuelve la referencia, el código de barras y la ficha oficial en PDF. El pedido queda pendiente hasta que se paga. | En sandbox-dashboard.openpay.mx busca el cargo y simula su pago. Spring lo ve por el webhook `POST /api/webhooks/openpay`, cada 2 minutos y al abrir el pedido. |
 | Mostrador con tarjeta | `POST /api/gyms/{gymId}/mostrador/stripe/sesion` abre Stripe en la pantalla del panel; al volver (`?cobro=tarjeta&session_id=`), la venta se cobra sola. | Igual que la tarjeta. |
+| Mostrador con PayPal | `POST /api/gyms/{gymId}/mostrador/paypal/orden` abre PayPal en la pantalla del panel; el cliente entra a su cuenta y aprueba. Al volver (`?cobro=paypal&token=&PayerID=`), la venta se cobra sola (`metodo: "paypal"`). | Igual que PayPal. |
+| Mostrador con pago en tienda | `metodo: "tienda"` genera la ficha de Paynet con Openpay y la muestra en el panel (referencia, ficha oficial y PDF). Los productos quedan apartados; ya pagada la ficha, el pedido aparece en Ventas → "Por entregar" y se entrega con "Entregar pedido". | Igual que Paynet. |
 
 La app usa los mismos endpoints con `?canal=app` y sus enlaces (`gymtrack://…`, `exp://…`). Como Stripe y PayPal solo regresan a direcciones https, Spring los manda a `regreso-app.html`, que reenvía a la app.
 

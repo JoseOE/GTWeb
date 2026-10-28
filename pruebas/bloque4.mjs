@@ -226,6 +226,26 @@ const delMostrador = r.body?.pedido;
 ok(r.status === 200 && delMostrador?.entrega?.estado === 'entregado', 'la venta de mostrador ya sale entregada', delMostrador?.entrega);
 r = await api('POST', `/api/gyms/${gymId}/ventas/pedidos/${delMostrador?.orderId}/entregar`, null, owner);
 ok(r.status === 409, 'el mostrador no pasa por "Entregar"', r.body?.error);
+// Mostrador con pago en tienda: la ficha aparta el producto y se entrega ya pagada.
+const antesFicha = await variante();
+r = await api('POST', `/api/gyms/${gymId}/mostrador/cobrar`, { partidas: [{ varianteId: agua.id, cantidad: 1 }], clienteId: null, metodo: 'tienda', totalVisto: precioAgua }, owner);
+const fichaMostrador = r.body?.pedido;
+ok(r.status === 200 && fichaMostrador?.estado === 'pendiente_pago' && fichaMostrador.paynet?.referencia && fichaMostrador.entrega?.estado === 'no_aplica',
+  'mostrador con pago en tienda → ficha pendiente, sin entregar', { estado: fichaMostrador?.estado, entrega: fichaMostrador?.entrega });
+const trasFicha = await variante();
+ok(trasFicha.apartadas === antesFicha.apartadas + 1 && trasFicha.existencias === antesFicha.existencias, 'la ficha del mostrador aparta (no baja existencias)', { antesFicha, trasFicha });
+r = await api('POST', `/api/gyms/${gymId}/ventas/pedidos/${fichaMostrador?.orderId}/entregar`, null, owner);
+ok(r.status === 409 && r.body.error.includes('no está pagado'), 'sin pagar no se entrega', r.body?.error);
+r = await api('POST', `/api/simuladores/paynet/${fichaMostrador?.orderId}/pagar`, null, owner);
+ok(r.status === 200 && r.body.estado === 'pagado' && r.body.entrega?.estado === 'pendiente', 'pagada la ficha, queda por entregar', r.body?.entrega);
+r = await api('GET', `/api/gyms/${gymId}/ventas/pedidos?estado=por_entregar&tamano=100`, null, owner);
+ok(r.body.pedidos.some(p => p.orderId === fichaMostrador?.orderId), 'aparece en "Por entregar"', r.body.total);
+r = await api('POST', `/api/gyms/${gymId}/ventas/pedidos/${fichaMostrador?.orderId}/entregar`, null, owner);
+ok(r.status === 200 && r.body.entrega?.estado === 'entregado', 'el dueño la entrega', r.body?.entrega);
+const trasEntregaFicha = await variante();
+ok(trasEntregaFicha.apartadas === antesFicha.apartadas && trasEntregaFicha.existencias === antesFicha.existencias - 1, 'al entregar baja la existencia', trasEntregaFicha);
+r = await api('POST', `/api/gyms/${gymId}/mostrador/cobrar`, { partidas: [{ varianteId: agua.id, cantidad: 1 }], metodo: 'paypal', datos: { token: 'PAYID-SIM-NOEXISTE' }, totalVisto: precioAgua }, owner);
+ok(r.status === 400, 'mostrador con PayPal sin una orden aprobada → 400', r.body?.error);
 
 console.log(fallos ? `\n${fallos} prueba(s) fallaron` : '\nTodo bien');
 // Código de salida 1 si algo falló: así correr-todas.mjs y la CI lo marcan en rojo.

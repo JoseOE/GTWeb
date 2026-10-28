@@ -66,6 +66,21 @@ ok(r.s === 200 && /checkout\.stripe\.com/.test(r.b.url), 'sesión de Stripe para
 r = await api('POST', `/api/gyms/${gym.id}/mostrador/stripe/sesion`, { partidas: [{ varianteId: v.id, cantidad: 1 }], totalVisto: 35 }, m.token);
 ok(r.s === 403, 'un miembro no abre cobros del mostrador → 403', r.s);
 
+console.log('\n5. Mostrador con PayPal y pago en tienda');
+const ticket = { partidas: [{ varianteId: v.id, cantidad: 1 }], totalVisto: 35 };
+r = await api('POST', `/api/gyms/${gym.id}/mostrador/paypal/orden`, { ...ticket, returnUrl: API + '/bienvenido.html?cobro=paypal', cancelUrl: API + '/bienvenido.html?cobro=cancelado&metodo=paypal' }, o.token);
+ok(r.s === 200 && /sandbox\.paypal\.com/.test(r.b.aprobarUrl), 'orden de PayPal para el ticket del mostrador', { monto: r.b?.monto });
+r = await api('POST', `/api/gyms/${gym.id}/mostrador/cobrar`, { ...ticket, metodo: 'paypal', datos: { token: r.b.id } }, o.token);
+ok(r.s === 400 && /apruebas/.test(r.b.error), 'cobrar sin aprobar en PayPal → 400', r.b?.error);
+r = await api('POST', `/api/gyms/${gym.id}/mostrador/paypal/orden`, { ...ticket, returnUrl: API + '/x', cancelUrl: API + '/x' }, m.token);
+ok(r.s === 403, 'un miembro no abre la orden del mostrador → 403', r.s);
+r = await api('POST', `/api/gyms/${gym.id}/mostrador/cobrar`, { ...ticket, metodo: 'tienda', clienteId: socio.id }, o.token);
+const ficha = r.b?.pedido;
+ok(r.s === 200 && ficha.estado === 'pendiente_pago' && ficha.paynet?.fichaUrl && ficha.entrega.estado === 'no_aplica',
+  'pago en tienda: ficha real de Openpay, pendiente y sin entregar', { estado: ficha?.estado, ref: ficha?.paynet?.referencia, entrega: ficha?.entrega?.estado });
+r = await api('POST', `/api/gyms/${gym.id}/ventas/pedidos/${ficha.orderId}/entregar`, null, o.token);
+ok(r.s === 409 && /todavía no está pagado/.test(r.b.error), 'no se entrega antes de pagar la ficha → 409', r.b?.error);
+
 console.log(fallos ? `\n${fallos} prueba(s) fallaron`
   : '\nTodo bien. Falta lo que pide navegador: pagar en la página de Stripe, aprobar en PayPal y simular la ficha en Openpay (ver el README).');
 process.exit(fallos ? 1 : 0);
