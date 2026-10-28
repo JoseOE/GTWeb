@@ -32,7 +32,7 @@
     <a class="navbar-brand" href="#inicio" aria-label="GymTrack, inicio"><i class="bx bx-dumbbell" aria-hidden="true"></i> Gym<span>Track</span></a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Abrir menú"><span class="navbar-toggler-icon"></span></button>
     <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav mx-auto"><li class="nav-item"><a class="nav-link" href="#quienes-somos">Nosotros</a></li><li class="nav-item"><a class="nav-link" href="#ecosistema">Ecosistema</a></li><li class="nav-item"><a class="nav-link" href="#servicios">Soluciones</a></li><li class="nav-item"><a class="nav-link" href="#ubicacion">Ubicación</a></li><li class="nav-item"><a class="nav-link" href="contacto.html">Contacto</a></li></ul>
+      <ul class="navbar-nav mx-auto"><li class="nav-item"><a class="nav-link" href="#quienes-somos">Nosotros</a></li><li class="nav-item"><a class="nav-link" href="#ecosistema">Ecosistema</a></li><li class="nav-item"><a class="nav-link" href="#servicios">Soluciones</a></li><li class="nav-item"><a class="nav-link" href="#opiniones">Opiniones</a></li><li class="nav-item"><a class="nav-link" href="#ubicacion">Ubicación</a></li><li class="nav-item"><a class="nav-link" href="contacto.html">Contacto</a></li></ul>
       <div class="nav-actions"><a href="login.html" class="nav-login">Iniciar sesión</a><a href="registro.html" class="gt-button gt-button-small">Empezar <i class="bx bx-up-arrow-alt" aria-hidden="true"></i></a></div>
     </div>
   </div>
@@ -129,6 +129,20 @@
 <section id="servicios" class="editorial-section solutions-section">
   <div class="container"><div class="section-heading"><h2>EL SIGUIENTE<br><em>PASO ES TUYO.</em></h2><p>Explora nuestro catálogo y encuentra<br>la solución para tu gimnasio.</p></div><div id="services-container" class="row g-4" aria-live="polite" aria-busy="true"><div class="catalog-state"><span class="spinner-border" role="status"><span class="visually-hidden">Cargando</span></span><p>Estamos preparando las soluciones…</p></div></div></div>
 </section>
+<section id="opiniones" class="editorial-section opinions-section" aria-labelledby="opiniones-titulo" hidden>
+  <div class="container">
+    <div class="section-heading"><h2 id="opiniones-titulo">LO QUE DICEN<br><em>LOS GIMNASIOS.</em></h2><p>Dueños y miembros que ya usan GymTrack<br>cuentan cómo les ha ido.</p></div>
+    <div class="opiniones-carrusel" role="region" aria-roledescription="carrusel" aria-label="Opiniones de usuarios de GymTrack">
+      <div class="opiniones-pista" id="opiniones-pista" tabindex="0" aria-live="off"></div>
+      <div class="opiniones-controles">
+        <button type="button" class="opiniones-flecha" id="opiniones-anterior" aria-label="Opiniones anteriores"><i class="bx bx-left-arrow-alt" aria-hidden="true"></i></button>
+        <div class="opiniones-puntos" id="opiniones-puntos"></div>
+        <button type="button" class="opiniones-flecha" id="opiniones-siguiente" aria-label="Más opiniones"><i class="bx bx-right-arrow-alt" aria-hidden="true"></i></button>
+      </div>
+    </div>
+    <p class="opiniones-nota">¿Ya usas GymTrack? Deja tu opinión desde tu panel o desde la app. Aquí aparecen las de 4 estrellas o más.</p>
+  </div>
+</section>
 <section class="contact-band"><div class="container contact-grid"><h2>DALE MÁS<br><span>AL FUTURO.</span></h2><div><p>Tu gimnasio tiene mucho por delante.<br>Hagamos que el siguiente paso cuente.</p><a class="gt-button gt-button-dark" href="https://wa.me/527721013839?text=Hola,%20me%20interesa%20implementar%20GymTrack%20en%20mi%20gimnasio." target="_blank" rel="noopener noreferrer">Hablemos por WhatsApp <i class="bx bx-up-arrow-alt" aria-hidden="true"></i></a></div></div></section>
 <section id="ubicacion" class="editorial-section location-section"><div class="container location-grid"><div><h2>CERCA<br><em>DE TI.</em></h2><p>Conoce dónde encontrarnos.<br>Escríbenos para organizar tu visita.</p><a class="text-link dark-link" href="contacto.html">Escribir al equipo <i class="bx bx-up-arrow-alt" aria-hidden="true"></i></a><button class="route-button" id="show-route" type="button"><i class="bx bx-navigation" aria-hidden="true"></i> Cómo llegar desde mi ubicación</button><p id="route-status" class="route-status" role="status"></p></div><div class="map-frame"><div id="map" aria-label="Mapa de ubicación de GymTrack"></div></div></div></section>
 </main>
@@ -211,5 +225,6 @@
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
     <script src="js/main.js"></script>
     <script src="js/experience.js"></script>
+    <script src="js/opiniones.js"></script>
 </body>
 </html>
