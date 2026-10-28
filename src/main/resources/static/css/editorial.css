@@ -1479,3 +1479,199 @@ button,a,input,summary {
     }
     
 }
+
+/* ─── Opiniones (carrusel de la página de inicio) ─── */
+.opinions-section {
+    background:var(--ink);
+    color:var(--paper)
+}
+.opinions-section h2 em {
+    color:var(--brand)
+}
+.opinions-section .section-heading>p {
+    color:#b9bbb0
+}
+.opiniones-pista {
+    display:grid;
+    grid-auto-flow:column;
+    grid-auto-columns:calc((100% - 48px) / 3);
+    gap:24px;
+    overflow-x:auto;
+    scroll-snap-type:x mandatory;
+    scrollbar-width:none;
+    padding-bottom:4px
+}
+.opiniones-pista::-webkit-scrollbar {
+    display:none
+}
+.opiniones-pista:focus-visible {
+    outline:3px solid var(--brand);
+    outline-offset:6px
+}
+.opinion-tarjeta {
+    scroll-snap-align:start;
+    display:flex;
+    flex-direction:column;
+    background:var(--paper);
+    color:var(--ink);
+    border-radius:4px;
+    overflow:hidden
+}
+.opinion-foto {
+    position:relative;
+    margin:0;
+    aspect-ratio:16/10;
+    background:#3a3c37
+}
+.opinion-foto>img {
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block
+}
+.opinion-foto figcaption {
+    position:absolute;
+    left:14px;
+    bottom:14px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    max-width:calc(100% - 28px);
+    padding:6px 12px 6px 6px;
+    background:var(--ink);
+    color:var(--paper);
+    border-radius:999px;
+    font-family:var(--identity);
+    font-size:13px;
+    font-weight:700
+}
+.opinion-foto figcaption span {
+    padding-left:6px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap
+}
+.opinion-logo {
+    width:24px;
+    height:24px;
+    border-radius:50%;
+    object-fit:cover;
+    background:#fff
+}
+.opinion-cuerpo {
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    padding:24px 24px 26px;
+    flex:1
+}
+.opinion-estrellas {
+    display:flex;
+    gap:2px;
+    color:var(--brand);
+    font-size:18px
+}
+.opinion-cuerpo blockquote {
+    margin:0;
+    font-family:var(--identity);
+    font-size:17px;
+    font-weight:600;
+    line-height:1.5;
+    letter-spacing:-.01em;
+    flex:1
+}
+.opinion-autor {
+    margin:0;
+    display:flex;
+    flex-direction:column;
+    font-size:14px;
+    padding-top:14px;
+    border-top:1px solid var(--line)
+}
+.opinion-autor span {
+    color:var(--muted)
+}
+.opiniones-controles {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    margin-top:32px
+}
+.opiniones-flecha {
+    width:48px;
+    height:48px;
+    border-radius:50%;
+    border:1px solid #55574f;
+    background:transparent;
+    color:var(--paper);
+    font-size:22px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    transition:background .2s var(--ease-out),border-color .2s var(--ease-out)
+}
+.opiniones-flecha:hover {
+    background:var(--brand);
+    border-color:var(--brand);
+    color:var(--ink)
+}
+.opiniones-flecha[hidden] {
+    visibility:hidden;
+    display:inline-flex
+}
+.opiniones-puntos {
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    justify-content:center
+}
+.opiniones-puntos button {
+    width:10px;
+    height:10px;
+    padding:0;
+    border:0;
+    border-radius:999px;
+    background:#55574f;
+    transition:width .25s var(--ease-out),background .25s var(--ease-out)
+}
+.opiniones-puntos button.activo {
+    width:28px;
+    background:var(--brand)
+}
+.opiniones-nota {
+    margin:28px 0 0;
+    color:#b9bbb0;
+    font-size:14px
+}
+@media (max-width:991px) {
+    .opiniones-pista {
+        grid-auto-columns:calc((100% - 24px) / 2)
+    }
+}
+@media (max-width:640px) {
+    .opiniones-pista {
+        grid-auto-columns:88%;
+        gap:16px
+    }
+    .opinion-cuerpo blockquote {
+        font-size:16px
+    }
+    .opiniones-puntos {
+        gap:5px
+    }
+    .opiniones-puntos button {
+        width:7px;
+        height:7px
+    }
+    .opiniones-puntos button.activo {
+        width:18px
+    }
+}
+@media (prefers-reduced-motion:reduce) {
+    .opiniones-puntos button,.opiniones-flecha {
+        transition:none
+    }
+}

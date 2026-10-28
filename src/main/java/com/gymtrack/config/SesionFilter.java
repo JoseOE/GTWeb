@@ -87,6 +87,7 @@ public class SesionFilter extends OncePerRequestFilter {
             regla("POST", "/api/simuladores/paypal/ordenes/*/cancelar"),
             regla("GET", "/api/recibos/compartidos/*"),
             regla("GET", "/api/pagos/modo"),
+            regla("GET", "/api/opiniones/destacadas"),
             regla("POST", "/api/webhooks/openpay"));
 
     // Solo las usa el panel de la página: exigen sesión aunque la app siga en transición.

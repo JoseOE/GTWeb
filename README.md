@@ -746,6 +746,45 @@ Lo que pide la ley de comercio electrónico al vender en línea, con los textos 
 - **Carrusel.** Muestra los productos con promedio **mayor a 3.8** estrellas (con una reseña basta), los mejor calificados primero.
 - **Moderación.** El dueño puede ocultar una reseña ofensiva o que no trata del producto: no cuenta en el promedio ni se muestra, pero su autor la sigue viendo.
 
+### Lo más vendido
+
+`GET /api/tienda/{gymId}/productos/mas-vendidos?limite=8` devuelve los productos con más piezas vendidas en pedidos pagados. No incluye planes, cancelados ni reembolsados. Cada uno viene con la forma de la lista y `vendidos`. Lo usa el carrusel "Lo más vendido en tu gimnasio" de la tienda de la app, y es visible para los mismos usuarios que el catálogo.
+
+### Opiniones sobre GymTrack
+
+Cada cuenta con gimnasio (el dueño, o un miembro ya aceptado) tiene **una opinión** sobre GymTrack: de 1 a 5 estrellas enteras y un texto de 10 a 300 caracteres. Se deja desde el panel (Mi Gimnasio), Mi cuenta o la app (Mi cuenta → Tu opinión).
+
+| Método | Ruta | Uso |
+|---|---|---|
+| GET | `/api/opiniones/destacadas?limite=12` | Pública. Las de **4★ o más** (el criterio "más de 3.8"), una por gimnasio primero, con nombre corto ("Mariana L."), rol y el nombre y la foto del gimnasio |
+| GET · PUT · DELETE | `/api/opiniones/mia` | Ver, publicar o cambiar `{estrellas, texto}`, o borrar la propia |
+
+La página de inicio las muestra en el carrusel "Lo que dicen los gimnasios" (`js/opiniones.js`); si no hay ninguna, la sección no aparece. La foto del gimnasio se sube en Mi Gimnasio (`foto` en `POST /api/gyms`; solo se acepta una imagen subida a GymTrack).
+
+### Datos de demostración
+
+`pruebas/demo-datos.mjs` crea 6 gimnasios completos para mostrar la plataforma: Maximus, Alfa, Lunas, Spartans, Vikings y Titanium Sport. Cada uno lleva:
+- su información y su foto;
+- de 9 a 12 máquinas con ejercicios y de 5 a 7 rutinas;
+- 4 planes y de 8 a 11 productos con foto;
+- de 6 a 8 miembros con su historial de pagos;
+- de 28 a 42 ventas de mostrador repartidas en los últimos 90 días;
+- reseñas de productos y opiniones.
+
+```bash
+DEMO_API=https://gtweb.onrender.com DEMO_MONGODB_URI="<cadena de Atlas>" node pruebas/demo-datos.mjs sembrar --produccion
+DEMO_API=https://gtweb.onrender.com DEMO_MONGODB_URI="<cadena de Atlas>" node pruebas/demo-datos.mjs borrar --produccion
+```
+
+- **Cuentas.** Son `dueno.<gimnasio>@gymtrack.demo` (maximus, alfa, lunas, spartans, vikings y titanium) y `<nombre>.<apellido>.<gimnasio>@gymtrack.demo`, todas con la contraseña `DEMO_PASSWORD` del `.env`.
+- **Sin correos.** Las cuentas `@gymtrack.demo` nunca reciben correo (`CorreoService.esCuentaDemo`): así Brevo no rebota.
+- **Qué hace por la API y qué en la base.** Casi todo se crea por la API, como desde el panel. La base solo se toca para:
+  - verificar el correo de los dueños;
+  - darles a los miembros la contraseña de demostración;
+  - repartir las fechas de las ventas.
+- **Borrar.** `borrar` quita solo las cuentas `@gymtrack.demo` y lo de sus gimnasios.
+- **Repetir.** Si un gimnasio demo ya existe, `sembrar` lo omite.
+
 ### Pagos con Stripe, PayPal y Paynet (sandbox)
 
 Con `PAGOS_MODO=sandbox` (Render) se cobra con las APIs reales en su modo de pruebas: no se mueve dinero real y se usan las tarjetas y cuentas de prueba de cada proveedor. En los tres el dinero se cobra en Spring, ya revisado el carrito, así que nunca queda un cobro sin pedido.

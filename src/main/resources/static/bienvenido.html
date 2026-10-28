@@ -228,6 +228,21 @@
                             </div>
                             <small class="text-body-secondary d-block">Si lo apagas, solo se pueden unir con tu código.</small>
                         </div>
+                        <div class="col-12">
+                            <label for="gym-foto-input" class="form-label fw-semibold small">Foto del gimnasio</label>
+                            <div class="d-flex flex-wrap align-items-center gap-3">
+                                <div id="gym-foto-preview" class="rounded-3 border d-flex align-items-center justify-content-center bg-body-tertiary" style="width:160px;height:100px;overflow:hidden;flex:none">
+                                    <i class='bx bx-image-add fs-2 text-body-secondary'></i>
+                                </div>
+                                <div class="flex-grow-1" style="min-width:220px">
+                                    <input type="file" id="gym-foto-input" class="form-control form-control-sm" accept="image/png,image/jpeg,image/webp">
+                                    <div class="d-flex gap-2 mt-2">
+                                        <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3 d-none" id="gym-foto-clear">Quitar foto</button>
+                                    </div>
+                                    <small class="text-body-secondary d-block mt-1" id="gym-foto-ayuda">Una foto de tu gimnasio por dentro o por fuera. Sale con las opiniones de tu gimnasio en la página de inicio de GymTrack.</small>
+                                </div>
+                            </div>
+                        </div>
 
                         <div class="col-12"><hr class="my-2"></div>
                         <div class="col-12">
@@ -256,6 +271,12 @@
                         </div>
                     </form>
                 </div>
+
+                <section class="dash-empty text-start p-4 mt-4" aria-labelledby="opinion-panel-titulo">
+                    <h4 class="fw-bold fs-6 mb-1" id="opinion-panel-titulo"><i class='bx bx-star text-primary me-1'></i> Tu opinión sobre GymTrack</h4>
+                    <p class="text-body-secondary small mb-3">Cuéntale a otros dueños cómo te ha ido. Puedes cambiarla cuando quieras.</p>
+                    <div id="opinion-panel"></div>
+                </section>
             </div>
 
             <!-- ─── MIS USUARIOS ─── -->
@@ -1482,6 +1503,48 @@
             const logoPreview = document.getElementById('gym-logo-preview');
             const logoClear = document.getElementById('gym-logo-clear');
             let logoDataUrl = null;
+            const fotoInput = document.getElementById('gym-foto-input');
+            const fotoPreview = document.getElementById('gym-foto-preview');
+            const fotoClear = document.getElementById('gym-foto-clear');
+            const fotoAyuda = document.getElementById('gym-foto-ayuda');
+            // undefined = sin cambios (el servidor la conserva); '' = quitarla.
+            let fotoUrl;
+
+            function showFoto(url) {
+                if (url) {
+                    fotoPreview.innerHTML = '<img src="' + escapeHtml(url) + '" alt="Foto del gimnasio" style="width:100%;height:100%;object-fit:cover">';
+                    fotoClear.classList.remove('d-none');
+                } else {
+                    fotoPreview.innerHTML = '<i class="bx bx-image-add fs-2 text-body-secondary"></i>';
+                    fotoClear.classList.add('d-none');
+                }
+            }
+            fotoClear.addEventListener('click', () => { fotoUrl = ''; showFoto(null); fotoInput.value = ''; });
+            // La foto se reduce a 1280 px y se sube como imagen del gimnasio
+            // (POST /api/gyms/{id}/imagenes); al guardar se manda su dirección.
+            fotoInput.addEventListener('change', () => {
+                const file = fotoInput.files && fotoInput.files[0];
+                const id = localStorage.getItem('gymId');
+                if (!file) return;
+                if (!id) {
+                    alertBox.textContent = 'Guarda primero tu gimnasio y después sube su foto.';
+                    alertBox.classList.remove('d-none');
+                    fotoInput.value = '';
+                    return;
+                }
+                fotoAyuda.textContent = 'Subiendo la foto…';
+                reducirImagen(file, 1280)
+                    .then(dataUrl => apiTienda('/api/gyms/' + id + '/imagenes', { method: 'POST', body: JSON.stringify({ dataUrl }) }))
+                    .then(r => {
+                        fotoUrl = r.url;
+                        showFoto(r.url);
+                        fotoAyuda.textContent = 'Lista. Guarda los cambios para usarla.';
+                    })
+                    .catch(err => {
+                        fotoAyuda.textContent = err.message || 'No se pudo subir la foto.';
+                        fotoInput.value = '';
+                    });
+            });
 
             colorInput.addEventListener('input', () => { colorHex.value = colorInput.value.toUpperCase(); });
             colorHex.addEventListener('input', () => {
@@ -1581,6 +1644,7 @@
                         cuotaInput.value = gym.cuotaMensual != null ? gym.cuotaMensual : '';
                         directorioInput.checked = !!gym.enDirectorio;
                         showLogo(gym.logo);
+                        showFoto(gym.foto);
                         showCode(gym.codigo);
                         setBadge('saved');
                     })
@@ -1604,6 +1668,7 @@
                         equipamiento: fields.equipamiento.value.trim(),
                         maquinas: fields.maquinas.value.split('\n').map(s => s.trim()).filter(Boolean),
                         logo: logoDataUrl,
+                        foto: fotoUrl,
                         colorPrimario: colorInput.value,
                         enDirectorio: directorioInput.checked,
                         cuotaMensual: cuotaInput.value === '' ? null : parseFloat(cuotaInput.value),
@@ -4118,6 +4183,8 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/pagos/metodos.js"></script>
+    <script src="js/opinion.js"></script>
+    <script>Opinion.montar(document.getElementById('opinion-panel'));</script>
     <script src="js/entregas.js"></script>
 </body>
 </html>

@@ -105,11 +105,27 @@
                     </div>
                 </div>
 
+                <!-- Opinión sobre GymTrack (solo con gimnasio) -->
+                <div class="col-12 page-fade-in delay-2" id="opinion-bloque" hidden>
+                    <div class="card auth-card border-0 shadow-lg rounded-4 p-4">
+                        <h3 class="fw-bold fs-5 mb-1"><i class='bx bx-star text-primary'></i> Tu opinión sobre GymTrack</h3>
+                        <p class="text-body-secondary small">Cuéntanos cómo te ha ido con la app y la tienda de tu gimnasio.</p>
+                        <div id="opinion-cuenta"></div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </section>
 
     <script src="js/cuenta.js"></script>
+    <script src="js/opinion.js"></script>
+    <script>
+        if (localStorage.getItem('gymId')) {
+            document.getElementById('opinion-bloque').hidden = false;
+            Opinion.montar(document.getElementById('opinion-cuenta'));
+        }
+    </script>
     <script>
         const userId = localStorage.getItem('userId');
         // Protección de ruta: sin sesión, al login.
