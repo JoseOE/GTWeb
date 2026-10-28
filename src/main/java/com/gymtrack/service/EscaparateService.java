@@ -1,7 +1,13 @@
 package com.gymtrack.service;
 
+import com.gymtrack.model.Pedido;
 import com.gymtrack.model.Producto;
 import com.gymtrack.repository.ProductoRepository;
+import org.bson.Document;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -32,10 +38,12 @@ public class EscaparateService {
 
     private final ProductoRepository productos;
     private final ResenaService resenas;
+    private final MongoTemplate mongo;
 
-    public EscaparateService(ProductoRepository productos, ResenaService resenas) {
+    public EscaparateService(ProductoRepository productos, ResenaService resenas, MongoTemplate mongo) {
         this.productos = productos;
         this.resenas = resenas;
+        this.mongo = mongo;
     }
 
     // GET /api/tienda/{gymId}/productos: todo lo publicado, filtrado por
@@ -49,6 +57,37 @@ public class EscaparateService {
                 .sorted(EN_ESCAPARATE)
                 .map(p -> conCalificacion(vista(p), cal.get(p.getId())))
                 .toList();
+    }
+
+    // Los productos más vendidos del gimnasio: piezas de pedidos pagados (no
+    // cancelados ni reembolsados), sin los planes de membresía. Solo los que
+    // siguen a la venta, en la forma de la lista y con "vendidos".
+    public List<Map<String, Object>> masVendidos(String gymId, int limite) {
+        Aggregation a = Aggregation.newAggregation(
+                Aggregation.match(Criteria.where("gymId").is(gymId).and("estado").is(Pedido.ESTADO_PAGADO)),
+                Aggregation.unwind("partidas"),
+                Aggregation.match(Criteria.where("partidas.tipo").ne(TIPO_MEMBRESIA).and("partidas.productoId").ne(null)),
+                Aggregation.group("partidas.productoId").sum("partidas.cantidad").as("vendidos"),
+                Aggregation.sort(Sort.by(Sort.Direction.DESC, "vendidos")),
+                Aggregation.limit(40));
+        Map<String, Integer> vendidos = new LinkedHashMap<>();
+        for (Document d : mongo.aggregate(a, "pedidos", Document.class).getMappedResults()) {
+            vendidos.put(String.valueOf(d.get("_id")), ((Number) d.get("vendidos")).intValue());
+        }
+        if (vendidos.isEmpty()) return List.of();
+        Map<String, ResenaService.Calificacion> cal = resenas.calificaciones(gymId);
+        Map<String, Producto> activos = new LinkedHashMap<>();
+        productos.findByGymIdAndActivoTrue(gymId).forEach(p -> activos.put(p.getId(), p));
+        List<Map<String, Object>> lista = new ArrayList<>();
+        for (Map.Entry<String, Integer> e : vendidos.entrySet()) {
+            Producto p = activos.get(e.getKey());
+            if (p == null || p.esPlan()) continue;
+            Map<String, Object> v = new LinkedHashMap<>(conCalificacion(vista(p), cal.get(p.getId())));
+            v.put("vendidos", e.getValue());
+            lista.add(v);
+            if (lista.size() >= Math.max(1, Math.min(limite, 20))) break;
+        }
+        return lista;
     }
 
     // Un producto oculto, borrado o de otro gimnasio responde igual: ya no se vende.

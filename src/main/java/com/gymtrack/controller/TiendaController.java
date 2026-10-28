@@ -32,6 +32,17 @@ public class TiendaController {
         return escaparate.productos(gymId, categoria, q);
     }
 
+    // GET /api/tienda/{gymId}/productos/mas-vendidos?limite=8 → los productos (no
+    // los planes) que más piezas han vendido, con la misma forma que la lista y
+    // "vendidos". Vacío si el gimnasio todavía no vende nada.
+    @GetMapping("/mas-vendidos")
+    public List<Map<String, Object>> masVendidos(@PathVariable String gymId,
+                                                 @RequestParam(defaultValue = "8") int limite,
+                                                 @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
+        acceso.exigirVerTienda(gymId, userId);
+        return escaparate.masVendidos(gymId, limite);
+    }
+
     @GetMapping("/{productoId}")
     public Map<String, Object> ver(@PathVariable String gymId, @PathVariable String productoId,
                                    @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
