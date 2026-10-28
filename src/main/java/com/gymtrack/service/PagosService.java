@@ -203,14 +203,15 @@ public class PagosService {
     // ═══════════════════════════ PAYPAL ═══════════════════════════
 
     // Crea la orden por el total (Orders v2) y devuelve {id, monto, moneda, aprobarUrl}.
+    // gymId: el gimnasio donde se cobra (el del comprador, o el del mostrador).
     @SuppressWarnings("unchecked")
-    public Map<String, Object> crearOrdenPaypal(User comprador, String canal, double total, int articulos,
+    public Map<String, Object> crearOrdenPaypal(User comprador, String gymId, String canal, double total, int articulos,
                                                 String returnUrl, String cancelUrl, String hostPropio) {
-        if (!sandbox) return paypalSim.crear(comprador, canal, total, articulos, returnUrl, cancelUrl, hostPropio, false);
+        if (!sandbox) return paypalSim.crear(comprador, gymId, canal, total, articulos, returnUrl, cancelUrl, hostPropio, false);
         if (articulos <= 0 || total <= 0) throw new TiendaException(HttpStatus.BAD_REQUEST, "Tu carrito está vacío.");
         String regreso = regresos.validar(returnUrl, "returnUrl", hostPropio);
         String cancelacion = regresos.validar(cancelUrl, "cancelUrl", hostPropio);
-        String comercio = comercio(comprador.getGymId());
+        String comercio = comercio(gymId);
 
         Map<String, Object> contexto = new LinkedHashMap<>();
         contexto.put("brand_name", recortar(comercio, 120));
@@ -220,7 +221,7 @@ public class PagosService {
         contexto.put("return_url", regresos.paraProveedor(regreso));
         contexto.put("cancel_url", regresos.paraProveedor(cancelacion));
         Map<String, Object> unidad = new LinkedHashMap<>();
-        unidad.put("reference_id", comprador.getGymId());
+        unidad.put("reference_id", gymId);
         unidad.put("custom_id", comprador.getId());
         unidad.put("description", recortar("Compra en " + comercio + " (GymTrack)", 120));
         unidad.put("amount", Map.of("currency_code", "MXN", "value", monto(total)));
@@ -248,7 +249,7 @@ public class PagosService {
         OrdenPaypal orden = new OrdenPaypal();
         orden.setId(String.valueOf(r.get("id")));
         orden.setUserId(comprador.getId());
-        orden.setGymId(comprador.getGymId());
+        orden.setGymId(gymId);
         orden.setCanal(canal);
         orden.setComercio(comercio);
         orden.setMonto(total);

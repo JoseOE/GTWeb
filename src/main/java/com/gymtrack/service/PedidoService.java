@@ -305,7 +305,7 @@ public class PedidoService {
         if (!Pedido.ESTADO_PAGADO.equals(p.getEstado())) {
             throw new TiendaException(HttpStatus.CONFLICT, "Este pedido está " + ESTADOS.getOrDefault(p.getEstado(), p.getEstado()).toLowerCase(Locale.ROOT) + ": no hay nada que entregar.");
         }
-        if (Pedido.CANAL_MOSTRADOR.equals(p.getCanal())) {
+        if (p.entregadaAlCobrar()) {
             throw new TiendaException(HttpStatus.CONFLICT, "Las ventas de mostrador se entregan al cobrarlas.");
         }
         if (!p.llevaProductos()) {
@@ -345,10 +345,9 @@ public class PedidoService {
     // Si hay que pasar a recoger algo: "pendiente" (pagado, por recoger en
     // recepción), "entregado" o "no_aplica" (solo membresía, o sin pagar).
     static Map<String, Object> entrega(Pedido p) {
-        boolean mostrador = Pedido.CANAL_MOSTRADOR.equals(p.getCanal());
         String estado;
         if (!p.llevaProductos()) estado = "no_aplica";
-        else if (p.getEntregadoEn() != null || (mostrador && Pedido.ESTADO_PAGADO.equals(p.getEstado()))) estado = "entregado";
+        else if (p.getEntregadoEn() != null || (p.entregadaAlCobrar() && Pedido.ESTADO_PAGADO.equals(p.getEstado()))) estado = "entregado";
         else if (p.porEntregar()) estado = "pendiente";
         else estado = "no_aplica";
         Map<String, Object> e = new LinkedHashMap<>();
