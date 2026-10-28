@@ -4,6 +4,7 @@ import com.gymtrack.model.Gym;
 import com.gymtrack.model.User;
 import com.gymtrack.repository.GymRepository;
 import com.gymtrack.repository.UserRepository;
+import com.gymtrack.service.BitacoraService;
 import com.gymtrack.service.CorreoService;
 import com.gymtrack.service.ConsentimientoService;
 import com.gymtrack.service.CuentaService;
@@ -31,16 +32,18 @@ public class UserController {
     private final CorreoService correoService;
     private final SesionService sesiones;
     private final IntentosLoginService intentos;
+    private final BitacoraService bitacora;
 
     public UserController(UserRepository userRepository, GymRepository gymRepository,
                           CuentaService cuentaService, CorreoService correoService, SesionService sesiones,
-                          IntentosLoginService intentos) {
+                          IntentosLoginService intentos, BitacoraService bitacora) {
         this.userRepository = userRepository;
         this.gymRepository = gymRepository;
         this.cuentaService = cuentaService;
         this.correoService = correoService;
         this.sesiones = sesiones;
         this.intentos = intentos;
+        this.bitacora = bitacora;
     }
 
     @PostMapping("/register")
@@ -101,6 +104,7 @@ public class UserController {
         // Demasiadas contraseñas incorrectas seguidas para ese correo: se espera.
         long espera = intentos.minutosDeEspera(loginRequest.getEmail());
         if (espera > 0) {
+            bitacora.registrar(BitacoraService.LOGIN_BLOQUEADO, null, loginRequest.getEmail(), null);
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of("error",
                     "Demasiados intentos fallidos. Espera " + espera + (espera == 1 ? " minuto" : " minutos")
                             + " o usa «¿Olvidaste tu contraseña?»."));
@@ -123,6 +127,7 @@ public class UserController {
                     pendiente.put("email", user.getEmail());
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).body(pendiente);
                 }
+                bitacora.registrar(BitacoraService.LOGIN_EXITOSO, user.getId(), user.getEmail(), null);
                 Map<String, Object> view = accountView(user, "Login exitoso");
                 // La sesión: la página la manda en cada llamada (Authorization: Bearer).
                 view.put("token", sesiones.abrir(user.getId()));
@@ -130,6 +135,7 @@ public class UserController {
             }
         }
         intentos.fallo(loginRequest.getEmail());
+        bitacora.registrar(BitacoraService.LOGIN_FALLIDO, userOpt.map(User::getId).orElse(null), loginRequest.getEmail(), null);
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Credenciales incorrectas."));
     }
 
