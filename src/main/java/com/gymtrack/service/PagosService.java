@@ -269,9 +269,36 @@ public class PagosService {
         return v;
     }
 
+    // Resultados de PayPal que se pueden simular en pruebas, y el código del
+    // sandbox de PayPal (negative testing) que produce cada uno.
+    public static final Map<String, String> SIMULACIONES_PAYPAL = Map.of(
+            "sin_fondos", "INSTRUMENT_DECLINED",
+            "cuenta_invalida", "PAYER_CANNOT_PAY");
+
+    // Se puede simular en el CI (simulado) y con PayPal en sandbox; nunca en producción.
+    public boolean paypalSimulable() {
+        return !sandbox || paypal.esSandbox();
+    }
+
     // Al volver de PayPal: la orden debe ser de quien paga, de su gimnasio y
     // canal, por este total y sin usar. Se captura al crear el pedido.
+    // datos.simular ("sin_fondos" | "cuenta_invalida") hace que la captura
+    // falle como en ese caso, solo en pruebas (paypalSimulable).
     public Map<String, Object> consumirPaypal(String userId, String gymId, String canal, double total, Map<String, Object> datos) {
+        Object simular = datos == null ? null : datos.get("simular");
+        if (simular != null && !"".equals(simular) && !"aprobado".equals(simular)) {
+            if (!paypalSimulable() || !SIMULACIONES_PAYPAL.containsKey(simular.toString())) {
+                throw new TiendaException(HttpStatus.BAD_REQUEST, "Ese resultado de PayPal no se puede simular aquí.");
+            }
+        } else {
+            simular = null;
+        }
+        Map<String, Object> seguros = new LinkedHashMap<>(consumirPaypalSinSimular(userId, gymId, canal, total, datos));
+        if (simular != null) seguros.put("simular", simular.toString());
+        return seguros;
+    }
+
+    private Map<String, Object> consumirPaypalSinSimular(String userId, String gymId, String canal, double total, Map<String, Object> datos) {
         if (!sandbox) return paypalSim.consumir(userId, gymId, canal, total, datos);
         if (datos != null && Boolean.TRUE.equals(datos.get("vinculo"))) {
             throw new TiendaException(HttpStatus.BAD_REQUEST, "La cuenta PayPal vinculada ya no está disponible. Paga con PayPal para aprobar el pago.");
@@ -302,6 +329,10 @@ public class PagosService {
     // Lo llama PedidoService con el inventario ya apartado: captura el cargo de
     // Stripe, la orden de PayPal o pide a Openpay la ficha de Paynet.
     public SimuladorPagoService.Resultado autorizar(PedidoService.Venta v, String orderId, double total) {
+        // En el CI la simulación de PayPal falla aquí mismo, con el mismo mensaje que el sandbox.
+        if (!sandbox && MetodosPago.PAYPAL.equals(v.proveedor()) && v.datos() != null && v.datos().get("simular") != null) {
+            throw rechazoPaypal(SIMULACIONES_PAYPAL.get(v.datos().get("simular").toString()));
+        }
         if (!sandbox || MetodosPago.EFECTIVO.equals(v.proveedor())) {
             return simuladores.autorizar(v.proveedor(), v.datos(), total);
         }
@@ -311,6 +342,18 @@ public class PagosService {
             case MetodosPago.PAYNET -> fichaOpenpay(v, orderId, total);
             default -> throw new TiendaException(HttpStatus.BAD_REQUEST, "Elige cómo quieres pagar.");
         };
+    }
+
+    // Qué decirle al comprador cuando PayPal rechaza la captura.
+    static TiendaException rechazoPaypal(String problema) {
+        String mensaje = switch (problema == null ? "" : problema) {
+            case "INSTRUMENT_DECLINED" -> "PayPal rechazó el pago: tu cuenta no tiene fondos suficientes o el método de pago fue rechazado. No se te cobró: usa otra cuenta u otro método.";
+            case "PAYER_CANNOT_PAY", "PAYER_ACCOUNT_RESTRICTED", "PAYER_ACCOUNT_LOCKED_OR_CLOSED" ->
+                    "PayPal rechazó el pago: esta cuenta no puede pagar (está restringida, vencida o no es válida). No se te cobró: usa otra cuenta u otro método.";
+            case "TRANSACTION_REFUSED" -> "PayPal rechazó la transacción. No se te cobró: intenta con otra cuenta u otro método.";
+            default -> "PayPal rechazó el pago con esa cuenta. Intenta con otra cuenta u otro método.";
+        };
+        return new TiendaException(HttpStatus.PAYMENT_REQUIRED, mensaje);
     }
 
     // No se pudo crear el pedido (algo se agotó, otra sesión ganó): el cargo de
@@ -369,14 +412,18 @@ public class PagosService {
     private SimuladorPagoService.Resultado capturarPaypal(Map<String, Object> datos, double total) {
         String id = datos == null || datos.get("orden") == null ? null : datos.get("orden").toString();
         if (id == null) throw new TiendaException(HttpStatus.PAYMENT_REQUIRED, "Falta aprobar el pago en PayPal. Vuelve a intentarlo.");
+        Object simular = datos.get("simular");
+        String codigo = simular == null ? null : SIMULACIONES_PAYPAL.get(simular.toString());
         Map<String, Object> r;
         try {
-            r = paypal.post("/v2/checkout/orders/" + id + "/capture", Map.of(), "captura-" + id);
+            // Con una simulación, cada intento es otra llamada (no la idempotente de la captura real).
+            r = paypal.post("/v2/checkout/orders/" + id + "/capture", Map.of(),
+                    codigo == null ? "captura-" + id : "simulacion-" + id + "-" + System.nanoTime(), codigo);
         } catch (PaypalApi.ErrorPaypal e) {
             if ("ORDER_NOT_APPROVED".equals(e.getMessage()) || "PAYER_ACTION_REQUIRED".equals(e.getMessage())) {
                 throw new TiendaException(HttpStatus.BAD_REQUEST, "Todavía no apruebas el pago en PayPal.");
             }
-            throw new TiendaException(HttpStatus.PAYMENT_REQUIRED, "PayPal rechazó el pago con esa cuenta. Intenta con otra cuenta u otro método.");
+            throw rechazoPaypal(e.getMessage());
         }
         Map<String, Object> captura = Map.of();
         if (r.get("purchase_units") instanceof List<?> unidades && !unidades.isEmpty()) {

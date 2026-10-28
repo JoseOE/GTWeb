@@ -31,6 +31,7 @@ public class PaypalApi {
     private final String clientId;
     private final String secreto;
     private final String base;
+    private final boolean sandbox;
 
     private String token;
     private Instant tokenVence = Instant.EPOCH;
@@ -42,8 +43,13 @@ public class PaypalApi {
         this.json = json;
         this.clientId = clientId == null ? "" : clientId.trim();
         this.secreto = secreto == null ? "" : secreto.trim();
-        this.base = "live".equalsIgnoreCase(modo == null ? "" : modo.trim())
-                ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com";
+        this.sandbox = !"live".equalsIgnoreCase(modo == null ? "" : modo.trim());
+        this.base = sandbox ? "https://api-m.sandbox.paypal.com" : "https://api-m.paypal.com";
+    }
+
+    // Solo el sandbox de PayPal acepta respuestas simuladas (PayPal-Mock-Response).
+    public boolean esSandbox() {
+        return sandbox;
     }
 
     public boolean configurada() {
@@ -53,10 +59,18 @@ public class PaypalApi {
     // POST con cuerpo JSON. idempotencia: el mismo valor no repite la operación
     // en PayPal (por si la respuesta se pierde y se reintenta).
     public Map<String, Object> post(String ruta, Object cuerpo, String idempotencia) {
+        return post(ruta, cuerpo, idempotencia, null);
+    }
+
+    // simular: un código de error de PayPal (INSTRUMENT_DECLINED...) para que el
+    // sandbox responda como si el pago fallara. En producción nunca se manda.
+    public Map<String, Object> post(String ruta, Object cuerpo, String idempotencia, String simular) {
+        String simulacion = sandbox && simular != null ? "{\"mock_application_codes\":\"" + simular + "\"}" : null;
         return llamar(() -> http.post().uri(base + ruta)
                 .header("Authorization", "Bearer " + token())
                 .header("PayPal-Request-Id", idempotencia == null ? UUID.randomUUID().toString() : idempotencia)
                 .header("Prefer", "return=representation")
+                .headers(h -> { if (simulacion != null) h.set("PayPal-Mock-Response", simulacion); })
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(cuerpo == null ? Map.of() : cuerpo)
                 .retrieve().body(String.class), ruta);

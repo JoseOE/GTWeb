@@ -45,7 +45,9 @@
                     <li>En el modo de prueba entra con una cuenta compradora de prueba de PayPal (sandbox), no con tu cuenta real.</li>
                     <li>Si cancelas en PayPal, no se crea ningún pedido.</li>
                 </ul>
+                <div data-paypal-simular></div>
             </div>`;
+        if (window.PaypalSimular) PaypalSimular.montar(contenedor.querySelector('[data-paypal-simular]'));
         if (cancelado) {
             cancelado = false;
             limpiarUrl();
@@ -54,7 +56,7 @@
 
     function obtenerDatos() {
         if (aprobado) {
-            const datos = aprobado;
+            const datos = { ...aprobado, ...(window.PaypalSimular ? PaypalSimular.tomar() : {}) };
             aprobado = null;
             limpiarUrl();
             return Promise.resolve(datos);

@@ -75,11 +75,12 @@ public class PagosController {
         return Map.of("recibido", true);
     }
 
-    // GET /api/pagos/modo → {modo: "sandbox" | "simulado"}: la página y la app
-    // dicen "modo de prueba" y qué cuentas de prueba usar.
+    // GET /api/pagos/modo → {modo: "sandbox" | "simulado", simularPaypal: true|false}:
+    // la página y la app dicen "modo de prueba" y qué cuentas de prueba usar, y si
+    // muestran el selector para simular un pago de PayPal rechazado.
     @GetMapping("/api/pagos/modo")
     public Map<String, Object> modo() {
-        return Map.of("modo", pagos.sandbox() ? PagosService.SANDBOX : "simulado");
+        return Map.of("modo", pagos.sandbox() ? PagosService.SANDBOX : "simulado", "simularPaypal", pagos.paypalSimulable());
     }
 
     private Map<String, Object> carritoSinCambios(User comprador, String canal) {
