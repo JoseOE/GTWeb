@@ -81,6 +81,16 @@ ok(r.s === 200 && ficha.estado === 'pendiente_pago' && ficha.paynet?.fichaUrl &&
 r = await api('POST', `/api/gyms/${gym.id}/ventas/pedidos/${ficha.orderId}/entregar`, null, o.token);
 ok(r.s === 409 && /todavía no está pagado/.test(r.b.error), 'no se entrega antes de pagar la ficha → 409', r.b?.error);
 
+console.log('\n6. PayPal: simular un rechazo (PayPal-Mock-Response del sandbox)');
+r = await api('GET', '/api/pagos/modo');
+ok(r.b?.simularPaypal === true, 'con PayPal en sandbox se puede simular', r.b);
+c = await carrito(1);
+for (const [simular, patron, que] of [['sin_fondos', /fondos suficientes/, 'sin fondos (INSTRUMENT_DECLINED)'], ['cuenta_invalida', /no puede pagar/, 'cuenta inválida (PAYER_CANNOT_PAY)']]) {
+  const o = (await api('POST', '/api/pagos/paypal/ordenes?canal=web', { returnUrl: RET, cancelUrl: CAN }, m.token)).b;
+  r = await api('POST', '/api/tienda/carrito/checkout?canal=web', { metodo: 'paypal', datos: { token: o.id, simular }, totalVisto: c.total, consentimiento: CONSENT }, m.token);
+  ok(r.s === 402 && patron.test(r.b?.error), 'PayPal responde ' + que + ' y no se cobra', r.b?.error);
+}
+
 console.log(fallos ? `\n${fallos} prueba(s) fallaron`
   : '\nTodo bien. Falta lo que pide navegador: pagar en la página de Stripe, aprobar en PayPal y simular la ficha en Openpay (ver el README).');
 process.exit(fallos ? 1 : 0);
