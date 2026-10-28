@@ -28,13 +28,15 @@ public class CuentaService {
     private final TokenCuentaRepository tokenRepository;
     private final CorreoService correoService;
     private final SesionService sesiones;
+    private final BitacoraService bitacora;
 
     public CuentaService(UserRepository userRepository, TokenCuentaRepository tokenRepository, CorreoService correoService,
-                         SesionService sesiones) {
+                         SesionService sesiones, BitacoraService bitacora) {
         this.userRepository = userRepository;
         this.tokenRepository = tokenRepository;
         this.correoService = correoService;
         this.sesiones = sesiones;
+        this.bitacora = bitacora;
     }
 
     // ─── Verificación del correo ───
@@ -112,6 +114,7 @@ public class CuentaService {
         tokenRepository.deleteByUserIdAndTipo(user.getId(), TokenCuenta.RECUPERAR_CONTRASENA);
         // Quien conociera la contraseña anterior deja de estar dentro.
         sesiones.cerrarTodas(user.getId());
+        bitacora.registrar(BitacoraService.CONTRASENA_RESTABLECIDA, user.getId(), user.getEmail(), null);
         correoService.contrasenaCambiada(user);
     }
 
@@ -139,6 +142,7 @@ public class CuentaService {
         boolean suSesion = tokenActual != null && sesiones.usuarioDe(tokenActual).filter(user.getId()::equals).isPresent();
         if (suSesion) sesiones.cerrarOtras(user.getId(), tokenActual);
         else sesiones.cerrarTodas(user.getId());
+        bitacora.registrar(BitacoraService.CONTRASENA_RESTABLECIDA, user.getId(), user.getEmail(), null);
         correoService.contrasenaCambiada(user);
         return user;
     }
