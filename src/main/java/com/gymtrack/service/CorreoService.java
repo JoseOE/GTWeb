@@ -160,6 +160,12 @@ public class CorreoService {
     // Un correo que falla nunca tumba la operación que lo pidió: se avisa en la
     // consola y quien llama decide qué decirle al usuario.
     boolean enviar(String para, String asunto, String plantilla, Map<String, Object> variables, List<Adjunto> adjuntos) {
+        // Las cuentas de demostración (@gymtrack.demo) no existen: mandarles correo
+        // solo generaría rebotes que dañan la reputación del remitente en Brevo.
+        if (esCuentaDemo(para)) {
+            log.info("Cuenta de demostración: no se envió \"{}\" a {}", asunto, para);
+            return false;
+        }
         if (!configurado()) {
             // La plantilla se arma de todos modos: así un error en ella aparece
             // en la consola también en local, sin Brevo.
@@ -206,6 +212,12 @@ public class CorreoService {
         Map<String, Object> datos = new HashMap<>(variables);
         datos.put("urlPublica", urlPublica);
         return plantillas.process("correos/" + plantilla, new Context(ES_MX, datos));
+    }
+
+    public static final String DOMINIO_DEMO = "gymtrack.demo";
+
+    public static boolean esCuentaDemo(String correo) {
+        return correo != null && correo.trim().toLowerCase().endsWith("@" + DOMINIO_DEMO);
     }
 
     private boolean configurado() {
