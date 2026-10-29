@@ -88,7 +88,9 @@ public class SesionFilter extends OncePerRequestFilter {
             regla("GET", "/api/recibos/compartidos/*"),
             regla("GET", "/api/pagos/modo"),
             regla("GET", "/api/opiniones/destacadas"),
-            regla("POST", "/api/webhooks/openpay"));
+            regla("POST", "/api/webhooks/openpay"),
+            // El lector de la puerta no tiene sesión: LectorController exige su llave (X-Lector-Key).
+            regla(null, "/api/lectores/**"));
 
     // Solo las usa el panel de la página: exigen sesión aunque la app siga en transición.
     private static final List<Regla> PANEL = List.of(
@@ -114,6 +116,8 @@ public class SesionFilter extends OncePerRequestFilter {
             regla(null, "/api/gyms/*/resenas"),
             regla(null, "/api/gyms/*/resenas/**"),
             regla("POST", "/api/gyms/*/tienda/migrar-medusa"),
+            regla(null, "/api/gyms/*/acceso"),
+            regla(null, "/api/gyms/*/acceso/**"),
             regla(null, "/api/simuladores/paynet/**"));
 
     public static final String ATRIBUTO_USUARIO = "gymtrack.sesion.usuario";
