@@ -19,9 +19,20 @@
 #include "SPI.h"
 #include <Preferences.h>
 #include <WiFi.h>
+#include <WiFiMulti.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include "secrets.h"
+
+// Las redes 2 y 3 son opcionales: un secrets.h viejo, sin ellas, también compila.
+#ifndef WIFI_SSID_2
+#define WIFI_SSID_2 ""
+#define WIFI_PASS_2 ""
+#endif
+#ifndef WIFI_SSID_3
+#define WIFI_SSID_3 ""
+#define WIFI_PASS_3 ""
+#endif
 
 #define DISPARO         D1   // GPIO 2; llega de GPIO 13 de la LILYGO
 #define SD_CS           21   // la microSD y el LED de la placa comparten este pin
@@ -50,6 +61,8 @@
 #define PCLK_GPIO_NUM   13
 
 Preferences prefs;
+WiFiMulti redes;
+uint32_t ultimoIntentoWifi = 0;
 bool camaraLista = false;
 uint32_t contador = 0;   // número de la última foto; sobrevive a los reinicios
 bool disparoAntes = false;
@@ -173,12 +186,21 @@ void setup() {
   prefs.begin("camara", false);
   contador = prefs.getUInt("contador", 0);
 
+  // Las mismas redes que la LILYGO: se conecta a la conocida con mejor señal.
   WiFi.mode(WIFI_STA);
-  WiFi.setAutoReconnect(true);
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  Serial.printf("Conectando a %s", WIFI_SSID);
-  for (int i = 0; i < 30 && WiFi.status() != WL_CONNECTED; i++) { delay(500); Serial.print("."); }
-  Serial.println(WiFi.status() == WL_CONNECTED ? " OK" : " sin WiFi (solo microSD)");
+  const char* nombres[] = {WIFI_SSID, WIFI_SSID_2, WIFI_SSID_3};
+  const char* claves[]  = {WIFI_PASS, WIFI_PASS_2, WIFI_PASS_3};
+  for (int i = 0; i < 3; i++) {
+    if (strlen(nombres[i])) redes.addAP(nombres[i], claves[i]);
+  }
+  Serial.println("Buscando una red conocida...");
+  for (int i = 0; i < 3 && redes.run(8000) != WL_CONNECTED; i++) Serial.println("  ...otra vez");
+  ultimoIntentoWifi = millis();
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.printf("WiFi: conectado a \"%s\", señal %d dBm\n", WiFi.SSID().c_str(), WiFi.RSSI());
+  } else {
+    Serial.println("Sin WiFi: las fotos quedan en la microSD; se reintenta cada 15 s.");
+  }
 
   camaraLista = iniciarCamara();
   if (camaraLista) {
@@ -191,6 +213,14 @@ void setup() {
 
 void loop() {
   if (Serial.available() && Serial.read() == 'f') tomarFotos();
+
+  // Sin WiFi, otro intento cada 15 s (si llega un pulso mientras, se atiende después).
+  if (WiFi.status() != WL_CONNECTED && millis() - ultimoIntentoWifi > 15000) {
+    ultimoIntentoWifi = millis();
+    if (redes.run(4000) == WL_CONNECTED) {
+      Serial.printf("WiFi: conectado a \"%s\"\n", WiFi.SSID().c_str());
+    }
+  }
 
   bool disparo = digitalRead(DISPARO) == HIGH;
   if (disparo && !disparoAntes && millis() > ARRANQUE_MS) {
