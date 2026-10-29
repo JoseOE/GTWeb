@@ -378,18 +378,28 @@ void vigilarWifi() {
 // ------------------------------------------------------------
 // Módem (LTE-M y 2G). Quien llame debe tener el candado.
 // ------------------------------------------------------------
+// El pulso en PWRKEY prende el módem si está apagado, pero lo APAGA si ya estaba
+// prendido (p. ej. si el ESP32 se reinició y el módem no).
+void pulsoModem() {
+  pinMode(MODEM_PWR, OUTPUT);
+  digitalWrite(MODEM_PWR, LOW);  delay(100);
+  digitalWrite(MODEM_PWR, HIGH); delay(1000);
+  digitalWrite(MODEM_PWR, LOW);
+}
+
 bool encenderModem(int cual) {
   Serial.printf("Encendiendo el módem para %s...\n", NOMBRE_RED[cual]);
   modemSerial.begin(115200, SERIAL_8N1, MODEM_RX, MODEM_TX);
-  if (!modem.testAT(1000)) {
-    // El pulso enciende el módem (si ya estaba encendido lo apagaría: por eso se prueba antes).
-    pinMode(MODEM_PWR, OUTPUT);
-    digitalWrite(MODEM_PWR, LOW);  delay(100);
-    digitalWrite(MODEM_PWR, HIGH); delay(1000);
-    digitalWrite(MODEM_PWR, LOW);
-    delay(3000);
+  // Primero se le pregunta un buen rato: si ya está prendido, no se le da el pulso.
+  bool responde = modem.testAT(4000);
+  // Si no, pulso para prenderlo; si tampoco, quizá el pulso lo apagó: otro pulso.
+  for (int intento = 0; intento < 2 && !responde; intento++) {
+    Serial.println(intento == 0 ? "  prendiendo el módem..." : "  no respondió: otro pulso...");
+    pulsoModem();
+    delay(5000);
+    responde = modem.testAT(10000);
   }
-  if (!modem.testAT(10000)) {
+  if (!responde) {
     Serial.println("El módem no responde. Revisa que la placa tenga batería o buena alimentación.");
     return false;
   }
@@ -645,7 +655,7 @@ void avisarC6(char tipo, const String& nombre, int dentro) {
   Serial.printf("         [C6] %s", linea.c_str());
 }
 
-// Corre aparte (núcleo 0). Por WiFi el servidor tiene la consulta abierta hasta
+// Corre aparte (en el núcleo 1, ver setup). Por WiFi el servidor tiene la consulta abierta hasta
 // 15 s (responde en cuanto haya algo); por LTE/2G se pregunta cada 4 s sin
 // esperar, para no tener el módem ocupado y que los tags pasen rápido.
 void tareaComandos(void*) {
@@ -806,7 +816,10 @@ void setup() {
   int guardada = prefs.getInt("red", RED_WIFI);
   red = RED_WIFI;   // al arrancar no hay nada de otra red que apagar
   usarRed(guardada >= RED_WIFI && guardada <= RED_2G ? guardada : RED_WIFI);
-  xTaskCreatePinnedToCore(tareaComandos, "comandos", 10240, nullptr, 1, nullptr, 0);
+  // En el núcleo 1, junto a loop(): por el módem, la librería HTTP espera la
+  // respuesta sin soltar el procesador, y en el núcleo 0 eso dispara el
+  // watchdog del sistema (task_wdt) y reinicia la placa.
+  xTaskCreatePinnedToCore(tareaComandos, "comandos", 10240, nullptr, 1, nullptr, 1);
   Serial.println("Listo. Comandos: w / l / g (WiFi, LTE-M, 2G), r (estado), n (simular tag desconocido), + / - (potencia)");
 }
 
