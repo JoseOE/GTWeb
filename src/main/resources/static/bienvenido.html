@@ -2826,8 +2826,12 @@
                     return `
                         <tr>
                             <td class="ps-4 text-nowrap">${hora(a.fecha)}<div class="small text-body-secondary">${new Date(a.fecha).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}</div></td>
-                            <td><span class="fw-semibold">${escapeHtml(a.nombre || 'Tag desconocido')}</span><div class="small text-body-secondary font-monospace text-break">${escapeHtml(a.epc || '')}</div></td>
-                            <td class="pe-4"><span class="badge rounded-pill ${clase}"><i class='bx ${icono}'></i> ${texto}</span>${a.motivo ? '<div class="small text-body-secondary">' + escapeHtml(a.motivo) + '</div>' : ''}</td>
+                            <td><span class="fw-semibold">${escapeHtml(a.nombre || 'Tag desconocido')}</span><div class="small text-body-secondary font-monospace text-break">${a.porRostro ? '<i class="bx bx-face" aria-hidden="true"></i> Por su cara' : escapeHtml(a.epc || '')}</div></td>
+                            <td class="pe-4"><span class="badge rounded-pill ${clase}"><i class='bx ${icono}'></i> ${texto}</span>${a.motivo ? '<div class="small text-body-secondary">' + escapeHtml(a.motivo) + '</div>' : ''}
+                                ${a.fotos && a.fotos.length ? '<div class="d-flex gap-1 mt-1">' + a.fotos.map(id => `
+                                    <a href="#" data-foto="${escapeHtml(id)}" class="d-block rounded-2 overflow-hidden border" style="width:48px;height:36px" aria-label="Ver foto en grande">
+                                        <img data-foto-id="${escapeHtml(id)}" alt="Foto del pase" style="width:100%;height:100%;object-fit:cover" ${fotosCache.has(id) ? 'src="' + fotosCache.get(id) + '"' : ''}>
+                                    </a>`).join('') + '</div>' : ''}</td>
                         </tr>`;
                 }).join('') : '<tr><td colspan="3" class="text-center text-body-secondary py-5"><i class="bx bx-scan fs-1 d-block mb-2 opacity-50"></i>Aquí aparece cada pase por el lector en cuanto ocurre.</td></tr>';
                 return `
