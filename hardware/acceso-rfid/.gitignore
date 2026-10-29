@@ -1,2 +1,3 @@
-# Llaves del lector y contraseña del WiFi: cada quien tiene las suyas.
+# Secretos de cada placa y lo que compila compilar_c6.sh.
 secrets.h
+build_c6/
