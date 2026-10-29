@@ -25,8 +25,18 @@ public class Lector {
     private Instant registroHasta;
     private String epcCapturado;
     private Instant epcCapturadoEn;
+    // Orden de abrir que no viene de una alerta (p. ej. la XIAO reconoció la
+    // cara de un socio): el lector la recoge en su siguiente consulta de comandos.
+    private Instant abrirEn;
+    private String abrirPara;
 
     public Lector() {}
+
+    public Instant getAbrirEn() { return abrirEn; }
+    public void setAbrirEn(Instant abrirEn) { this.abrirEn = abrirEn; }
+
+    public String getAbrirPara() { return abrirPara; }
+    public void setAbrirPara(String abrirPara) { this.abrirPara = abrirPara; }
 
     public Instant getRegistroHasta() { return registroHasta; }
     public void setRegistroHasta(Instant registroHasta) { this.registroHasta = registroHasta; }

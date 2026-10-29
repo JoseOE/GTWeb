@@ -5,6 +5,8 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 // Bitácora de la puerta: cada entrada, salida o acceso negado.
 @Document(collection = "accesos")
@@ -27,8 +29,17 @@ public class Acceso {
     private String motivo;      // por qué se negó, o quién abrió desde el panel
     private String solicitudId;
     private Instant fecha;
+    // Entró o salió porque la XIAO reconoció su cara; sus fotos quedan aquí.
+    private boolean porRostro;
+    private List<String> fotos = new ArrayList<>();
 
     public Acceso() {}
+
+    public boolean isPorRostro() { return porRostro; }
+    public void setPorRostro(boolean porRostro) { this.porRostro = porRostro; }
+
+    public List<String> getFotos() { return fotos; }
+    public void setFotos(List<String> fotos) { this.fotos = fotos; }
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
