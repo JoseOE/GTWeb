@@ -20,6 +20,11 @@
 //
 // Sin internet decide con la lista de tags que descarga cada minuto (/lista).
 //
+// Cada entrada, salida o negado se le avisa por GPIO 13 a la ESP32-C6 del foco
+// (c6_foco): ella prende el foco y le pasa el aviso a la C6 de la Alexa (c6_alexa),
+// que por Matter hace que la Alexa diga "Bienvenido Chema", "Hasta luego Chema"
+// o "Acceso denegado".
+//
 // Comandos por el monitor serie (115200):
 //   w  usar WiFi        l  usar LTE-M        g  usar 2G        r  estado de la red
 //   n  simular un tag desconocido (crea la alerta en el panel)
@@ -69,6 +74,8 @@
 #define MODEM_RX        26   // llega del TX del módem (dentro de la placa)
 #define MODEM_TX        27
 #define MODEM_PWR       4    // pulso para encender el módem
+#define AVISO_C6        13   // va al RX de la ESP32-C6 del foco (serial de 9600, solo TX)
+#define BAUDIOS_C6      9600
 // Reservados para la versión final, sin conectar todavía:
 //   servo de la puerta en GPIO 23; botón "Solicitar acceso" en GPIO 34 (con 10 kΩ a 3V3).
 
@@ -110,6 +117,7 @@ Visto vistos[8];
 
 // Respuesta del servidor (codigo < 0 = no hubo respuesta).
 struct Respuesta { int codigo; String cuerpo; };
+int dentroServidor = -1;        // cuántos quedan dentro, según la última respuesta
 
 // Lista para decidir sin internet.
 struct Permitido { char epc[65]; char nombre[32]; bool permitido; };
@@ -603,7 +611,38 @@ bool preguntarAlServidor(const char* epc, String& resultado, String& nombre, Str
   nombre = campo(r.cuerpo, "nombre");
   motivo = campo(r.cuerpo, "motivo");
   fotos = r.cuerpo.indexOf("\"fotos\":true") >= 0;
+  int i = r.cuerpo.indexOf("\"dentro\":");
+  dentroServidor = i >= 0 ? r.cuerpo.substring(i + 9).toInt() : -1;
   return resultado.length() > 0;
+}
+
+// ------------------------------------------------------------
+// Aviso a la ESP32-C6 del foco (y de ahí a la Alexa por Matter)
+// ------------------------------------------------------------
+// Los tres UART del ESP32 ya están ocupados (USB, módem y YRM): este serial
+// de solo transmisión se hace a mano, bit por bit, a 9600 baudios.
+portMUX_TYPE candadoBits = portMUX_INITIALIZER_UNLOCKED;
+
+void enviarByteC6(uint8_t b) {
+  const uint32_t bit = 1000000 / BAUDIOS_C6;   // 104 µs
+  taskENTER_CRITICAL(&candadoBits);
+  digitalWrite(AVISO_C6, LOW);                  // bit de inicio
+  esp_rom_delay_us(bit);
+  for (int i = 0; i < 8; i++) {
+    digitalWrite(AVISO_C6, (b >> i) & 1);
+    esp_rom_delay_us(bit);
+  }
+  digitalWrite(AVISO_C6, HIGH);                 // bit de parada
+  esp_rom_delay_us(bit);
+  taskEXIT_CRITICAL(&candadoBits);
+}
+
+// Una línea "TIPO|nombre|dentro": E entrada, S salida, N negado, A abierta
+// desde el panel. dentro = cuántos quedan en el gimnasio (-1 = no se sabe).
+void avisarC6(char tipo, const String& nombre, int dentro) {
+  String linea = String(tipo) + "|" + nombre + "|" + dentro + "\n";
+  for (size_t i = 0; i < linea.length(); i++) enviarByteC6(linea[i]);
+  Serial.printf("         [C6] %s", linea.c_str());
 }
 
 // Corre aparte (núcleo 0). Por WiFi el servidor tiene la consulta abierta hasta
@@ -650,16 +689,19 @@ void decidirSinRed(const char* epc) {
     if (strcmp(lista[i].epc, epc) == 0) {
       if (lista[i].permitido) {
         Serial.printf("ENTRADA  %s  [sin red: lista local]\n", lista[i].nombre);
+        avisarC6('E', lista[i].nombre, -1);
         abrirPuerta();
         senal(LED_VERDE, 1);
       } else {
         Serial.printf("NEGADO   %s: membresia vencida  [sin red]\n", lista[i].nombre);
+        avisarC6('N', lista[i].nombre, -1);
         senal(LED_ROJO, 3);
       }
       return;
     }
   }
   Serial.printf("NEGADO   tag desconocido %s  [sin red]\n", epc);
+  avisarC6('N', "", -1);
   senal(LED_ROJO, 3);
 }
 
@@ -674,15 +716,18 @@ void alLeerTag(const char* epc, int8_t rssi, bool forzar) {
   }
   if (resultado == "ENTRADA") {
     Serial.printf("ENTRADA  %s  RSSI=%d\n", nombre.c_str(), rssi);
+    avisarC6('E', nombre, dentroServidor);
     abrirPuerta();
     senal(LED_VERDE, 1);
   } else if (resultado == "SALIDA") {
     Serial.printf("SALIDA   %s  RSSI=%d\n", nombre.c_str(), rssi);
+    avisarC6('S', nombre, dentroServidor);
     abrirPuerta();
     senal(LED_AZUL, 2);
   } else if (resultado == "NEGADO") {
     Serial.printf("NEGADO   %s %s (%s)\n", nombre.length() ? nombre.c_str() : epc, motivo.c_str(),
                   fotos ? "alerta nueva en el panel" : "su alerta sigue pendiente");
+    if (fotos) avisarC6('N', nombre, -1);   // la misma alerta otra vez: la Alexa no lo repite
     senal(LED_ROJO, 3);
   } else if (resultado == "REGISTRO") {
     Serial.printf("REGISTRO tag %s capturado%s%s: asignalo en el panel\n", epc,
@@ -722,6 +767,7 @@ void atenderComando() {
   comandoPendiente = 0;
   if (c == 1) {
     Serial.printf("PANEL    el dueño abrio la puerta a %s\n", nombreComando);
+    avisarC6('A', nombreComando, -1);
     abrirPuerta();
     senal(LED_VERDE, 1);
   } else {
@@ -738,6 +784,8 @@ void setup() {
 
   pinMode(LED_VERDE, OUTPUT); pinMode(LED_AZUL, OUTPUT);
   pinMode(LED_ROJO, OUTPUT);  pinMode(BUZZER, OUTPUT);
+  pinMode(AVISO_C6, OUTPUT);
+  digitalWrite(AVISO_C6, HIGH);   // un serial en reposo está en alto
 
   // El YRM puede tardar en encender más que la LILYGO: se reintenta unos segundos.
   yrm.begin(115200, SERIAL_8N1, RFID_RX, RFID_TX);
