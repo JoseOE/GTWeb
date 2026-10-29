@@ -145,14 +145,61 @@ public class ControlAccesoService {
         return respuesta(Acceso.ENTRADA, socio.getNombre(), null, null);
     }
 
-    // Solo una alerta nueva pide fotos ("fotos": true): si el mismo tag vuelve a
-    // pasar mientras su alerta sigue pendiente, la XIAO no toma otras 3.
+    // La XIAO reconoció una cara con su modelo (Edge Impulse). La etiqueta del
+    // modelo es el primer nombre del socio ("chema", "valeria"...). Se aplican las
+    // mismas reglas que con el tag, y si puede pasar, se le ordena abrir al lector.
+    public Map<String, Object> registrarRostro(Lector lector, String etiqueta, Double confianza) {
+        String buscada = normalizar(etiqueta);
+        if (buscada.isEmpty()) {
+            throw new TiendaException(HttpStatus.BAD_REQUEST, "Falta la etiqueta del modelo.");
+        }
+        User socio = socios(lector.getGymId()).values().stream()
+                .filter(u -> buscada.equals(normalizar(nombreDe(u).split("\\s+")[0])))
+                .findFirst().orElse(null);
+        String porcentaje = confianza == null ? "" : " (" + Math.round(confianza * 100) + " %)";
+        if (socio == null) {
+            return respuesta("DESCONOCIDO", "", "Ningún socio de este gimnasio se llama \"" + etiqueta + "\"", null);
+        }
+        Instant ahora = Instant.now();
+        Optional<Acceso> ultimo = accesos.findFirstByUserIdAndTipoInOrderByFechaDesc(socio.getId(), List.of(Acceso.ENTRADA, Acceso.SALIDA));
+        if (ultimo.isPresent() && Duration.between(ultimo.get().getFecha(), ahora).compareTo(MINIMO_ENTRE_PASES) < 0) {
+            return respuesta("IGNORADO", socio.getNombre(), "Muy pronto desde su último pase", null);
+        }
+        String motivo = "Reconocido por su cara" + porcentaje;
+        if (estaDentro(ultimo, ahora)) {
+            guardarAcceso(lector, null, socio.getId(), socio.getNombre(), Acceso.SALIDA, motivo, null, true);
+            ordenarAbrir(lector, socio.getNombre());
+            return respuesta(Acceso.SALIDA, socio.getNombre(), motivo, null);
+        }
+        if (!membresiaVigente(socio)) {
+            return negar(lector, null, socio, "Membresía vencida (reconocido por su cara" + porcentaje + ")", true);
+        }
+        guardarAcceso(lector, null, socio.getId(), socio.getNombre(), Acceso.ENTRADA, motivo, null, true);
+        ordenarAbrir(lector, socio.getNombre());
+        return respuesta(Acceso.ENTRADA, socio.getNombre(), motivo, null);
+    }
+
+    // El lector la recoge en esperarComando; caduca a los 30 s.
+    private void ordenarAbrir(Lector lector, String nombre) {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(lector.getId())),
+                new Update().set("abrirEn", Instant.now()).set("abrirPara", nombre), Lector.class);
+    }
+
     private Map<String, Object> negar(Lector lector, String epc, User socio, String motivo) {
+        return negar(lector, epc, socio, motivo, false);
+    }
+
+    // Solo una alerta nueva pide fotos ("fotos": true): si el mismo tag (o la
+    // misma cara) vuelve a pasar mientras su alerta sigue pendiente, la XIAO no toma otras 3.
+    private Map<String, Object> negar(Lector lector, String epc, User socio, String motivo, boolean porRostro) {
         String nombre = socio == null ? null : socio.getNombre();
         Instant ahora = Instant.now();
         // El mismo tag frente al lector: no se llena el panel de alertas repetidas.
-        Optional<SolicitudAcceso> reciente = solicitudes.findFirstByLectorIdAndEpcAndEstadoAndCreadaEnAfter(
-                lector.getId(), epc, SolicitudAcceso.PENDIENTE, ahora.minus(SOLICITUD_REPETIDA));
+        Optional<SolicitudAcceso> reciente = epc != null
+                ? solicitudes.findFirstByLectorIdAndEpcAndEstadoAndCreadaEnAfter(
+                        lector.getId(), epc, SolicitudAcceso.PENDIENTE, ahora.minus(SOLICITUD_REPETIDA))
+                : solicitudes.findFirstByLectorIdAndUserIdAndEstadoAndCreadaEnAfter(
+                        lector.getId(), socio.getId(), SolicitudAcceso.PENDIENTE, ahora.minus(SOLICITUD_REPETIDA));
         if (reciente.isPresent()) {
             return respuesta(Acceso.NEGADO, nombre, motivo, reciente.get().getId());
         }
@@ -165,7 +212,7 @@ public class ControlAccesoService {
         s.setMotivo(motivo);
         s.setCreadaEn(ahora);
         s = solicitudes.save(s);
-        guardarAcceso(lector, epc, s.getUserId(), nombre, Acceso.NEGADO, motivo, s.getId());
+        guardarAcceso(lector, epc, s.getUserId(), nombre, Acceso.NEGADO, motivo, s.getId(), porRostro);
         Map<String, Object> r = respuesta(Acceso.NEGADO, nombre, motivo, s.getId());
         r.put("fotos", true);
         return r;
@@ -175,6 +222,17 @@ public class ControlAccesoService {
     public Optional<Map<String, Object>> esperarComando(Lector lector, Duration espera) {
         Instant limite = Instant.now().plus(espera);
         while (true) {
+            // Una orden directa (cara reconocida): se toma y se borra de una vez.
+            Lector conOrden = mongo.findAndModify(
+                    Query.query(Criteria.where("_id").is(lector.getId()).and("abrirEn").gt(Instant.now().minusSeconds(30))),
+                    new Update().unset("abrirEn").unset("abrirPara"), Lector.class);
+            if (conOrden != null) {
+                Map<String, Object> comando = new LinkedHashMap<>();
+                comando.put("comando", "abrir");
+                comando.put("solicitudId", null);
+                comando.put("nombre", conOrden.getAbrirPara() == null ? "" : conOrden.getAbrirPara());
+                return Optional.of(comando);
+            }
             Optional<SolicitudAcceso> decidida = solicitudes.findFirstByLectorIdAndEstadoInAndComandoEntregadoFalseAndAtendidaEnAfter(
                     lector.getId(), List.of(SolicitudAcceso.APROBADA, SolicitudAcceso.RECHAZADA), Instant.now().minus(VIGENCIA_SOLICITUD));
             if (decidida.isPresent()) {
@@ -204,27 +262,40 @@ public class ControlAccesoService {
         if (datos.length > MAX_FOTO) {
             throw new TiendaException(HttpStatus.BAD_REQUEST, "La foto es demasiado pesada (máximo 1.5 MB).");
         }
-        Optional<SolicitudAcceso> solicitud = solicitudes.findFirstByLectorIdAndCreadaEnAfterOrderByCreadaEnDesc(
-                lector.getId(), Instant.now().minus(FOTOS_DE_LA_SOLICITUD));
-        if (solicitud.isPresent() && solicitud.get().getFotos().size() >= FOTOS_POR_ALERTA) {
-            throw new TiendaException(HttpStatus.CONFLICT, "Esa alerta ya tiene sus " + FOTOS_POR_ALERTA + " fotos.");
+        Instant desde = Instant.now().minus(FOTOS_DE_LA_SOLICITUD);
+        Optional<SolicitudAcceso> solicitud = solicitudes.findFirstByLectorIdAndCreadaEnAfterOrderByCreadaEnDesc(lector.getId(), desde);
+        // Si lo más reciente fue una entrada o salida por cara, las fotos son de ese pase.
+        Optional<Acceso> porCara = accesos.findFirstByLectorIdAndPorRostroTrueAndFechaAfterOrderByFechaDesc(lector.getId(), desde)
+                .filter(a -> !Acceso.NEGADO.equals(a.getTipo()))
+                .filter(a -> solicitud.isEmpty() || a.getFecha().isAfter(solicitud.get().getCreadaEn()));
+        List<String> destino = porCara.isPresent() ? porCara.get().getFotos()
+                : solicitud.map(SolicitudAcceso::getFotos).orElse(null);
+        if (destino != null && destino.size() >= FOTOS_POR_ALERTA) {
+            throw new TiendaException(HttpStatus.CONFLICT, "Ese pase ya tiene sus " + FOTOS_POR_ALERTA + " fotos.");
         }
 
         FotoAcceso foto = new FotoAcceso();
         foto.setGymId(lector.getGymId());
         foto.setLectorId(lector.getId());
-        foto.setSolicitudId(solicitud.map(SolicitudAcceso::getId).orElse(null));
+        foto.setSolicitudId(porCara.isPresent() ? null : solicitud.map(SolicitudAcceso::getId).orElse(null));
         foto.setDatos(datos);
         foto.setCreadaEn(Instant.now());
         String fotoId = fotos.save(foto).getId();
 
-        solicitud.ifPresent(s -> {
-            s.getFotos().add(fotoId);
-            solicitudes.save(s);
-        });
+        if (porCara.isPresent()) {
+            Acceso a = porCara.get();
+            a.getFotos().add(fotoId);
+            accesos.save(a);
+        } else {
+            solicitud.ifPresent(s -> {
+                s.getFotos().add(fotoId);
+                solicitudes.save(s);
+            });
+        }
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("id", fotoId);
         r.put("solicitudId", foto.getSolicitudId());
+        r.put("accesoId", porCara.map(Acceso::getId).orElse(null));
         return r;
     }
 
@@ -306,6 +377,8 @@ public class ControlAccesoService {
             m.put("epc", a.getEpc());
             m.put("tipo", a.getTipo());
             m.put("motivo", a.getMotivo());
+            m.put("porRostro", a.isPorRostro());
+            m.put("fotos", a.getFotos() == null ? List.of() : a.getFotos());
             return m;
         }).toList();
 
@@ -478,7 +551,13 @@ public class ControlAccesoService {
     }
 
     private void guardarAcceso(Lector lector, String epc, String userId, String nombre, String tipo, String motivo, String solicitudId) {
+        guardarAcceso(lector, epc, userId, nombre, tipo, motivo, solicitudId, false);
+    }
+
+    private void guardarAcceso(Lector lector, String epc, String userId, String nombre, String tipo, String motivo,
+                               String solicitudId, boolean porRostro) {
         Acceso a = new Acceso();
+        a.setPorRostro(porRostro);
         a.setGymId(lector.getGymId());
         a.setLectorId(lector.getId());
         a.setEpc(epc);
@@ -503,6 +582,13 @@ public class ControlAccesoService {
 
     private static String nombreDe(User u) {
         return u.getNombre() == null || u.getNombre().isBlank() ? "(sin nombre)" : u.getNombre();
+    }
+
+    // "Chéma " → "chema": para comparar la etiqueta del modelo con el nombre del socio.
+    static String normalizar(String texto) {
+        if (texto == null) return "";
+        return java.text.Normalizer.normalize(texto.trim(), java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "").toLowerCase();
     }
 
     static String normalizarEpc(String epc) {

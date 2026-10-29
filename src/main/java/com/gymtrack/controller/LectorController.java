@@ -30,12 +30,26 @@ public class LectorController {
         return control.registrarLectura(lector, body.get("epc"));
     }
 
-    // GET /api/lectores/comandos → espera hasta 15 s a que el dueño abra o
-    // niegue desde el panel: {"comando": "abrir|negar", ...}, o 204 si no hubo nada.
-    @GetMapping("/comandos")
-    public ResponseEntity<Map<String, Object>> comandos(@RequestHeader(value = ControlAccesoService.LLAVE, required = false) String llave) {
+    // POST /api/lectores/rostro  {"etiqueta": "chema", "confianza": 0.93}
+    //   La XIAO reconoció una cara. → {"resultado": "ENTRADA|SALIDA|NEGADO|IGNORADO|DESCONOCIDO", ...}
+    @PostMapping("/rostro")
+    public Map<String, Object> rostro(@RequestHeader(value = ControlAccesoService.LLAVE, required = false) String llave,
+                                      @RequestBody Map<String, Object> body) {
         Lector lector = control.lectorDe(llave);
-        return control.esperarComando(lector, Duration.ofSeconds(15))
+        Object confianza = body.get("confianza");
+        return control.registrarRostro(lector, body.get("etiqueta") == null ? null : body.get("etiqueta").toString(),
+                confianza instanceof Number n ? n.doubleValue() : null);
+    }
+
+    // GET /api/lectores/comandos?espera=15 → espera hasta "espera" segundos (0 a 15)
+    // a que haya algo que hacer: {"comando": "abrir|negar", ...}, o 204 si no hubo nada.
+    // Por WiFi el lector espera los 15 s; por LTE o 2G pregunta con espera=0 cada
+    // pocos segundos, para no tener el módem ocupado.
+    @GetMapping("/comandos")
+    public ResponseEntity<Map<String, Object>> comandos(@RequestHeader(value = ControlAccesoService.LLAVE, required = false) String llave,
+                                                        @RequestParam(defaultValue = "15") int espera) {
+        Lector lector = control.lectorDe(llave);
+        return control.esperarComando(lector, Duration.ofSeconds(Math.max(0, Math.min(espera, 15))))
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
