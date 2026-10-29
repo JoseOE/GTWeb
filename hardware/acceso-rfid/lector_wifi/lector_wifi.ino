@@ -431,17 +431,45 @@ void apagarModem() {
   modem.poweroff();
 }
 
-// Si se cayeron los datos celulares, otro intento cada 30 s.
+// Si se cayeron los datos celulares, otro intento cada 30 s; a los 3 fallos
+// seguidos se reinicia el módem completo (a veces se queda trabado sin red).
+int fallosDatos = 0;
+
 void vigilarModem() {
   if (millis() - ultimoIntentoRed < 30000) return;
   ultimoIntentoRed = millis();
   if (xSemaphoreTake(candado, 0) != pdTRUE) return;   // ocupado en una petición: después
   if (!modem.isGprsConnected()) {
-    Serial.printf("Sin datos por %s: reconectando...\n", NOMBRE_RED[red]);
-    if (!modem.isNetworkConnected()) modem.waitForNetwork(30000L);
-    if (modem.gprsConnect(APN, "", "")) Serial.printf("%s de vuelta, IP %s\n", NOMBRE_RED[red], modem.getLocalIP().c_str());
+    fallosDatos++;
+    Serial.printf("Sin datos por %s (señal %d/31, intento %d): reconectando...\n",
+                  NOMBRE_RED[red], modem.getSignalQuality(), fallosDatos);
+    bool ok = (modem.isNetworkConnected() || modem.waitForNetwork(30000L)) && modem.gprsConnect(APN, "", "");
+    if (ok) {
+      fallosDatos = 0;
+      Serial.printf("%s de vuelta, IP %s\n", NOMBRE_RED[red], modem.getLocalIP().c_str());
+    } else if (fallosDatos >= 3) {
+      Serial.println("No regresa: reiniciando el módem. Si pasa seguido, revisa la batería y la alimentación del YRM.");
+      apagarModem();
+      delay(3000);
+      if (encenderModem(red)) fallosDatos = 0;
+    }
   }
   xSemaphoreGive(candado);
+}
+
+// Cambiar de red reinicia la placa: así la red nueva arranca limpia (al volver
+// de LTE a WiFi, el WiFi quedaba conectado pero sin poder llegar al servidor).
+void cambiarRed(int nueva) {
+  if (nueva == red) return;
+  Serial.printf("\nCambiando a %s: se guarda y se reinicia la placa...\n", NOMBRE_RED[nueva]);
+  prefs.putInt("red", nueva);
+  if (red != RED_WIFI) {
+    redLista = false;
+    xSemaphoreTake(candado, portMAX_DELAY);
+    apagarModem();
+  }
+  delay(300);
+  ESP.restart();
 }
 
 // ------------------------------------------------------------
@@ -826,9 +854,9 @@ void setup() {
 void loop() {
   if (Serial.available()) {
     char c = Serial.read();
-    if (c == 'w' && red != RED_WIFI) usarRed(RED_WIFI);
-    if (c == 'l' && red != RED_LTE)  usarRed(RED_LTE);
-    if (c == 'g' && red != RED_2G)   usarRed(RED_2G);
+    if (c == 'w') cambiarRed(RED_WIFI);
+    if (c == 'l') cambiarRed(RED_LTE);
+    if (c == 'g') cambiarRed(RED_2G);
     if (c == 'r') mostrarEstado();
     if (c == 'n') alLeerTag(EPC_SIMULADO, 0, true);
     if (c == '+' && potenciaDbm < 26) fijarPotencia(++potenciaDbm);
