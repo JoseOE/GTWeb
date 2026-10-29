@@ -108,6 +108,31 @@ public class ControlAccesoService {
         return lector;
     }
 
+    // La XIAO reconoció un comando de voz con su modelo (Edge Impulse) mientras
+    // se presionaba su botón: "entrada" prende su LED y "salida" lo apaga.
+    public Map<String, Object> registrarVoz(Lector lector, String comandoCrudo, Double confianza) {
+        String comando = normalizar(comandoCrudo);
+        if (!comando.equals("entrada") && !comando.equals("salida")) {
+            throw new TiendaException(HttpStatus.BAD_REQUEST, "El comando de voz debe ser \"entrada\" o \"salida\".");
+        }
+        String led = comando.equals("entrada") ? "encendido" : "apagado";
+        String porcentaje = confianza == null ? "" : " (" + Math.round(confianza * 100) + " %)";
+        guardarAcceso(lector, null, null, "Comando de voz", Acceso.VOZ,
+                "\"" + comando + "\"" + porcentaje + ": LED " + led, null);
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("resultado", "OK");
+        r.put("comando", comando);
+        r.put("led", led);
+        return r;
+    }
+
+    // "Entrada " → "entrada": para comparar lo que manda el modelo.
+    static String normalizar(String texto) {
+        if (texto == null) return "";
+        return java.text.Normalizer.normalize(texto.trim(), java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "").toLowerCase();
+    }
+
     public Map<String, Object> registrarLectura(Lector lector, String epcCrudo) {
         String epc = normalizarEpc(epcCrudo);
         Instant ahora = Instant.now();
@@ -316,6 +341,14 @@ public class ControlAccesoService {
         r.put("solicitudes", listaSolicitudes);
         r.put("accesos", listaAccesos);
         r.put("dentro", dentro);
+        // El último comando de voz dice cómo quedó el LED de la XIAO.
+        r.put("voz", accesos.findFirstByGymIdAndTipoOrderByFechaDesc(gymId, Acceso.VOZ).map(a -> {
+            Map<String, Object> v = new LinkedHashMap<>();
+            v.put("encendido", a.getMotivo() != null && a.getMotivo().startsWith("\"entrada\""));
+            v.put("detalle", a.getMotivo());
+            v.put("fecha", a.getFecha());
+            return v;
+        }).orElse(null));
         return r;
     }
 
