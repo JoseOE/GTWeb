@@ -161,13 +161,24 @@ public class ControlAccesoService {
         }
         if (estaDentro(ultimo, ahora)) {
             guardarAcceso(lector, epc, socio.getId(), socio.getNombre(), Acceso.SALIDA, null, null);
-            return respuesta(Acceso.SALIDA, socio.getNombre(), null, null);
+            return conAforo(respuesta(Acceso.SALIDA, socio.getNombre(), null, null), lector.getGymId());
         }
         if (!membresiaVigente(socio)) {
             return negar(lector, epc, socio, "Membresía vencida");
         }
         guardarAcceso(lector, epc, socio.getId(), socio.getNombre(), Acceso.ENTRADA, null, null);
-        return respuesta(Acceso.ENTRADA, socio.getNombre(), null, null);
+        return conAforo(respuesta(Acceso.ENTRADA, socio.getNombre(), null, null), lector.getGymId());
+    }
+
+    // "dentro": cuántos socios con tag quedan en el gimnasio. El lector se lo
+    // pasa a la ESP32-C6 del foco, que lo deja prendido mientras haya alguien.
+    private Map<String, Object> conAforo(Map<String, Object> r, String gymId) {
+        Instant ahora = Instant.now();
+        long dentro = tarjetas.findByGymId(gymId).stream().map(Tarjeta::getUserId).distinct()
+                .filter(id -> estaDentro(accesos.findFirstByUserIdAndTipoInOrderByFechaDesc(id, List.of(Acceso.ENTRADA, Acceso.SALIDA)), ahora))
+                .count();
+        r.put("dentro", dentro);
+        return r;
     }
 
     // Solo una alerta nueva pide fotos ("fotos": true): si el mismo tag vuelve a
