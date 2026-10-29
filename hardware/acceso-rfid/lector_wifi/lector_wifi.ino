@@ -19,9 +19,21 @@
 // Antes de subirlo: copia secrets.example.h como secrets.h y llena el WiFi y el servidor.
 
 #include <WiFi.h>
+#include <WiFiMulti.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
+#include <Preferences.h>
 #include "secrets.h"
+
+// Las redes 2 y 3 son opcionales: un secrets.h viejo, sin ellas, también compila.
+#ifndef WIFI_SSID_2
+#define WIFI_SSID_2 ""
+#define WIFI_PASS_2 ""
+#endif
+#ifndef WIFI_SSID_3
+#define WIFI_SSID_3 ""
+#define WIFI_PASS_3 ""
+#endif
 
 #define RFID_RX         32   // llega del TXD del YRM
 #define RFID_TX         33   // va al RXD del YRM
@@ -40,6 +52,8 @@ const uint16_t ESPERA_HTTP_MS   = 4000;    // más que esto y se decide con la l
 const char*    EPC_SIMULADO     = "E20000000000000000000001";
 
 HardwareSerial yrm(2);
+Preferences prefs;
+WiFiMulti redes;
 int potenciaDbm = 15;
 
 // Lo que deja la tarea de comandos para que loop() lo haga (0 = nada, 1 = abrir, 2 = negar).
@@ -179,18 +193,96 @@ String campo(const String& json, const char* nombre) {
   return f < 0 ? "" : json.substring(i, f);
 }
 
-void conectarWifi() {
-  if (WiFi.status() == WL_CONNECTED) return;
-  Serial.printf("Conectando a %s", WIFI_SSID);
-  WiFi.mode(WIFI_STA);
-  WiFi.setAutoReconnect(true);
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  for (int i = 0; i < 30 && WiFi.status() != WL_CONNECTED; i++) { delay(500); Serial.print("."); }
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.printf(" OK, IP %s\n", WiFi.localIP().toString().c_str());
-  } else {
-    Serial.println(" sin WiFi (se decide con la lista local)");
+// Las redes que se sabe la placa (hasta 3, en secrets.h). Se conecta sola a la
+// conocida que tenga mejor señal: en casa, en la escuela o con el hotspot.
+void agregarRedes() {
+  const char* nombres[] = {WIFI_SSID, WIFI_SSID_2, WIFI_SSID_3};
+  const char* claves[]  = {WIFI_PASS, WIFI_PASS_2, WIFI_PASS_3};
+  Serial.print("Redes conocidas:");
+  for (int i = 0; i < 3; i++) {
+    if (strlen(nombres[i]) == 0) continue;
+    redes.addAP(nombres[i], claves[i]);
+    Serial.printf(" \"%s\"", nombres[i]);
   }
+  Serial.println();
+}
+
+// Por qué no conecta, en palabras (WiFi.status()).
+const char* motivoWifi(wl_status_t s) {
+  switch (s) {
+    case WL_NO_SSID_AVAIL:  return "no encuentra ninguna de las redes (nombre mal escrito, red de 5 GHz o señal débil)";
+    case WL_CONNECT_FAILED: return "la red rechazó la conexión (revisa la contraseña)";
+    default:                return "no encuentra ninguna de las redes conocidas cerca";
+  }
+}
+
+bool wifiAvisado = false;      // ya se imprimió que conectó
+uint32_t ultimoIntentoWifi = 0;
+
+void avisarConexion() {
+  wifiAvisado = true;
+  Serial.printf("WiFi: conectado a \"%s\", IP %s, señal %d dBm\n",
+                WiFi.SSID().c_str(), WiFi.localIP().toString().c_str(), WiFi.RSSI());
+}
+
+void conectarWifi() {
+  WiFi.mode(WIFI_STA);
+  WiFi.setSleep(false);
+  agregarRedes();
+  Serial.println("Buscando una red conocida...");
+  for (int i = 0; i < 3 && redes.run(8000) != WL_CONNECTED; i++) Serial.println("  ...otra vez");
+  ultimoIntentoWifi = millis();
+  if (WiFi.status() == WL_CONNECTED) {
+    avisarConexion();
+  } else {
+    Serial.printf("Sin WiFi: %s. Se reintenta cada 10 s; mientras, decide con la lista local.\n",
+                  motivoWifi(WiFi.status()));
+  }
+}
+
+// Si no hay WiFi, otro intento cada 10 s (busca las redes unos segundos).
+void vigilarWifi() {
+  if (WiFi.status() == WL_CONNECTED) {
+    if (!wifiAvisado) {
+      avisarConexion();
+      descargarLista();
+    }
+    return;
+  }
+  if (wifiAvisado) {
+    wifiAvisado = false;
+    Serial.println("Se perdió el WiFi: decide con la lista local mientras vuelve.");
+  }
+  if (millis() - ultimoIntentoWifi < 10000) return;
+  ultimoIntentoWifi = millis();
+  Serial.printf("Reintentando WiFi (%s)\n", motivoWifi(WiFi.status()));
+  redes.run(5000);
+}
+
+int leerLista(const String& json) {
+  int n = 0, i = 0;
+  while (n < 60 && (i = json.indexOf("{", i)) >= 0) {
+    int f = json.indexOf("}", i);
+    if (f < 0) break;
+    String obj = json.substring(i, f + 1);
+    String epc = campo(obj, "epc");
+    if (epc.length()) {
+      strlcpy(lista[n].epc, epc.c_str(), sizeof(lista[n].epc));
+      strlcpy(lista[n].nombre, campo(obj, "nombre").c_str(), sizeof(lista[n].nombre));
+      lista[n].permitido = obj.indexOf("\"permitido\":true") >= 0;
+      n++;
+    }
+    i = f + 1;
+  }
+  return n;
+}
+
+// La última lista queda guardada en la memoria de la placa: si se reinicia
+// sin WiFi, sigue sabiendo quién puede entrar.
+void cargarListaGuardada() {
+  String json = prefs.getString("lista", "");
+  tamLista = leerLista(json);
+  if (tamLista) Serial.printf("Lista guardada en la placa: %d tags\n", tamLista);
 }
 
 void descargarLista() {
@@ -203,21 +295,8 @@ void descargarLista() {
   int code = http.GET();
   if (code == 200) {
     String json = http.getString();
-    int n = 0, i = 0;
-    while (n < 60 && (i = json.indexOf("{", i)) >= 0) {
-      int f = json.indexOf("}", i);
-      if (f < 0) break;
-      String obj = json.substring(i, f + 1);
-      String epc = campo(obj, "epc");
-      if (epc.length()) {
-        strlcpy(lista[n].epc, epc.c_str(), sizeof(lista[n].epc));
-        strlcpy(lista[n].nombre, campo(obj, "nombre").c_str(), sizeof(lista[n].nombre));
-        lista[n].permitido = obj.indexOf("\"permitido\":true") >= 0;
-        n++;
-      }
-      i = f + 1;
-    }
-    tamLista = n;
+    tamLista = leerLista(json);
+    if (json.length() < 3900 && json != prefs.getString("lista", "")) prefs.putString("lista", json);
     Serial.printf("Lista local: %d tags\n", tamLista);
   } else {
     Serial.printf("No se pudo bajar la lista (HTTP %d)\n", code);
@@ -402,6 +481,8 @@ void setup() {
     fijarPotencia(potenciaDbm);
   }
 
+  prefs.begin("lector", false);
+  cargarListaGuardada();
   conectarWifi();
   Serial.printf("Servidor: %s\n", SERVIDOR);
   descargarLista();
@@ -417,7 +498,7 @@ void loop() {
     if (c == '-' && potenciaDbm > 5)  fijarPotencia(--potenciaDbm);
   }
   atenderComando();
-  // Si se cae el WiFi, setAutoReconnect lo recupera solo; mientras, se usa la lista.
+  vigilarWifi();
   if (millis() - ultimaLista > LISTA_CADA_MS) descargarLista();
   inventario();
   delay(150);
