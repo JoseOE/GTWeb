@@ -124,6 +124,12 @@ void atender(const String& aviso) {
     Serial.printf("  %s no tiene sensor: agrégalo a SOCIOS si quieres que la Alexa lo salude\n", nombre.c_str());
     return;
   }
+  if (tipo == 'A' && abierto[i]) {
+    // Un "dar acceso" del panel repetido o atrasado: ya se le dio la bienvenida
+    // y no se le hace decir "hasta luego / bienvenido" otra vez.
+    Serial.printf("  %s ya estaba dentro: no se repite la bienvenida\n", SOCIOS[i]);
+    return;
+  }
   if (tipo == 'E' || tipo == 'A') {
     // Si ya estaba abierto (no pasó su tag al salir), se cierra y se vuelve a
     // abrir para que la rutina de bienvenida corra otra vez.
