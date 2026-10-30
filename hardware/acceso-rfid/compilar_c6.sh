@@ -48,7 +48,10 @@ for sketch in c6_puente c6_alexa; do
   # que copia (chmod) y eso no se puede en las carpetas de Windows (/mnt/c).
   # Después solo se copia el .bin a Windows.
   "$CLI" compile --fqbn "esp32:esp32:$PLACA:$OPCIONES" --output-dir "$HOME/build_c6/$sketch" "$AQUI/$sketch"
+  # .bin = la memoria completa (la primera vez); .app.bin = solo el programa
+  # (para actualizar sin borrar el emparejamiento Matter).
   cp "$HOME/build_c6/$sketch/$sketch.ino.merged.bin" "$SALIDA/$sketch.bin"
+  cp "$HOME/build_c6/$sketch/$sketch.ino.bin" "$SALIDA/$sketch.app.bin"
 done
 
 echo
