@@ -55,9 +55,13 @@ void mostrarEstado() {
 // "abierto" de antes, setContact() cree que ya está y no lo cambia (y
 // getContact() dice otra cosa). Así el sensor se quedaba siempre abierto y la
 // Alexa nunca veía un cambio para correr la rutina.
+// Primero se lee el valor (así trae el tipo que Matter espera) y luego se cambia.
 bool ponerContacto(MatterContactSensor& sensor, bool cerrado) {
-  esp_matter_attr_val_t valor = esp_matter_bool(cerrado);
-  return sensor.updateAttributeVal(0x0045, 0x0000, &valor);   // BooleanState · StateValue
+  esp_matter_attr_val_t valor = esp_matter_invalid(NULL);
+  if (!sensor.getAttributeVal(0x0045, 0x0000, &valor)) return false;   // BooleanState · StateValue
+  if (valor.val.b == cerrado) return true;                             // ya está así
+  valor.val.b = cerrado;
+  return sensor.updateAttributeVal(0x0045, 0x0000, &valor);
 }
 
 // Con Matter, el WiFi lo maneja Matter (se lo dio la Alexa al emparejar) y

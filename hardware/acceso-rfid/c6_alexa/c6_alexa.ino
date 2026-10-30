@@ -69,9 +69,14 @@ int indiceDe(const String& nombre) {
 // quedó "abierto" de antes, setContact() cree que ya está y no lo cambia (y
 // getContact() dice otra cosa). Así la Alexa nunca veía el cambio.
 // En Matter "contacto = true" es cerrado; la Alexa lo muestra como "cerrado".
+// Primero se lee el valor (así trae el tipo que Matter espera) y luego se cambia.
 bool ponerContacto(MatterContactSensor& sensor, bool cerrado) {
-  esp_matter_attr_val_t valor = esp_matter_bool(cerrado);
-  bool ok = sensor.updateAttributeVal(0x0045, 0x0000, &valor);   // BooleanState · StateValue
+  esp_matter_attr_val_t valor = esp_matter_invalid(NULL);
+  bool ok = sensor.getAttributeVal(0x0045, 0x0000, &valor);      // BooleanState · StateValue
+  if (ok && valor.val.b != cerrado) {
+    valor.val.b = cerrado;
+    ok = sensor.updateAttributeVal(0x0045, 0x0000, &valor);
+  }
   if (!ok) Serial.println("  Matter RECHAZÓ el cambio del sensor");
   return ok;
 }
