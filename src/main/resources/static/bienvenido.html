@@ -1137,13 +1137,13 @@
 
             <!-- ─── ACCESOS RFID ───
                  /api/gyms/{id}/acceso: el lector de la puerta (LILYGO + YRM1004), los tags
-                 de los socios, las alertas de accesos negados con las fotos de la XIAO
+                 de los socios, las alertas de accesos negados
                  (el dueño decide si abre) y la bitácora de entradas y salidas. -->
             <div class="dash-panel" id="panel-accesos" data-panel="accesos" role="tabpanel" aria-labelledby="tab-accesos" tabindex="0">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
                     <div>
                         <h3 class="fw-bold mb-1"><i class='bx bx-id-card text-primary me-1'></i> Accesos RFID</h3>
-                        <p class="text-body-secondary mb-0">Entradas y salidas de tus socios con su tag. Si alguien no puede entrar, aquí ves sus fotos y decides si le abres.</p>
+                        <p class="text-body-secondary mb-0">Entradas y salidas de tus socios con su tag. Si alguien no puede entrar, aquí te llega la alerta y decides si le abres.</p>
                     </div>
                     <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="accesos-actualizar">
                         <i class='bx bx-refresh' aria-hidden="true"></i> Actualizar
@@ -2640,7 +2640,6 @@
         function initAccesos() {
             const contenido = document.getElementById('accesos-contenido');
             const badgeNav = document.getElementById('accesos-nav-alertas');
-            const fotosCache = new Map();   // id → URL local de la foto (se piden con la sesión)
             let datos = null;
             let llaveNueva = null;          // la llave de un lector recién creado: se muestra una vez
             let abierta = false;
@@ -2715,18 +2714,8 @@
                     <div class="alert alert-warning rounded-4 mb-4" role="alert">
                         <div class="fw-semibold mb-1"><i class='bx bx-key'></i> Llave del lector (cópiala ahora: no se vuelve a mostrar)</div>
                         <code class="user-select-all d-block text-break">${escapeHtml(llaveNueva)}</code>
-                        <small class="d-block mt-1">Va en <code>LECTOR_LLAVE</code> del archivo <code>secrets.h</code> de la LILYGO y de la XIAO.</small>
+                        <small class="d-block mt-1">Va en <code>LECTOR_LLAVE</code> del archivo <code>secrets.h</code> de la LILYGO.</small>
                     </div>` : '');
-            }
-
-            function htmlFotos(s) {
-                if (!s.fotos.length) {
-                    return '';
-                }
-                return '<div class="d-flex flex-wrap gap-2">' + s.fotos.map(id => `
-                    <a href="#" data-foto="${escapeHtml(id)}" class="d-block rounded-3 overflow-hidden border bg-body-secondary" style="width:120px;height:90px" aria-label="Ver foto en grande">
-                        <img data-foto-id="${escapeHtml(id)}" alt="Foto del acceso negado" style="width:100%;height:100%;object-fit:cover" ${fotosCache.has(id) ? 'src="' + fotosCache.get(id) + '"' : ''}>
-                    </a>`).join('') + '</div>';
             }
 
             function htmlAlertas() {
@@ -2746,7 +2735,6 @@
                                     </div>
                                     <span class="badge rounded-pill ${claseEstado}">${estado}</span>
                                 </div>
-                                <div class="mb-3">${htmlFotos(s)}</div>
                                 ${pendiente ? `
                                 <div class="d-flex flex-wrap gap-2">
                                     <button type="button" class="btn btn-success btn-sm rounded-pill px-3" data-accion="abrir" data-id="${s.id}"><i class='bx bx-lock-open-alt'></i> Dar acceso</button>
@@ -2872,24 +2860,12 @@
                     + htmlAlertas() + htmlTarjetas() + htmlHistorial();
                 if (abiertas) contenido.querySelector('details')?.setAttribute('open', '');
                 contenido.querySelectorAll('select[data-socio-de]').forEach(s => { if (elegidos[s.dataset.socioDe]) s.value = elegidos[s.dataset.socioDe]; });
-                cargarFotos();
             }
 
             function actualizarBadge() {
                 const n = datos ? datos.solicitudes.filter(s => s.estado === 'PENDIENTE').length : 0;
                 badgeNav.textContent = n;
                 badgeNav.classList.toggle('d-none', n === 0);
-            }
-
-            function cargarFotos() {
-                contenido.querySelectorAll('img[data-foto-id]:not([src])').forEach(img => {
-                    const id = img.dataset.fotoId;
-                    if (fotosCache.has(id)) { img.src = fotosCache.get(id); return; }
-                    fetch('/api/gyms/' + localStorage.getItem('gymId') + '/acceso/fotos/' + id)
-                        .then(r => r.ok ? r.blob() : Promise.reject())
-                        .then(b => { fotosCache.set(id, URL.createObjectURL(b)); contenido.querySelectorAll(`img[data-foto-id="${id}"]`).forEach(i => i.src = fotosCache.get(id)); })
-                        .catch(() => {});
-                });
             }
 
             function cargar(silencioso) {
@@ -2917,13 +2893,6 @@
             }
 
             contenido.addEventListener('click', e => {
-                const foto = e.target.closest('[data-foto]');
-                if (foto) {
-                    e.preventDefault();
-                    const url = fotosCache.get(foto.dataset.foto);
-                    if (url) window.open(url, '_blank', 'noopener');
-                    return;
-                }
                 const b = e.target.closest('[data-accion]');
                 if (!b) return;
                 const gymId = localStorage.getItem('gymId');
