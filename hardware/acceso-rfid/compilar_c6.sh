@@ -43,8 +43,11 @@ for sketch in c6_puente c6_alexa; do
     exit 1
   fi
   echo "== Compilando $sketch para $PLACA"
-  "$CLI" compile --fqbn "esp32:esp32:$PLACA:$OPCIONES" --output-dir "$SALIDA/$sketch" "$AQUI/$sketch"
-  cp "$SALIDA/$sketch/$sketch.ino.merged.bin" "$SALIDA/$sketch.bin"
+  # Se compila en una carpeta de Ubuntu: arduino-cli cambia los permisos de lo
+  # que copia (chmod) y eso no se puede en las carpetas de Windows (/mnt/c).
+  # Después solo se copia el .bin a Windows.
+  "$CLI" compile --fqbn "esp32:esp32:$PLACA:$OPCIONES" --output-dir "$HOME/build_c6/$sketch" "$AQUI/$sketch"
+  cp "$HOME/build_c6/$sketch/$sketch.ino.merged.bin" "$SALIDA/$sketch.bin"
 done
 
 echo
