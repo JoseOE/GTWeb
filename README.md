@@ -30,6 +30,7 @@ GitHub Pages solo sirve archivos estáticos, así que ahí funcionan la página 
 - [Seguridad y sesiones](#-seguridad-y-sesiones)
 - [Correos de la cuenta](#-correos-de-la-cuenta)
 - [Tienda](#-tienda)
+- [Control de acceso RFID, voz y Alexa](#-control-de-acceso-rfid-voz-y-alexa)
 - [Contexto del proyecto](#problemática)
 - [Equipo y sprints](#-equipo-y-flujo-de-trabajo)
 - [Negocios Electrónicos · Tema 3 (análisis, evidencias y decisiones)](docs/negocios-electronicos-tema3.md)
@@ -221,6 +222,7 @@ GTWeb/
 ├── Dockerfile                    # Imagen para desplegar en Render
 ├── .github/workflows/            # Revisión de cada PR y publicación de la parte estática en GitHub Pages
 ├── pruebas/                      # Pruebas de punta a punta (Node)
+├── hardware/acceso-rfid/         # Firmware del lector RFID (LILYGO), la XIAO de voz y las dos ESP32-C6 con Matter
 └── src/main/
     ├── java/com/gymtrack/
     │   ├── GymTrackApplication.java   # Arranque y datos iniciales del catálogo
@@ -837,6 +839,82 @@ El recibo se descarga de `GET /api/recibos/pedidos/{orderId}.pdf` con `fetch` y 
 
 ---
 
+## 🚪 Control de acceso RFID, voz y Alexa
+
+La puerta del gimnasio tiene un lector RFID UHF que valida la membresía de cada socio contra la API en tiempo real, registra **entradas y salidas** y avisa en el panel cuando alguien no puede entrar. Además se puede entrar o salir con un **comando de voz**, y una Alexa saluda a cada socio y prende la lámpara del gimnasio por **Matter**. El firmware de las placas está en [`hardware/acceso-rfid/`](hardware/acceso-rfid).
+
+```plaintext
+ tag UHF ──► YRM1004 ──► LILYGO T-SIM7070G ── HTTPS (WiFi, LTE-M o 2G) ──► GTWeb en Render ──► MongoDB Atlas
+                            ▲      │                                            │
+   XIAO ESP32-S3 (voz) ─────┘      │ serial 9600                                └─► panel "Accesos RFID"
+   pulso D0 → GPIO 14              ▼                                                 (alertas, dar acceso)
+                          ESP32-C6 puente ── UDP 4210 ──► ESP32-C6 Alexa
+                     sensor Matter "Gimnasio ocupado"    un sensor Matter por socio + "Voz" + "Acceso denegado"
+                                   │                                  │
+                                   └──────────── Alexa (rutinas) ─────┘
+                           prende/apaga la lámpara        "Bienvenido Chema", "Hasta luego Chema", "Acceso denegado"
+```
+
+### Cómo decide la puerta
+
+| Situación | Resultado | Qué pasa |
+|---|---|---|
+| Socio fuera con la membresía al día | `ENTRADA` | LED verde, se abre la puerta, la Alexa le da la bienvenida y, si es el primero, prende la lámpara |
+| Socio dentro | `SALIDA` | LED azul; la salida no se valida. La Alexa lo despide y, si ya no queda nadie, apaga la lámpara |
+| Membresía vencida o tag desconocido | `NEGADO` | LED rojo, alerta en el panel y la Alexa dice "Acceso denegado" |
+| El dueño da acceso desde la alerta | `ENTRADA` | La LILYGO recibe la orden (consulta larga a `/api/lectores/comandos`), abre y la Alexa le da la bienvenida. Su siguiente pase cuenta como salida aunque siga vencido |
+| Comando de voz "entrada" / "salida" | `ENTRADA` / `SALIDA` | Se registra como "Acceso por voz", por turnos (una entrada repetida se ignora) |
+
+- Un pase del mismo tag a menos de 10 s del anterior se ignora; quien no registra su salida en 4 h se da por fuera.
+- Sin internet, la LILYGO decide con la lista de tags que guarda en su memoria.
+- Por qué no MQTT: el lector es un solo cliente que siempre pregunta, así que HTTPS con una llave por lector (guardada como hash SHA-256) basta y no necesita un broker aparte.
+
+### Placas
+
+| Placa | Programa | Qué hace |
+|---|---|---|
+| LILYGO T-SIM7070G + YRM1004 | `lector_wifi/` | Lee los tags, pregunta a la API, LEDs y puerta. Red por WiFi (3 redes conocidas), LTE-M o 2G: comandos `w` / `l` / `g` en el monitor serie (115200); `r` muestra el estado, `n` simula un tag desconocido |
+| XIAO ESP32-S3 Sense | `xiao_voz_turnos/` | Escucha continua con un modelo de Edge Impulse ("entrada" / "salida") y le manda un pulso a la LILYGO (≈100 ms entrada, ≈300 ms salida). Guía: [`MODELO_VOZ.md`](hardware/acceso-rfid/MODELO_VOZ.md) |
+| ESP32-C6 puente | `c6_puente/` | Recibe los avisos de la LILYGO (`E\|Chema\|3`, `S`, `N`, `A`, `D`), es el sensor Matter "Gimnasio ocupado" y reenvía cada aviso por UDP |
+| ESP32-C6 Alexa | `c6_alexa/` | Un sensor de contacto Matter por socio, uno de "Voz" y uno de "Acceso denegado"; la Alexa reacciona con rutinas. Guía: [`ALEXA_MATTER.md`](hardware/acceso-rfid/ALEXA_MATTER.md) |
+
+Cada carpeta lleva un `secrets.example.h`: cópialo como `secrets.h` (no se sube a GitHub) y pon el WiFi, la URL del servidor y la llave del lector que da el panel al crearlo.
+
+### Compilar y subir las ESP32-C6
+
+En Windows, el Control inteligente de aplicaciones bloquea el compilador RISC-V de la C6, así que se compilan en Ubuntu (WSL) y se suben desde Windows con el esptool del Arduino IDE. Usa el USB-C marcado **ESP32C6**, no el CH343.
+
+```bash
+bash /mnt/c/Users/<tu-usuario>/Documents/Proyectos/Gym-Track/GTWeb/hardware/acceso-rfid/compilar_c6.sh
+```
+
+```powershell
+.\subir_c6.ps1 -Puerto COM5 -Programa c6_puente -Borrar   # primera vez: borra todo y sube la imagen completa
+.\subir_c6.ps1 -Puerto COM5 -Programa c6_puente           # actualizar: solo el programa, conserva el emparejamiento
+```
+
+Al arrancar sin emparejar, el monitor muestra el código de 11 dígitos para la app Alexa (Dispositivos → + → Matter). Las dos C6 traen el mismo código de prueba: empareja una a la vez. Mantener BOOT 5 s borra el emparejamiento.
+
+> En el núcleo ESP32 3.3.11, `MatterContactSensor::setContact()` no cambia el sensor (el estado lo lleva el cluster BooleanState y escribir el atributo da `ESP_ERR_NOT_SUPPORTED`). Los programas lo cambian con `BooleanStateCluster::SetStateValue()`.
+
+### API del acceso
+
+| Método | Ruta | Uso |
+|---|---|---|
+| POST | `/api/lectores/accesos` | El lector manda un EPC → `ENTRADA`, `SALIDA`, `NEGADO`, `IGNORADO` o `REGISTRO`, con cuántos quedan dentro |
+| POST | `/api/lectores/voz` | Entrada o salida por comando de voz |
+| GET | `/api/lectores/comandos?espera=0..15` | Consulta larga: órdenes del panel ("abrir" / "negar") |
+| GET | `/api/lectores/lista` · `/api/lectores/aforo` | Tags permitidos para decidir sin red · cuántos hay dentro |
+| GET | `/api/gyms/{gymId}/acceso` | Resumen del panel: lectores, tags, alertas, quién está dentro y bitácora |
+| POST | `/api/gyms/{gymId}/acceso/lectores` | Crear un lector (devuelve su llave una sola vez) |
+| POST · DELETE | `/api/gyms/{gymId}/acceso/tarjetas` · `/tarjetas/{id}` | Ligar un tag a un socio · quitarlo |
+| POST · DELETE | `/api/gyms/{gymId}/acceso/lectores/{lectorId}/registro` | Modo registro: el siguiente tag que pase se captura para asignarlo |
+| POST | `/api/gyms/{gymId}/acceso/solicitudes/{id}/abrir` · `/negar` | Atender una alerta de acceso negado |
+
+Las rutas `/api/lectores/*` piden el encabezado `X-Lector-Key`; las del panel, la sesión del dueño. Para probar sin placas: `node pruebas/lector-rfid.mjs preparar|probar|limpiar`.
+
+---
+
 # Problemática
 
 Actualmente, muchos gimnasios medianos y locales presentan una desconexión entre sus procesos administrativos, el control de acceso y la gestión de los entrenamientos.
@@ -945,18 +1023,18 @@ La credencial podrá tomar diferentes formas:
 
 El usuario únicamente deberá acercar su credencial al lector instalado en la entrada.
 
-🚪 4. Control de acceso IoT (Próximamente)
-El módulo IoT estará instalado físicamente en la entrada del gimnasio, conectado a un torniquete o puerta.
+🚪 4. Control de acceso IoT
+El módulo IoT está en la entrada del gimnasio (ver [Control de acceso RFID, voz y Alexa](#-control-de-acceso-rfid-voz-y-alexa)).
 
-Su función será:
+Su función:
 
-* Detectar una credencial RFID.
-* Obtener el identificador asociado.
-* Enviar la solicitud de validación segura al backend en Java.
+* Detectar una credencial RFID UHF.
+* Obtener el identificador asociado (EPC).
+* Enviar la solicitud de validación segura (HTTPS con llave del lector) al backend en Java.
 * Consultar la base de datos (MongoDB) para verificar el estado de pago.
-* Autorizar o rechazar el acceso.
-* Accionar el mecanismo de apertura (relé) cuando la membresía esté activa.
-* Registrar el acceso.
+* Autorizar o rechazar el acceso, y registrar la entrada o la salida.
+* Avisar al dueño en el panel cuando se niega un acceso, para que decida si abre.
+* Saludar al socio con una Alexa y prender la lámpara del gimnasio por Matter.
 
 🗄️ 5. Backend y Base de Datos
 GymTrack utiliza **Java Spring Boot** como API backend principal y **MongoDB Atlas** como base de datos NoSQL.
@@ -985,8 +1063,8 @@ Gimnasio
 🔐 Seguridad y Multi-tenancy
 Dado que la plataforma web permitirá a múltiples gimnasios contratar el servicio, la información se aísla a nivel lógico y de base de datos para asegurar que cada administrador solo pueda ver y modificar los datos de su propio gimnasio. Las contraseñas se guardan cifradas con BCrypt y las cuentas de la página confirman su correo antes de entrar.
 
-🌐 Comunicación IoT (Próximamente)
-La comunicación entre el dispositivo IoT y los servicios backend utilizará protocolos ligeros como MQTT sobre redes Wi-Fi, asegurados mediante encriptación TLS.
+🌐 Comunicación IoT
+El lector habla con el backend por HTTPS (TLS) sobre WiFi, o por LTE-M / 2G con su módem cuando no hay WiFi. Las órdenes del panel le llegan con una consulta larga, sin broker MQTT. Las placas de la puerta se comunican entre sí por serial, UDP en la red local y Matter hacia la Alexa.
 
 ---
 
@@ -1023,13 +1101,16 @@ La comunicación entre el dispositivo IoT y los servicios backend utilizará pro
 | Expo y Expo Router | Framework de desarrollo y manejo de navegación |
 | TypeScript | Tipado estático |
 
-**IoT (arquitectura planeada)**
+**IoT (control de acceso)**
 
 | Tecnología | Uso |
 |---|---|
-| ESP32 | Microcontrolador |
-| RFID | Identificación física |
-| MQTT + TLS | Comunicación remota segura |
+| LILYGO T-SIM7070G (ESP32 + módem SIM7070) | Lector de la puerta, con WiFi, LTE-M y 2G (TinyGSM) |
+| YRM1004 (RFID UHF) | Lectura de tarjetas, llaveros y stickers UHF |
+| HTTPS + llave por lector (hash SHA-256) | Comunicación segura con la API |
+| XIAO ESP32-S3 Sense + Edge Impulse | Comandos de voz "entrada" / "salida" |
+| ESP32-C6 + Matter (Arduino ESP32 3.3.11) | Sensores de contacto que la Alexa usa en sus rutinas |
+| Amazon Alexa | Anuncios de bienvenida/despedida y la lámpara inteligente |
 
 ---
 
@@ -1070,9 +1151,13 @@ Fase 3 — Aplicación Móvil (Usuarios)
 - [ ] Mejorar el manejo de la sesión persistente y seguridad (Tokens): mandar el token de sesión y pedir el cambio de la contraseña temporal (`contrasenaTemporal`).
 
 Fase 4 — IoT (Control de Acceso)
-- [ ] Configurar el microcontrolador ESP32 y Lector RFID.
-- [ ] Implementar un Broker MQTT y conectar el flujo IoT hacia Spring Boot.
-- [ ] Lógica para accionar relés de apertura al validar membresía.
+- [x] Configurar el ESP32 (LILYGO T-SIM7070G) y el lector RFID UHF (YRM1004).
+- [x] Conectar el lector a Spring Boot por HTTPS (en lugar de un broker MQTT), con lista local para cuando no hay red.
+- [x] Registrar entradas y salidas, y alertas de acceso negado en el panel con "dar acceso".
+- [x] Respaldo por LTE-M y 2G.
+- [x] Comandos de voz con la XIAO ESP32-S3 (Edge Impulse).
+- [x] Alexa por Matter con dos ESP32-C6: saludos por socio, "acceso denegado" y la lámpara del gimnasio.
+- [ ] Mecanismo de apertura real (servo o chapa) en la puerta.
 
 Fase 5 — Integración e Investigación
 - [ ] Pruebas E2E del ecosistema (Web -> Backend -> MongoDB -> IoT -> App).
@@ -1105,12 +1190,12 @@ La página web está publicada completa en Render (https://gtweb.onrender.com):
 - inicio de sesión;
 - panel del gimnasio;
 - correos de la cuenta (Brevo);
-- tienda de cada gimnasio, con pagos simulados, mostrador y ventas, en el mismo servicio de Spring y MongoDB.
+- tienda de cada gimnasio, con pagos simulados, mostrador y ventas, en el mismo servicio de Spring y MongoDB;
+- control de acceso RFID con voz y Alexa (pestaña "Accesos RFID" del panel).
 
-La sesión de la página usa token. La aplicación móvil consume por defecto la misma API publicada en Render. Faltan tres cosas:
+La sesión de la página usa token. La aplicación móvil consume por defecto la misma API publicada en Render. Faltan dos cosas:
 - que la app mande el token de sesión, para activar `EXIGIR_TOKEN=true` en Render;
-- agregar la verificación de correo en la app;
-- integrar la capa de hardware IoT.
+- agregar la verificación de correo en la app.
 
 ```plaintext
         Desarrollo de Apps
