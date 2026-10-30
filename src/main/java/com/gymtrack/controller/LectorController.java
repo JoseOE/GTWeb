@@ -30,12 +30,27 @@ public class LectorController {
         return control.registrarLectura(lector, body.get("epc"));
     }
 
-    // GET /api/lectores/comandos → espera hasta 15 s a que el dueño abra o
-    // niegue desde el panel: {"comando": "abrir|negar", ...}, o 204 si no hubo nada.
-    @GetMapping("/comandos")
-    public ResponseEntity<Map<String, Object>> comandos(@RequestHeader(value = ControlAccesoService.LLAVE, required = false) String llave) {
+    // POST /api/lectores/voz  {"comando": "entrada|salida", "confianza": 0.93}
+    //   La XIAO reconoció un comando de voz (con su botón presionado) y prendió
+    //   o apagó su LED. Queda en el historial y el panel muestra cómo está el LED.
+    @PostMapping("/voz")
+    public Map<String, Object> voz(@RequestHeader(value = ControlAccesoService.LLAVE, required = false) String llave,
+                                   @RequestBody Map<String, Object> body) {
         Lector lector = control.lectorDe(llave);
-        return control.esperarComando(lector, Duration.ofSeconds(15))
+        Object confianza = body.get("confianza");
+        return control.registrarVoz(lector, body.get("comando") == null ? null : body.get("comando").toString(),
+                confianza instanceof Number n ? n.doubleValue() : null);
+    }
+
+    // GET /api/lectores/comandos?espera=15 → espera hasta "espera" segundos (0 a 15)
+    // a que el dueño abra o niegue desde el panel: {"comando": "abrir|negar", ...},
+    // o 204 si no hubo nada. Por WiFi el lector espera los 15 s; por LTE o 2G
+    // pregunta con espera=0 cada pocos segundos, para no tener el módem ocupado.
+    @GetMapping("/comandos")
+    public ResponseEntity<Map<String, Object>> comandos(@RequestHeader(value = ControlAccesoService.LLAVE, required = false) String llave,
+                                                        @RequestParam(defaultValue = "15") int espera) {
+        Lector lector = control.lectorDe(llave);
+        return control.esperarComando(lector, Duration.ofSeconds(Math.max(0, Math.min(espera, 15))))
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
@@ -46,6 +61,12 @@ public class LectorController {
                                     @RequestBody byte[] jpeg) {
         Lector lector = control.lectorDe(llave);
         return control.guardarFoto(lector, jpeg);
+    }
+
+    // GET /api/lectores/aforo → {"dentro": 3}: cuántos hay en el gimnasio (con tag o por voz).
+    @GetMapping("/aforo")
+    public Map<String, Object> aforo(@RequestHeader(value = ControlAccesoService.LLAVE, required = false) String llave) {
+        return control.aforo(control.lectorDe(llave));
     }
 
     // GET /api/lectores/lista → los tags del gimnasio, para decidir sin internet.

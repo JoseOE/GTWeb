@@ -18,3 +18,9 @@
 #define WIFI_PASS_2     ""
 #define WIFI_SSID_3     ""
 #define WIFI_PASS_3     ""
+
+// Datos celulares (LTE-M y 2G, comandos l y g de la LILYGO) y la red WiFi que
+// la LILYGO crea para la XIAO mientras usa el módem. La clave: 8 caracteres o más.
+#define APN             "internet.itelcel.com"
+#define LECTOR_AP_SSID  "GymTrack-Lector"
+#define LECTOR_AP_PASS  "cambia-esta-clave"

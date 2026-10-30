@@ -108,6 +108,55 @@ public class ControlAccesoService {
         return lector;
     }
 
+    // La XIAO reconoció un comando de voz con su modelo (Edge Impulse) mientras
+    // se presionaba su botón: "entrada" prende su LED y "salida" lo apaga.
+    // Cada comando válido cuenta como una entrada o una salida de verdad ("Acceso
+    // por voz"), por turnos: no hay dos entradas seguidas ni dos salidas
+    // seguidas. Un comando repetido responde IGNORADO y no se registra.
+    public Map<String, Object> registrarVoz(Lector lector, String comandoCrudo, Double confianza) {
+        String comando = normalizar(comandoCrudo);
+        if (!comando.equals("entrada") && !comando.equals("salida")) {
+            throw new TiendaException(HttpStatus.BAD_REQUEST, "El comando de voz debe ser \"entrada\" o \"salida\".");
+        }
+        boolean entrada = comando.equals("entrada");
+        boolean dentro = vozDentro(lector.getGymId());
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("comando", comando);
+        if (entrada == dentro) {
+            r.put("resultado", "IGNORADO");
+            r.put("motivo", entrada ? "Ya entró por voz: falta su salida" : "Nadie ha entrado por voz");
+            r.put("led", dentro ? "encendido" : "apagado");
+            return r;
+        }
+        String porcentaje = confianza == null ? "" : " (" + Math.round(confianza * 100) + " %)";
+        guardarAcceso(lector, null, null, NOMBRE_VOZ, entrada ? Acceso.ENTRADA : Acceso.SALIDA,
+                PREFIJO_VOZ + " \"" + comando + "\"" + porcentaje, null);
+        r.put("resultado", entrada ? Acceso.ENTRADA : Acceso.SALIDA);
+        r.put("motivo", "");
+        r.put("led", entrada ? "encendido" : "apagado");
+        return r;
+    }
+
+    static final String NOMBRE_VOZ = "Acceso por voz";
+    static final String PREFIJO_VOZ = "Comando de voz";
+
+    private Optional<Acceso> ultimoPorVoz(String gymId) {
+        return accesos.findFirstByGymIdAndMotivoStartingWithOrderByFechaDesc(gymId, PREFIJO_VOZ);
+    }
+
+    // Quien entró por voz y no ha salido sigue dentro (con la misma salida
+    // automática que los tags).
+    private boolean vozDentro(String gymId) {
+        return estaDentro(ultimoPorVoz(gymId), Instant.now());
+    }
+
+    // "Entrada " → "entrada": para comparar lo que manda el modelo.
+    static String normalizar(String texto) {
+        if (texto == null) return "";
+        return java.text.Normalizer.normalize(texto.trim(), java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "").toLowerCase();
+    }
+
     public Map<String, Object> registrarLectura(Lector lector, String epcCrudo) {
         String epc = normalizarEpc(epcCrudo);
         Instant ahora = Instant.now();
@@ -136,13 +185,30 @@ public class ControlAccesoService {
         }
         if (estaDentro(ultimo, ahora)) {
             guardarAcceso(lector, epc, socio.getId(), socio.getNombre(), Acceso.SALIDA, null, null);
-            return respuesta(Acceso.SALIDA, socio.getNombre(), null, null);
+            return conAforo(respuesta(Acceso.SALIDA, socio.getNombre(), null, null), lector.getGymId());
         }
         if (!membresiaVigente(socio)) {
             return negar(lector, epc, socio, "Membresía vencida");
         }
         guardarAcceso(lector, epc, socio.getId(), socio.getNombre(), Acceso.ENTRADA, null, null);
-        return respuesta(Acceso.ENTRADA, socio.getNombre(), null, null);
+        return conAforo(respuesta(Acceso.ENTRADA, socio.getNombre(), null, null), lector.getGymId());
+    }
+
+    // Para el lector después de un comando de voz (la LILYGO no sabe cuántos quedan).
+    public Map<String, Object> aforo(Lector lector) {
+        return conAforo(new LinkedHashMap<>(), lector.getGymId());
+    }
+
+    // "dentro": cuántos socios con tag quedan en el gimnasio. El lector se lo
+    // pasa a la ESP32-C6 del foco, que lo deja prendido mientras haya alguien.
+    private Map<String, Object> conAforo(Map<String, Object> r, String gymId) {
+        Instant ahora = Instant.now();
+        long dentro = tarjetas.findByGymId(gymId).stream().map(Tarjeta::getUserId).distinct()
+                .filter(id -> estaDentro(accesos.findFirstByUserIdAndTipoInOrderByFechaDesc(id, List.of(Acceso.ENTRADA, Acceso.SALIDA)), ahora))
+                .count();
+        if (vozDentro(gymId)) dentro++;   // quien entró por voz también cuenta
+        r.put("dentro", dentro);
+        return r;
     }
 
     // Solo una alerta nueva pide fotos ("fotos": true): si el mismo tag vuelve a
@@ -316,6 +382,15 @@ public class ControlAccesoService {
         r.put("solicitudes", listaSolicitudes);
         r.put("accesos", listaAccesos);
         r.put("dentro", dentro);
+        // El último acceso por voz: si quien entró por voz sigue dentro (LED de la XIAO prendido).
+        r.put("voz", ultimoPorVoz(gymId).map(a -> {
+            Map<String, Object> v = new LinkedHashMap<>();
+            v.put("encendido", estaDentro(Optional.of(a), ahora));
+            v.put("detalle", a.getMotivo());
+            v.put("fecha", a.getFecha());
+            return v;
+        }).orElse(null));
+        if (vozDentro(gymId)) dentro.add(NOMBRE_VOZ);
         return r;
     }
 
