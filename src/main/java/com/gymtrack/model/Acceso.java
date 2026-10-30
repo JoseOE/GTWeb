@@ -6,15 +6,15 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
-// Bitácora de la puerta: cada entrada, salida o acceso negado, y los comandos
-// de voz de la XIAO.
+// Bitácora de la puerta: cada entrada, salida o acceso negado. Las de los
+// comandos de voz de la XIAO se llaman "Acceso por voz" y su motivo empieza con
+// "Comando de voz".
 @Document(collection = "accesos")
 public class Acceso {
 
     public static final String ENTRADA = "ENTRADA";
     public static final String SALIDA = "SALIDA";
     public static final String NEGADO = "NEGADO";
-    public static final String VOZ = "VOZ";      // motivo: el comando ("entrada" o "salida")
 
     @Id
     private String id;

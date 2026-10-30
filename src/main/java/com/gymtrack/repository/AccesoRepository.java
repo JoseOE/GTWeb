@@ -10,5 +10,5 @@ import java.util.Optional;
 public interface AccesoRepository extends MongoRepository<Acceso, String> {
     List<Acceso> findTop40ByGymIdOrderByFechaDesc(String gymId);
     Optional<Acceso> findFirstByUserIdAndTipoInOrderByFechaDesc(String userId, Collection<String> tipos);
-    Optional<Acceso> findFirstByGymIdAndTipoOrderByFechaDesc(String gymId, String tipo);
+    Optional<Acceso> findFirstByGymIdAndMotivoStartingWithOrderByFechaDesc(String gymId, String prefijo);
 }
