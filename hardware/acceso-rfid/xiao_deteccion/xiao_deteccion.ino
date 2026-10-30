@@ -1,27 +1,26 @@
 // Comandos de voz del lector: XIAO ESP32-S3 Sense + modelo de Edge Impulse.
 //
-// Mientras se mantiene presionado el botón, la XIAO graba con su micrófono
-// (hasta 2 s). Al soltarlo, el modelo (modelo_voz.h) decide qué se dijo:
+// La XIAO escucha TODO EL TIEMPO (sin botón). Una tarea lee el micrófono sin
+// parar y guarda los últimos 2 s; cada 250 ms se revisa el último segundo:
+//   - si es puro ruido de fondo (más bajo que UMBRAL_SONIDO), no se hace nada;
+//   - si hay sonido, el modelo (modelo_voz.h) decide qué se dijo.
+// Si oye "entrada" o "salida" en VENTANAS_SEGUIDAS revisiones seguidas, con
+// UMBRAL_VOZ o más:
 //   "entrada" -> prende el LED        "salida" -> apaga el LED
-//   otra cosa o poca seguridad -> 3 parpadeos rápidos y el LED se queda como estaba
-// Cada comando reconocido se manda a GTWeb (POST /api/lectores/voz): aparece en
-// el historial de la puerta y el panel muestra si el LED está prendido.
+// y descansa DESCANSO_VOZ_MS para no contar la misma palabra dos veces.
+// Cada comando se manda a GTWeb (POST /api/lectores/voz): aparece en el
+// historial de la puerta y el panel muestra si el LED está prendido.
 //
 // Internet: las redes de secrets.h, o la red propia de la LILYGO cuando ella usa
 // LTE/2G (LECTOR_AP_SSID); en ese caso le manda el comando a la LILYGO y ella lo
 // reenvía al servidor por el módem.
 //
-// Conexión: botón entre D0 y GND (sin resistencia: se usa la interna).
-// (Antes era D2, pero en una de las placas D2 se lee en GND aun sin nada conectado.)
 // LED: el naranja de la placa y, si quieres uno más visible, un LED en D3
-// (con resistencia de 220 Ω a GND).
+// (con resistencia de 220 Ω a GND). Ya no lleva botón.
 //
-// Monitor serie (115200): avisa cada vez que se presiona o suelta el botón y
-// muestra lo que oyó el modelo con el porcentaje de cada clase.
-//   g  grabar 1.5 s sin el botón (para probar el micrófono y el modelo)
+// Monitor serie (115200): cada 3 s, el nivel del ruido de fondo (para ajustar
+// UMBRAL_SONIDO); cuando hay sonido, lo que oyó el modelo con el % de cada clase.
 // Placa: "XIAO_ESP32S3". En Herramientas, PSRAM: "OPI PSRAM".
-// Antes de subirlo: el secrets.h (el mismo que la LILYGO; ya está copiado) y el
-// nombre de tu librería de Edge Impulse en modelo_voz.h.
 
 #include <ESP_I2S.h>
 #include <Preferences.h>
@@ -51,24 +50,31 @@
 #endif
 #define IP_LECTOR "http://192.168.4.1"   // la LILYGO en su propia red
 
-#define BOTON          D0     // a GND al presionar
 #define LED_PLACA      21     // LED naranja de la placa; enciende en LOW
 #define LED_EXTRA      D3     // LED opcional; enciende en HIGH
 #define MIC_CLK        42     // micrófono PDM de la placa Sense
 #define MIC_DATOS      41
 #define FRECUENCIA     16000
-#define MAX_MUESTRAS   (FRECUENCIA * 2)
+#define ANILLO         (FRECUENCIA * 2)    // los últimos 2 s de audio
+#define CADA_MS        250                 // cada cuánto se revisa el último segundo
+#define NIVEL_CADA_MS  3000                // cada cuánto se muestra el ruido de fondo
 
 I2SClass mic;
 Preferences prefs;
 WiFiMulti redes;
 uint32_t ultimoIntentoWifi = 0;
 
-int16_t* grabacion = nullptr;   // lo que se grabó con el botón (PSRAM)
-int16_t* ventana = nullptr;     // el pedazo que ve el modelo
-size_t muestras = 0;
-bool ledEncendido = false;      // sobrevive a los reinicios
-bool botonAntes = false;        // para avisar cada vez que cambia
+int16_t* anillo = nullptr;          // lo que va oyendo el micrófono (PSRAM)
+int16_t* ventana = nullptr;         // el último segundo, el que ve el modelo
+volatile uint32_t escritas = 0;     // muestras que ha leído el micrófono desde que arrancó
+uint32_t revisadas = 0;             // hasta dónde se revisó
+bool ledEncendido = false;          // sobrevive a los reinicios
+
+String ultimoComando;               // el comando que se está oyendo en ventanas seguidas
+int seguidas = 0;
+uint32_t descansoHasta = 0;
+uint32_t ultimoNivel = 0;
+int32_t picoFondo = 0;              // el pico más alto del ruido de fondo desde el último aviso
 
 // ------------------------------------------------------------
 // LED
@@ -77,12 +83,6 @@ void ponerLed(bool encendido) {
   ledEncendido = encendido;
   digitalWrite(LED_PLACA, encendido ? LOW : HIGH);
   digitalWrite(LED_EXTRA, encendido ? HIGH : LOW);
-}
-
-// "No entendí": parpadea y regresa como estaba.
-void parpadeoNoEntendi() {
-  bool antes = ledEncendido;
-  for (int i = 0; i < 3; i++) { ponerLed(!antes); delay(120); ponerLed(antes); delay(120); }
 }
 
 // ------------------------------------------------------------
@@ -123,89 +123,59 @@ void avisarServidor(const char* comando, float confianza) {
 }
 
 // ------------------------------------------------------------
-// Audio y modelo
+// Micrófono (corre aparte, en el núcleo 0, sin parar)
 // ------------------------------------------------------------
-// Graba mientras el botón siga presionado (o hasta 2 s). Con conBoton = false
-// (comando 'g' del monitor) graba 1.5 s fijos, para probar sin el botón.
-void grabar(bool conBoton) {
-  Serial.println(conBoton ? "Grabando... (suelta el botón al terminar la palabra)"
-                          : "Grabando 1.5 s... ¡habla ahora!");
-  int16_t basura[256];
-  mic.readBytes((char*)basura, sizeof(basura));   // lo primero trae basura
-  muestras = 0;
-  const size_t limite = conBoton ? MAX_MUESTRAS : (FRECUENCIA * 3) / 2;
-  int lecturasVacias = 0;
-  while ((!conBoton || digitalRead(BOTON) == LOW) && muestras < limite) {
-    size_t pedir = min((size_t)512, limite - muestras);
-    size_t leidas = mic.readBytes((char*)(grabacion + muestras), pedir * 2) / 2;
-    muestras += leidas;
-    if (leidas == 0 && ++lecturasVacias == 20) {
-      Serial.println("         ⚠ el micrófono no entrega audio (¿PSRAM en OPI PSRAM? ¿placa Sense bien puesta?)");
-    }
-    if (lecturasVacias > 200) break;   // no quedarse aquí para siempre
+void tareaMicrofono(void*) {
+  int16_t bloque[256];
+  for (;;) {
+    size_t n = mic.readBytes((char*)bloque, sizeof(bloque)) / 2;
+    uint32_t base = escritas;
+    for (size_t i = 0; i < n; i++) anillo[(base + i) % ANILLO] = bloque[i];
+    escritas = base + n;
+    if (n == 0) vTaskDelay(1);
   }
-  if (conBoton) while (digitalRead(BOTON) == LOW) delay(10);   // si llegó a 2 s, esperar a que suelte
 }
 
-// Quita el nivel de fondo (DC) del micrófono y dice qué tan fuerte llegó el audio.
-int32_t prepararAudio() {
+// ------------------------------------------------------------
+// Modelo
+// ------------------------------------------------------------
+// Copia el último segundo, le quita el nivel de fondo (DC) del micrófono y
+// devuelve su pico (0 a 32767).
+int32_t tomarUltimoSegundo() {
+  const uint32_t n = EI_CLASSIFIER_RAW_SAMPLE_COUNT;
+  uint32_t inicio = escritas - n;
   int64_t suma = 0;
-  for (size_t i = 0; i < muestras; i++) suma += grabacion[i];
-  int32_t media = muestras ? (int32_t)(suma / (int64_t)muestras) : 0;
+  for (uint32_t i = 0; i < n; i++) {
+    ventana[i] = anillo[(inicio + i) % ANILLO];
+    suma += ventana[i];
+  }
+  int32_t media = (int32_t)(suma / (int64_t)n);
   int32_t pico = 0;
-  uint64_t energia = 0;
-  for (size_t i = 0; i < muestras; i++) {
-    int32_t v = (int32_t)grabacion[i] - media;
+  for (uint32_t i = 0; i < n; i++) {
+    int32_t v = (int32_t)ventana[i] - media;
     if (v > 32767) v = 32767;
     if (v < -32768) v = -32768;
-    grabacion[i] = (int16_t)v;
+    ventana[i] = (int16_t)v;
     int32_t absoluto = v < 0 ? -v : v;
     if (absoluto > pico) pico = absoluto;
-    energia += (int64_t)v * v;
-  }
-  uint32_t promedio = muestras ? sqrt((double)energia / muestras) : 0;
-  Serial.printf("         nivel del audio: pico %ld, promedio %lu (de 32767)\n", (long)pico, (unsigned long)promedio);
-  if (pico < 30) {
-    Serial.println("         ⚠ el micrófono no capta nada: revisa que la placa de expansión Sense (la de");
-    Serial.println("           la cámara, ahí está el micrófono) esté bien puesta y que PSRAM sea OPI PSRAM.");
   }
   return pico;
 }
 
-// El modelo ve EI_CLASSIFIER_RAW_SAMPLE_COUNT muestras (normalmente 1 s). Si se
-// grabó más, se toma el pedazo con más volumen (donde está la palabra); si se
-// grabó menos, se centra y se rellena con silencio. Con NORMALIZAR_VOZ, el
-// volumen se sube a un nivel parecido al de las muestras de entrenamiento
-// (el micrófono de la XIAO suena mucho más bajo que el de un celular).
-void armarVentana(int32_t pico) {
-  const size_t n = EI_CLASSIFIER_RAW_SAMPLE_COUNT;
-  memset(ventana, 0, n * sizeof(int16_t));
-  size_t desde = 0, cuantas = muestras, destino = 0;
-  if (muestras <= n) {
-    destino = (n - muestras) / 2;
-  } else {
-    uint64_t mayor = 0;
-    for (size_t inicio = 0; inicio + n <= muestras; inicio += FRECUENCIA / 20) {
-      uint64_t energia = 0;
-      for (size_t i = inicio; i < inicio + n; i += 4) energia += (int32_t)grabacion[i] * grabacion[i];
-      if (energia > mayor) { mayor = energia; desde = inicio; }
-    }
-    cuantas = n;
-  }
-  float ganancia = 1.0f;
+// Con NORMALIZAR_VOZ, el volumen se sube a un nivel parecido al de las muestras
+// de entrenamiento (el micrófono de la XIAO suena mucho más bajo que un celular).
+void ajustarVolumen(int32_t pico) {
 #if NORMALIZAR_VOZ
-  if (pico > 30) {
-    ganancia = (float)PICO_OBJETIVO / (float)pico;
-    if (ganancia > (float)GANANCIA_MAXIMA) ganancia = (float)GANANCIA_MAXIMA;
-  }
-  Serial.printf("         ganancia aplicada: x%.1f\n", ganancia);
-#endif
-  for (size_t i = 0; i < cuantas; i++) {
-    int32_t v = (int32_t)(grabacion[desde + i] * ganancia);
+  if (pico <= 0) return;
+  float ganancia = (float)PICO_OBJETIVO / (float)pico;
+  if (ganancia > (float)GANANCIA_MAXIMA) ganancia = (float)GANANCIA_MAXIMA;
+  for (uint32_t i = 0; i < EI_CLASSIFIER_RAW_SAMPLE_COUNT; i++) {
+    int32_t v = (int32_t)(ventana[i] * ganancia);
     if (v > 32767) v = 32767;
     if (v < -32768) v = -32768;
-    ventana[destino + i] = (int16_t)v;
+    ventana[i] = (int16_t)v;
   }
+#endif
 }
 
 static int datosAudio(size_t offset, size_t length, float* out) {
@@ -215,14 +185,13 @@ static int datosAudio(size_t offset, size_t length, float* out) {
 
 // ¿Qué se dijo? false = no se pudo correr el modelo.
 bool clasificar(String& etiqueta, float& valor, int32_t pico) {
-  armarVentana(pico);
   ei::signal_t senal;
   senal.total_length = EI_CLASSIFIER_RAW_SAMPLE_COUNT;
   senal.get_data = &datosAudio;
   ei_impulse_result_t resultado = {0};
   if (run_classifier(&senal, &resultado, false) != EI_IMPULSE_OK) return false;
   valor = 0;
-  Serial.print("         modelo:");
+  Serial.printf("sonido (pico %ld):", (long)pico);
   for (size_t i = 0; i < EI_CLASSIFIER_LABEL_COUNT; i++) {
     Serial.printf(" %s %.0f%%", resultado.classification[i].label, resultado.classification[i].value * 100);
     if (resultado.classification[i].value > valor) {
@@ -234,59 +203,63 @@ bool clasificar(String& etiqueta, float& valor, int32_t pico) {
   return true;
 }
 
-void escuchar(bool conBoton) {
-  grabar(conBoton);
-  float segundos = muestras / (float)FRECUENCIA;
-  if (muestras < FRECUENCIA / 4) {
-    Serial.println("Muy corta (menos de 0.25 s): mantén el botón mientras hablas.");
+void obedecer(const String& etiqueta, float valor) {
+  bool entrada = etiqueta.equalsIgnoreCase(CLASE_ENTRADA);
+  Serial.printf("VOZ      \"%s\" (%.0f %%): LED %s\n", entrada ? CLASE_ENTRADA : CLASE_SALIDA,
+                valor * 100, entrada ? "encendido" : "apagado");
+  ponerLed(entrada);
+  prefs.putBool("led", entrada);
+  avisarServidor(entrada ? CLASE_ENTRADA : CLASE_SALIDA, valor);
+}
+
+// Revisa el último segundo de audio.
+void revisar() {
+  int32_t pico = tomarUltimoSegundo();
+  if (millis() < descansoHasta) return;            // acaba de obedecer: no contar la misma palabra
+  if (pico < UMBRAL_SONIDO) {                       // puro ruido de fondo
+    seguidas = 0;
+    if (pico > picoFondo) picoFondo = pico;
     return;
   }
-  Serial.printf("VOZ      %.1f s grabados\n", segundos);
-  int32_t pico = prepararAudio();
+  ajustarVolumen(pico);
   String etiqueta;
   float valor = 0;
-  if (!clasificar(etiqueta, valor, pico)) {
-    Serial.println("         no se pudo correr el modelo");
+  if (!clasificar(etiqueta, valor, pico)) return;
+  bool esComando = valor >= UMBRAL_VOZ &&
+                   (etiqueta.equalsIgnoreCase(CLASE_ENTRADA) || etiqueta.equalsIgnoreCase(CLASE_SALIDA));
+  if (!esComando) {
+    seguidas = 0;
     return;
   }
-  if (valor >= UMBRAL_VOZ && etiqueta.equalsIgnoreCase(CLASE_ENTRADA)) {
-    Serial.printf("         \"%s\" (%.0f %%): LED encendido\n", CLASE_ENTRADA, valor * 100);
-    ponerLed(true);
-    prefs.putBool("led", true);
-    avisarServidor(CLASE_ENTRADA, valor);
-  } else if (valor >= UMBRAL_VOZ && etiqueta.equalsIgnoreCase(CLASE_SALIDA)) {
-    Serial.printf("         \"%s\" (%.0f %%): LED apagado\n", CLASE_SALIDA, valor * 100);
-    ponerLed(false);
-    prefs.putBool("led", false);
-    avisarServidor(CLASE_SALIDA, valor);
-  } else {
-    Serial.printf("         no entendí (%s %.0f %%)\n", etiqueta.c_str(), valor * 100);
-    parpadeoNoEntendi();
-  }
+  if (etiqueta == ultimoComando) seguidas++;
+  else { ultimoComando = etiqueta; seguidas = 1; }
+  if (seguidas < VENTANAS_SEGUIDAS) return;
+  seguidas = 0;
+  descansoHasta = millis() + DESCANSO_VOZ_MS;
+  obedecer(etiqueta, valor);
 }
 
 // ------------------------------------------------------------
 void setup() {
   Serial.begin(115200);
   delay(500);
-  Serial.println("\n=== XIAO DETECCION DE VOZ · version 3 (boton en D0) ===");
-  pinMode(BOTON, INPUT_PULLUP);
-  delay(10);
-  botonAntes = digitalRead(BOTON) == LOW;
-  Serial.printf("Botón en D0 (GPIO %d): %s\n", BOTON, botonAntes ? "PRESIONADO (si no lo estás presionando, revisa el cable de D0)" : "suelto");
+  Serial.println("\n=== XIAO DETECCION DE VOZ · version 4 (escucha siempre, sin boton) ===");
   pinMode(LED_PLACA, OUTPUT);
   pinMode(LED_EXTRA, OUTPUT);
   prefs.begin("voz", false);
   ponerLed(prefs.getBool("led", false));
 
-  grabacion = (int16_t*)ps_malloc(MAX_MUESTRAS * sizeof(int16_t));
+  anillo = (int16_t*)ps_malloc(ANILLO * sizeof(int16_t));
   ventana = (int16_t*)ps_malloc(EI_CLASSIFIER_RAW_SAMPLE_COUNT * sizeof(int16_t));
   mic.setPinsPdmRx(MIC_CLK, MIC_DATOS);
-  if (!grabacion || !ventana || !mic.begin(I2S_MODE_PDM_RX, FRECUENCIA, I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO)) {
-    Serial.println("No se pudo iniciar el micrófono (¿PSRAM en OPI PSRAM?).");
+  if (!anillo || !ventana || !mic.begin(I2S_MODE_PDM_RX, FRECUENCIA, I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_MONO)) {
+    Serial.println("No se pudo iniciar el micrófono (¿PSRAM en OPI PSRAM? ¿placa Sense bien puesta?).");
+    while (true) delay(1000);
   }
-  Serial.printf("Modelo: %d clases, %d muestras por ventana (%.1f s)\n", EI_CLASSIFIER_LABEL_COUNT,
-                EI_CLASSIFIER_RAW_SAMPLE_COUNT, EI_CLASSIFIER_RAW_SAMPLE_COUNT / (float)FRECUENCIA);
+  memset(anillo, 0, ANILLO * sizeof(int16_t));
+  xTaskCreatePinnedToCore(tareaMicrofono, "microfono", 4096, nullptr, 2, nullptr, 0);
+  Serial.printf("Modelo: %d clases, ventana de %.1f s. Umbral de sonido: %d\n", EI_CLASSIFIER_LABEL_COUNT,
+                EI_CLASSIFIER_RAW_SAMPLE_COUNT / (float)FRECUENCIA, UMBRAL_SONIDO);
 
   // Las mismas redes que la LILYGO, más su red propia (cuando usa LTE/2G).
   WiFi.mode(WIFI_STA);
@@ -304,32 +277,24 @@ void setup() {
   } else {
     Serial.println("Sin WiFi: los comandos funcionan igual, pero el panel no se entera; se reintenta cada 15 s.");
   }
-  Serial.println("Listo: mantén el botón, di \"entrada\" o \"salida\" y suéltalo.");
-  Serial.println("Sin botón: escribe g en el monitor y habla (graba 1.5 s).");
+  revisadas = escritas;
+  Serial.println("Escuchando: di \"entrada\" o \"salida\".");
 }
 
 void loop() {
-  // Prueba sin botón: 'g' en el monitor.
-  if (Serial.available() && Serial.read() == 'g') escuchar(false);
+  // Cada 250 ms de audio nuevo, se revisa el último segundo.
+  if (escritas >= EI_CLASSIFIER_RAW_SAMPLE_COUNT && escritas - revisadas >= (uint32_t)(FRECUENCIA * CADA_MS / 1000)) {
+    revisadas = escritas;
+    revisar();
+  }
 
-  // Cada cambio del botón se avisa, aunque no se grabe nada: así se ve si la
-  // XIAO lo está leyendo.
-  bool presionado = digitalRead(BOTON) == LOW;
-  if (presionado != botonAntes) {
-    botonAntes = presionado;
-    Serial.println(presionado ? "Botón PRESIONADO" : "Botón suelto");
+  // El ruido de fondo, para saber a cuánto poner UMBRAL_SONIDO en modelo_voz.h.
+  if (millis() - ultimoNivel > NIVEL_CADA_MS) {
+    ultimoNivel = millis();
+    Serial.printf("(ruido de fondo: pico %ld; umbral de sonido %d)\n", (long)picoFondo, UMBRAL_SONIDO);
+    picoFondo = 0;
   }
-  // El botón cuenta solo si se lee presionado 60 ms seguidos: un falso contacto
-  // o el rebote no disparan grabaciones de unos milisegundos.
-  if (presionado) {
-    bool firme = true;
-    for (int i = 0; i < 6 && firme; i++) { delay(10); firme = digitalRead(BOTON) == LOW; }
-    if (firme) {
-      escuchar(true);
-      botonAntes = false;   // escuchar() regresa cuando ya se soltó
-      Serial.println("Botón suelto");
-    }
-  }
+
   // Sin WiFi, otro intento cada 15 s (también si la LILYGO cambió de red).
   if (WiFi.status() != WL_CONNECTED && millis() - ultimoIntentoWifi > 15000) {
     ultimoIntentoWifi = millis();

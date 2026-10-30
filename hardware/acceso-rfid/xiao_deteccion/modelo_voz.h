@@ -22,3 +22,14 @@
 #define NORMALIZAR_VOZ   1
 #define PICO_OBJETIVO    16000
 #define GANANCIA_MAXIMA  40
+
+// Escucha continua.
+// UMBRAL_SONIDO: debajo de este pico es ruido de fondo y ni se le pregunta al
+// modelo. El monitor muestra cada 3 s "(ruido de fondo: pico N ...)": ponlo un
+// poco arriba de ese N (si es 150, pon unos 300). Si no reacciona cuando hablas,
+// bájalo; si reacciona con cualquier ruido, súbelo.
+#define UMBRAL_SONIDO      300
+// Cuántas revisiones seguidas (cada 250 ms) tiene que oír el mismo comando.
+#define VENTANAS_SEGUIDAS  2
+// Después de obedecer, cuánto tiempo no escucha (para no contar la palabra dos veces).
+#define DESCANSO_VOZ_MS    2000
