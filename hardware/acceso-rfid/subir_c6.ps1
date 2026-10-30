@@ -19,8 +19,8 @@ param(
 )
 
 $completo = Join-Path $PSScriptRoot "build_c6\$Programa.bin"
-$programa = Join-Path $PSScriptRoot "build_c6\$Programa.app.bin"
-$archivo = if ($Borrar) { $completo } else { $programa }
+$soloPrograma = Join-Path $PSScriptRoot "build_c6\$Programa.app.bin"
+$archivo = if ($Borrar) { $completo } else { $soloPrograma }
 if (-not (Test-Path $archivo)) {
     Write-Error "No existe $archivo. Primero corre compilar_c6.sh en Ubuntu."
     exit 1
@@ -36,13 +36,13 @@ if (-not $esptool) {
 Write-Host "esptool: $($esptool.FullName)"
 if ($Borrar) {
     Write-Host "Borrando toda la memoria de la C6 en $Puerto (se pierde el emparejamiento)..."
-    & $esptool.FullName --chip esp32c6 --port $Puerto erase_flash
+    & $esptool.FullName --chip esp32c6 --port $Puerto erase-flash
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     Write-Host "Subiendo $Programa completo a la C6 en $Puerto..."
-    & $esptool.FullName --chip esp32c6 --port $Puerto --baud 460800 write_flash 0x0 $completo
+    & $esptool.FullName --chip esp32c6 --port $Puerto --baud 460800 write-flash 0x0 $completo
 } else {
     Write-Host "Actualizando solo el programa de $Programa en $Puerto (el emparejamiento se queda)..."
-    & $esptool.FullName --chip esp32c6 --port $Puerto --baud 460800 write_flash 0x10000 $programa
+    & $esptool.FullName --chip esp32c6 --port $Puerto --baud 460800 write-flash 0x10000 $soloPrograma
 }
 if ($LASTEXITCODE -eq 0) {
     Write-Host "`nListo. Abre el monitor serie (Arduino IDE, 115200) en $Puerto."
