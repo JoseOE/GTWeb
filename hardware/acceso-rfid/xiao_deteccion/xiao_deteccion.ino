@@ -11,7 +11,8 @@
 // LTE/2G (LECTOR_AP_SSID); en ese caso le manda el comando a la LILYGO y ella lo
 // reenvía al servidor por el módem.
 //
-// Conexión: botón entre D2 y GND (sin resistencia: se usa la interna).
+// Conexión: botón entre D0 y GND (sin resistencia: se usa la interna).
+// (Antes era D2, pero en una de las placas D2 se lee en GND aun sin nada conectado.)
 // LED: el naranja de la placa y, si quieres uno más visible, un LED en D3
 // (con resistencia de 220 Ω a GND).
 //
@@ -50,7 +51,7 @@
 #endif
 #define IP_LECTOR "http://192.168.4.1"   // la LILYGO en su propia red
 
-#define BOTON          D2     // a GND al presionar
+#define BOTON          D0     // a GND al presionar
 #define LED_PLACA      21     // LED naranja de la placa; enciende en LOW
 #define LED_EXTRA      D3     // LED opcional; enciende en HIGH
 #define MIC_CLK        42     // micrófono PDM de la placa Sense
@@ -268,11 +269,11 @@ void escuchar(bool conBoton) {
 void setup() {
   Serial.begin(115200);
   delay(500);
-  Serial.println("\n=== XIAO DETECCION DE VOZ · version 2 (29-oct) ===");
+  Serial.println("\n=== XIAO DETECCION DE VOZ · version 3 (boton en D0) ===");
   pinMode(BOTON, INPUT_PULLUP);
   delay(10);
   botonAntes = digitalRead(BOTON) == LOW;
-  Serial.printf("Botón en D2 (GPIO %d): %s\n", BOTON, botonAntes ? "PRESIONADO (si no lo estás presionando, revisa las patas)" : "suelto");
+  Serial.printf("Botón en D0 (GPIO %d): %s\n", BOTON, botonAntes ? "PRESIONADO (si no lo estás presionando, revisa el cable de D0)" : "suelto");
   pinMode(LED_PLACA, OUTPUT);
   pinMode(LED_EXTRA, OUTPUT);
   prefs.begin("voz", false);

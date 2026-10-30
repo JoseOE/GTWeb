@@ -13,7 +13,7 @@ Cada comando se manda a GTWeb (`POST /api/lectores/voz`): sale en el historial
 de la puerta como "Voz" y el panel muestra si el LED está prendido o apagado.
 
 ## Conexión
-- Botón entre **D2** y **GND** (sin resistencia; se usa la interna).
+- Botón entre **D0** y **GND** (sin resistencia; se usa la interna).
 - LED: el naranja de la placa. Opcional, uno más visible en **D3** con 220 Ω a GND.
 - El cable de la LILYGO a D1 ya no se usa: quítalo.
 

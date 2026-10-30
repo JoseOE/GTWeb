@@ -13,7 +13,8 @@
 // Las muestras salen igual que lo que oirá el modelo: el mismo micrófono, el
 // mismo botón y la misma forma de grabar que xiao_deteccion.
 //
-// Conexión: botón entre D2 y GND (sin resistencia: se usa la interna).
+// Conexión: botón entre D0 y GND (sin resistencia: se usa la interna).
+// (Antes era D2, pero en una de las placas D2 se lee en GND aun sin nada conectado.)
 // Placa: "XIAO_ESP32S3". En Herramientas, PSRAM: "OPI PSRAM".
 // Usa el mismo secrets.h que xiao_deteccion (ya está copiado en esta carpeta).
 
@@ -32,7 +33,7 @@
 #define WIFI_PASS_3 ""
 #endif
 
-#define BOTON          D2     // a GND al presionar
+#define BOTON          D0     // a GND al presionar
 #define LED            21     // LED naranja de la placa; enciende en LOW
 #define MIC_CLK        42     // micrófono PDM de la placa Sense
 #define MIC_DATOS      41
