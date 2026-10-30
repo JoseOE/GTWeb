@@ -680,7 +680,8 @@ void enviarByteC6(uint8_t b) {
 }
 
 // Una línea "TIPO|nombre|dentro": E entrada, S salida, N negado, A abierta
-// desde el panel. dentro = cuántos quedan en el gimnasio (-1 = no se sabe).
+// desde el panel, D solo el aforo (tras un comando de voz).
+// dentro = cuántos quedan en el gimnasio (-1 = no se sabe).
 void avisarC6(char tipo, const String& nombre, int dentro) {
   String linea = String(tipo) + "|" + nombre + "|" + dentro + "\n";
   for (size_t i = 0; i < linea.length(); i++) enviarByteC6(linea[i]);
@@ -811,6 +812,7 @@ void inventario() {
 // tags o hay un LED encendido: ~100 ms = entrada, ~300 ms = salida.
 volatile uint32_t pulsoDesde = 0;
 volatile uint32_t pulsoDuro = 0;
+uint32_t aforoPendienteEn = 0;   // cuándo preguntar el aforo tras un comando de voz
 
 void IRAM_ATTR cambioPulsoXiao() {
   uint32_t ahora = millis();
@@ -828,6 +830,21 @@ void atenderVoz() {
   avisarC6(entrada ? 'E' : 'S', "Voz", -1);
   abrirPuerta();
   senal(entrada ? LED_VERDE : LED_AZUL, entrada ? 1 : 2);
+  aforoPendienteEn = millis() + 3000;   // para entonces la XIAO ya avisó al servidor
+}
+
+// Después de un comando de voz: cuántos quedan dentro, para que la C6 del foco
+// sepa si apagarlo ("D||0") o dejarlo prendido.
+void atenderAforo() {
+  if (!aforoPendienteEn || (int32_t)(millis() - aforoPendienteEn) < 0) return;
+  aforoPendienteEn = 0;
+  Respuesta r = pedir("GET", "/api/lectores/aforo", nullptr, 0, nullptr, esperaServidor());
+  int i = r.cuerpo.indexOf("\"dentro\":");
+  if (r.codigo != 200 || i < 0) {
+    Serial.printf("No se pudo saber cuántos quedan dentro (HTTP %d)\n", r.codigo);
+    return;
+  }
+  avisarC6('D', "", r.cuerpo.substring(i + 9).toInt());
 }
 
 void atenderComando() {
@@ -897,6 +914,7 @@ void loop() {
   }
   atenderComando();
   atenderVoz();
+  atenderAforo();
   if (red == RED_WIFI) {
     vigilarWifi();
   } else {
