@@ -374,8 +374,16 @@ void conectarWifi() {
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
   agregarRedes();
-  Serial.println("Buscando una red conocida...");
-  for (int i = 0; i < 3 && redes.run(8000) != WL_CONNECTED; i++) Serial.println("  ...otra vez");
+  // Primero la red principal (WIFI_SSID) aunque otra conocida tenga mejor
+  // señal: WiFiMulti elige por señal y en la escuela ganaba la red de docentes.
+  Serial.printf("Probando primero la red principal \"%s\"...\n", WIFI_SSID);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  for (uint32_t t = millis(); WiFi.status() != WL_CONNECTED && millis() - t < 10000;) delay(200);
+  if (WiFi.status() != WL_CONNECTED) {
+    WiFi.disconnect();
+    Serial.println("No está cerca: buscando las otras redes conocidas...");
+    for (int i = 0; i < 3 && redes.run(8000) != WL_CONNECTED; i++) Serial.println("  ...otra vez");
+  }
   ultimoIntentoRed = millis();
   if (WiFi.status() == WL_CONNECTED) {
     avisarConexion();
