@@ -13,7 +13,8 @@
 #define CLASE_SALIDA   "salida"    // apaga el LED
 
 // Qué tan seguro tiene que estar el modelo (0 a 1) para obedecer.
-#define UMBRAL_VOZ     0.80f
+// (Con el modelo GYMTrack la palabra sale fuerte en una sola revisión: 90 %+.)
+#define UMBRAL_VOZ     0.90f
 
 // Volumen: el micrófono de la XIAO suena mucho más bajo que un celular. Con 1,
 // cada grabación se sube hasta que su pico llegue a PICO_OBJETIVO (de 32767),
@@ -28,8 +29,11 @@
 // modelo. El monitor muestra cada 3 s "(ruido de fondo: pico N ...)": ponlo un
 // poco arriba de ese N (si es 150, pon unos 300). Si no reacciona cuando hablas,
 // bájalo; si reacciona con cualquier ruido, súbelo.
-#define UMBRAL_SONIDO      300
+// (En la prueba del 29-oct el ruido de fondo llegó hasta ~300; los "salida"
+// falsos salían con picos de 300-360, al empezar o terminar otras palabras.)
+#define UMBRAL_SONIDO      400
 // Cuántas revisiones seguidas (cada 250 ms) tiene que oír el mismo comando.
-#define VENTANAS_SEGUIDAS  2
+// Con 1 basta una revisión con UMBRAL_VOZ o más (la palabra casi nunca sale en dos).
+#define VENTANAS_SEGUIDAS  1
 // Después de obedecer, cuánto tiempo no escucha (para no contar la palabra dos veces).
 #define DESCANSO_VOZ_MS    2000

@@ -243,11 +243,16 @@ void revisar() {
 void setup() {
   Serial.begin(115200);
   delay(500);
-  Serial.println("\n=== XIAO DETECCION DE VOZ · version 4 (escucha siempre, sin boton) ===");
+  Serial.println("\n=== XIAO DETECCION DE VOZ · version 5 (escucha siempre, sin boton) ===");
   pinMode(LED_PLACA, OUTPUT);
   pinMode(LED_EXTRA, OUTPUT);
+  // Prueba de los LEDs: el naranja de la placa y el de D3 parpadean 3 veces.
+  // Si aquí no prenden, el problema es la conexión, no la voz.
+  Serial.println("Prueba de LEDs: deben parpadear 3 veces (el naranja de la placa y el de D3)");
+  for (int i = 0; i < 3; i++) { ponerLed(true); delay(300); ponerLed(false); delay(300); }
   prefs.begin("voz", false);
   ponerLed(prefs.getBool("led", false));
+  Serial.printf("LED al arrancar: %s (como quedó la última vez)\n", ledEncendido ? "encendido" : "apagado");
 
   anillo = (int16_t*)ps_malloc(ANILLO * sizeof(int16_t));
   ventana = (int16_t*)ps_malloc(EI_CLASSIFIER_RAW_SAMPLE_COUNT * sizeof(int16_t));
