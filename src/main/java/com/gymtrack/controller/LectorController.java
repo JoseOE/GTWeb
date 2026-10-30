@@ -63,6 +63,12 @@ public class LectorController {
         return control.guardarFoto(lector, jpeg);
     }
 
+    // GET /api/lectores/aforo → {"dentro": 3}: cuántos hay en el gimnasio (con tag o por voz).
+    @GetMapping("/aforo")
+    public Map<String, Object> aforo(@RequestHeader(value = ControlAccesoService.LLAVE, required = false) String llave) {
+        return control.aforo(control.lectorDe(llave));
+    }
+
     // GET /api/lectores/lista → los tags del gimnasio, para decidir sin internet.
     @GetMapping("/lista")
     public List<Map<String, Object>> lista(@RequestHeader(value = ControlAccesoService.LLAVE, required = false) String llave) {

@@ -194,6 +194,11 @@ public class ControlAccesoService {
         return conAforo(respuesta(Acceso.ENTRADA, socio.getNombre(), null, null), lector.getGymId());
     }
 
+    // Para el lector después de un comando de voz (la LILYGO no sabe cuántos quedan).
+    public Map<String, Object> aforo(Lector lector) {
+        return conAforo(new LinkedHashMap<>(), lector.getGymId());
+    }
+
     // "dentro": cuántos socios con tag quedan en el gimnasio. El lector se lo
     // pasa a la ESP32-C6 del foco, que lo deja prendido mientras haya alguien.
     private Map<String, Object> conAforo(Map<String, Object> r, String gymId) {
