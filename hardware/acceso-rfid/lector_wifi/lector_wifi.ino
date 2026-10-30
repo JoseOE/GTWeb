@@ -69,6 +69,12 @@
 #define LECTOR_AP_PASS "gymtrack2026"
 #endif
 
+// ============================================================
+// SECCIÓN 1 · Pines, tiempos y variables globales
+// Aquí se dice a qué pin va cada cosa (YRM, módem, LEDs, buzzer, C6 y XIAO),
+// cuánto se espera al servidor por cada red y las variables que comparten
+// loop() y la tarea de comandos (FreeRTOS).
+// ============================================================
 #define RFID_RX         32   // llega del TXD del YRM
 #define RFID_TX         33   // va al RXD del YRM
 #define LED_VERDE       18
@@ -134,10 +140,13 @@ Permitido lista[60];
 int tamLista = 0;
 uint32_t ultimaLista = 0;
 
-// ------------------------------------------------------------
-// Protocolo del YRM (chip M100), igual que en prueba_puerta:
+// ============================================================
+// SECCIÓN 2 · Comunicación con el lector UHF YRM1004 (UART2, 115200)
+// En esta sección se arman y se leen las tramas del chip M100: pedir la
+// versión, fijar la potencia de lectura y validar cada respuesta con su
+// checksum. Formato de trama:
 // BB | tipo | cmd | largo (2) | datos | checksum | 7E
-// ------------------------------------------------------------
+// ============================================================
 void enviar(uint8_t cmd, const uint8_t* datos, uint16_t n) {
   uint8_t cs = cmd + (n >> 8) + (n & 0xFF);
   yrm.write(0xBB); yrm.write(0x00); yrm.write(cmd);
@@ -208,9 +217,11 @@ bool fijarPotencia(int dbm) {
   return ok;
 }
 
-// ------------------------------------------------------------
-// Señales y puerta
-// ------------------------------------------------------------
+// ============================================================
+// SECCIÓN 3 · Señales: LEDs, buzzer y puerta
+// En esta sección se prende el LED que corresponde (verde entrada, azul
+// salida, rojo negado) con sus pitidos. La puerta todavía solo se anuncia.
+// ============================================================
 void pitido(int ms) {
   digitalWrite(BUZZER, HIGH); delay(ms); digitalWrite(BUZZER, LOW);
 }
@@ -228,9 +239,14 @@ void abrirPuerta() {
   Serial.println("         [puerta] abrir 3 s");
 }
 
-// ------------------------------------------------------------
-// Peticiones al servidor, por WiFi o por el módem
-// ------------------------------------------------------------
+// ============================================================
+// SECCIÓN 4 · Peticiones HTTPS al servidor GTWeb
+// En esta sección se hace cada petición a la API (con el encabezado
+// X-Lector-Key). Por WiFi usa HTTPClient con TLS; por LTE-M o 2G usa el
+// cliente TLS del módem, y como el módem es uno solo, la petición toma
+// primero el semáforo "candado" (mutex de FreeRTOS) para no chocar con la
+// otra tarea.
+// ============================================================
 // Saca el valor de "campo":"valor" de una respuesta JSON sencilla.
 String campo(const String& json, const char* nombre) {
   String clave = String("\"") + nombre + "\":\"";
@@ -311,9 +327,14 @@ uint32_t esperaServidor() {
   return red == RED_WIFI ? ESPERA_WIFI_MS : ESPERA_MODEM_MS;
 }
 
-// ------------------------------------------------------------
-// WiFi
-// ------------------------------------------------------------
+// ============================================================
+// SECCIÓN 5 · Conexión por WiFi (las 3 redes guardadas en secrets.h)
+// En esta sección se intenta la conexión WiFi: se registran las hasta 3 redes
+// de secrets.h (WIFI_SSID, WIFI_SSID_2, WIFI_SSID_3) en WiFiMulti, que se
+// conecta a la conocida con mejor señal. Se hacen 3 intentos de 8 s al
+// arrancar y, si no hay red, un reintento cada 10 s (vigilarWifi); mientras,
+// la puerta decide con la lista local.
+// ============================================================
 // Las redes que se sabe la placa (hasta 3, en secrets.h). Se conecta sola a la
 // conocida que tenga mejor señal: en casa, en la escuela o con el hotspot.
 void agregarRedes() {
@@ -384,9 +405,16 @@ void vigilarWifi() {
   redes.run(5000);
 }
 
-// ------------------------------------------------------------
-// Módem (LTE-M y 2G). Quien llame debe tener el candado.
-// ------------------------------------------------------------
+// ============================================================
+// SECCIÓN 6 · Conexión celular: LTE-M y 2G con el módem SIM7070G
+// En esta sección se intenta la conexión celular. encenderModem() prende el
+// módem (con reintentos del pulso PWRKEY), revisa la SIM y elige el modo:
+//   - LTE-M: setNetworkMode(38) = solo LTE y setPreferredMode(3) = Cat-M o NB-IoT.
+//   - 2G:    setNetworkMode(13) = solo GSM/GPRS.
+// Luego espera la red hasta 90 s y abre los datos con el APN de Telcel.
+// vigilarModem() reintenta los datos cada 30 s y, a los 3 fallos seguidos,
+// reinicia el módem. Quien llame debe tener el candado.
+// ============================================================
 // El pulso en PWRKEY prende el módem si está apagado, pero lo APAGA si ya estaba
 // prendido (p. ej. si el ESP32 se reinició y el módem no).
 void pulsoModem() {
@@ -481,9 +509,13 @@ void cambiarRed(int nueva) {
   ESP.restart();
 }
 
-// ------------------------------------------------------------
-// Cambio de red
-// ------------------------------------------------------------
+// ============================================================
+// SECCIÓN 7 · Elegir la red (WiFi, LTE-M o 2G)
+// En esta sección se arranca la red guardada en la memoria (Preferences):
+// con WiFi llama a la sección 5; con LTE-M o 2G crea la red propia para la
+// XIAO y llama a la sección 6. Cambiar de red (comandos w / l / g) guarda la
+// elección y reinicia la placa.
+// ============================================================
 void usarRed(int nueva) {
   redLista = false;
   delay(300);   // que la tarea de comandos suelte lo que estaba haciendo
@@ -543,10 +575,12 @@ void mostrarEstado() {
                 (millis() - ultimoSondeoOk) / 1000, ESP.getFreeHeap());
 }
 
-// ------------------------------------------------------------
-// Relevo para la XIAO (solo en LTE/2G): recibe su petición por la red propia
-// y la manda al servidor por el módem, con la llave del lector.
-// ------------------------------------------------------------
+// ============================================================
+// SECCIÓN 8 · Relevo para la XIAO (solo en LTE-M / 2G)
+// En esta sección la LILYGO hace de pasarela: recibe la petición HTTP que la
+// XIAO manda por la red propia (GymTrack-Lector) y la reenvía al servidor por
+// el módem, con la llave del lector. Solo deja pasar rutas /api/lectores/.
+// ============================================================
 String leerLinea(WiFiClient& c, uint32_t limite) {
   String linea;
   while (millis() < limite) {
@@ -605,9 +639,12 @@ void atenderRelevo() {
                   r.cuerpo.length() ? r.cuerpo : String("{\"error\":\"El servidor no respondió por ") + NOMBRE_RED[red] + ".\"}");
 }
 
-// ------------------------------------------------------------
-// Lista local y consultas
-// ------------------------------------------------------------
+// ============================================================
+// SECCIÓN 9 · Lista local y consulta de cada tag
+// En esta sección se descarga cada minuto la lista de tags permitidos (y se
+// guarda en la memoria para decidir sin internet) y se arma el payload JSON
+// {"epc": "..."} que se le manda al servidor por cada tag leído.
+// ============================================================
 int leerLista(const String& json) {
   int n = 0, i = 0;
   while (n < 60 && (i = json.indexOf("{", i)) >= 0) {
@@ -665,9 +702,13 @@ bool preguntarAlServidor(const char* epc, String& resultado, String& nombre, Str
   return resultado.length() > 0;
 }
 
-// ------------------------------------------------------------
-// Aviso a la ESP32-C6 puente (y de ahí a la Alexa por Matter)
-// ------------------------------------------------------------
+// ============================================================
+// SECCIÓN 10 · Aviso a la ESP32-C6 puente (y de ahí a la Alexa por Matter)
+// En esta sección se manda cada evento a la C6 por el GPIO 13 como una línea
+// de texto "TIPO|nombre|dentro" a 9600 baudios. Cada byte se envía dentro de
+// una sección crítica (taskENTER_CRITICAL) para que ninguna interrupción ni
+// otra tarea deforme los bits.
+// ============================================================
 // Los tres UART del ESP32 ya están ocupados (USB, módem y YRM): este serial
 // de solo transmisión se hace a mano, bit por bit, a 9600 baudios.
 portMUX_TYPE candadoBits = portMUX_INITIALIZER_UNLOCKED;
@@ -695,6 +736,13 @@ void avisarC6(char tipo, const String& nombre, int dentro) {
   Serial.printf("         [C6] %s", linea.c_str());
 }
 
+// ============================================================
+// SECCIÓN 11 · Tarea de FreeRTOS: comandos del panel
+// En esta sección corre una tarea aparte de loop() que pregunta al servidor
+// si el dueño dio o negó un acceso desde el panel. No mueve LEDs ni la
+// puerta: deja el comando en comandoPendiente y loop() lo ejecuta
+// (atenderComando), así las dos tareas nunca usan los mismos pines a la vez.
+// ============================================================
 // Corre aparte (en el núcleo 1, ver setup). Por WiFi el servidor tiene la consulta abierta hasta
 // 15 s (responde en cuanto haya algo); por LTE/2G se pregunta cada 4 s sin
 // esperar, para no tener el módem ocupado y que los tags pasen rápido.
@@ -722,9 +770,13 @@ void tareaComandos(void*) {
   }
 }
 
-// ------------------------------------------------------------
-// Lógica de la puerta
-// ------------------------------------------------------------
+// ============================================================
+// SECCIÓN 12 · Lógica de la puerta
+// En esta sección se decide qué hacer con cada tag: se descarta si sigue
+// frente al lector (rearme de 3 s), se pregunta al servidor y se actúa según
+// la respuesta (ENTRADA, SALIDA, NEGADO, REGISTRO). Sin respuesta del
+// servidor, decide con la lista local (decidirSinRed).
+// ============================================================
 bool seguiaCerca(const char* epc) {
   uint32_t ahora = millis();
   int libre = 0;
@@ -795,6 +847,12 @@ void alLeerTag(const char* epc, int8_t rssi, bool forzar) {
   }
 }
 
+// ============================================================
+// SECCIÓN 13 · Lectura continua de tags (inventario del YRM)
+// En esta sección se pide un inventario al YRM (comando 0x22) en cada vuelta
+// de loop() y se leen todas las tramas de tags que respondan: RSSI, PC y el
+// EPC, que se convierte a texto hexadecimal y pasa a la sección 12.
+// ============================================================
 void inventario() {
   vaciarEntrada();
   enviar(0x22, nullptr, 0);
@@ -818,9 +876,13 @@ void inventario() {
   }
 }
 
-// ------------------------------------------------------------
-// Comandos de voz de la XIAO (pulso por GPIO 14)
-// ------------------------------------------------------------
+// ============================================================
+// SECCIÓN 14 · Comandos de voz de la XIAO y órdenes del panel
+// En esta sección se mide el pulso que manda la XIAO por el GPIO 14 con una
+// interrupción (corto = entrada, largo = salida), se pregunta el aforo
+// después de un comando de voz y se ejecuta el comando que dejó la tarea de
+// la sección 11 (dar o negar acceso desde el panel).
+// ============================================================
 // La XIAO ya decidió y avisó al panel; aquí solo se prende el LED y se abre.
 // El pulso se mide con una interrupción para no perderlo mientras se leen
 // tags o hay un LED encendido: ~100 ms = entrada, ~300 ms = salida.
@@ -876,7 +938,14 @@ void atenderComando() {
   }
 }
 
-// ------------------------------------------------------------
+// ============================================================
+// SECCIÓN 15 · Arranque (setup) y ciclo principal (loop)
+// setup(): configura pines e interrupción, despierta al YRM, crea el
+// semáforo del módem, carga la lista guardada, conecta la red elegida
+// (sección 7) y crea la tarea de comandos (sección 11).
+// loop(): atiende el monitor serie, los comandos del panel, la voz y el
+// aforo, vigila la red, refresca la lista y lee tags (sección 13).
+// ============================================================
 void setup() {
   Serial.begin(115200);
   delay(500);
