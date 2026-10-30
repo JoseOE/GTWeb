@@ -38,6 +38,12 @@
 #include <WiFiUdp.h>
 #include "secrets.h"
 
+// ============================================================
+// SECCIÓN 1 · Socios, sensores Matter y variables globales
+// Aquí se define la lista de socios (un sensor de contacto Matter por cada
+// uno, más "Voz" y "Acceso denegado") y el puerto UDP por el que llegan los
+// avisos de la C6 puente.
+// ============================================================
 #define BOTON         BOOT_PIN
 #define PUERTO_UDP    4210        // el mismo en c6_puente
 #define CIERRE_DENEGADO_MS 5000
@@ -68,14 +74,18 @@ int indiceDe(const String& nombre) {
   return -1;
 }
 
-// Se escribe el estado directo en Matter. setContact() de la librería no sirve:
-// Matter guarda el estado de los sensores en la memoria y, si al arrancar uno
-// quedó "abierto" de antes, setContact() cree que ya está y no lo cambia (y
-// getContact() dice otra cosa). Así la Alexa nunca veía el cambio.
-// En Matter "contacto = true" es cerrado; la Alexa lo muestra como "cerrado".
-// En esta versión de Matter el estado del sensor no se guarda como atributo
-// (por eso cambiarlo daba ESP_ERR_NOT_SUPPORTED): lo lleva el "cluster"
-// BooleanState y se cambia con su SetStateValue(), que además avisa a la Alexa.
+// ============================================================
+// SECCIÓN 2 · Control de los sensores Matter
+// En esta sección se abre o cierra cada sensor. Al cambiar, Matter le avisa a
+// la Alexa y ella corre la rutina ("Bienvenido Chema", "Hasta luego Chema",
+// "Acceso denegado"). En Matter "contacto = true" es cerrado.
+// ============================================================
+// setContact() de la librería de Arduino no sirve en el núcleo 3.3.11: el
+// estado del sensor no se guarda como atributo (cambiarlo daba
+// ESP_ERR_NOT_SUPPORTED) y la Alexa nunca veía un cambio. Lo lleva el
+// "cluster" BooleanState y se cambia con su SetStateValue(), que además
+// avisa a la Alexa. Se toma el candado de la pila de Matter (CHIP) porque
+// Matter corre en su propia tarea de FreeRTOS.
 bool ponerContacto(MatterContactSensor& sensor, bool cerrado) {
   esp_matter::lock::ScopedChipStackLock candado(portMAX_DELAY);
   chip::app::ServerClusterInterface* c = esp_matter::data_model::provider::get_instance().registry().Get(
@@ -104,6 +114,12 @@ void abrirSocio(int i, bool abrir) {
   if (ponerContacto(sensores[i], !abrir)) abierto[i] = abrir;
 }
 
+// ============================================================
+// SECCIÓN 3 · Avisos de la C6 puente: qué sensor mover
+// En esta sección se interpreta cada aviso "TIPO|nombre|dentro":
+//   E / A (entrada) -> abre el sensor del socio   S (salida) -> lo cierra
+//   N (negado)      -> abre "Acceso denegado" 5 s  D (aforo)  -> se ignora
+// ============================================================
 void atender(const String& aviso) {
   int p1 = aviso.indexOf('|'), p2 = aviso.indexOf('|', p1 + 1);
   if (p1 != 1 || p2 < 0) return;
@@ -142,6 +158,14 @@ void atender(const String& aviso) {
   }
 }
 
+// ============================================================
+// SECCIÓN 4 · Arranque (setup) y ciclo principal (loop)
+// setup(): crea los 7 sensores (todos cerrados), arranca Matter, abre el
+// puerto UDP y, si no está emparejada, muestra el código para la app Alexa.
+// loop(): cierra los sensores cuando Matter ya está listo, recibe los
+// paquetes UDP de la C6 puente, cierra "Acceso denegado" a los 5 s y vigila
+// el botón BOOT (5 s = borrar emparejamiento).
+// ============================================================
 void setup() {
   Serial.begin(115200);
   delay(300);

@@ -31,6 +31,12 @@
 #include <WiFiUdp.h>
 #include "secrets.h"
 
+// ============================================================
+// SECCIÓN 1 · Pines, sensor Matter y variables globales
+// Aquí se define el pin que recibe a la LILYGO (GPIO 18), el puerto UDP para
+// hablar con la C6 de la Alexa y el sensor de contacto Matter
+// "Gimnasio ocupado".
+// ============================================================
 #define RX_LILYGO     18      // llega de GPIO 13 de la LILYGO
 #define BOTON         BOOT_PIN
 #define PUERTO_UDP    4210    // el mismo en c6_alexa
@@ -45,6 +51,12 @@ uint32_t ultimoEstado = 0;
 bool sincronizado = false;
 uint32_t ultimoIntento = 0;
 
+// ============================================================
+// SECCIÓN 2 · Diagnóstico y control del sensor Matter
+// En esta sección se imprime cada 10 s el estado de Matter (emparejada, WiFi,
+// sensor) y se cambia el sensor de contacto: abierto = hay gente (la rutina de
+// la Alexa prende la lámpara), cerrado = vacío (la apaga).
+// ============================================================
 // Cada 10 s: para saber si Matter está bien (emparejada, con WiFi) y cómo está el sensor.
 void mostrarEstado() {
   Serial.printf("[estado] emparejada: %s · WiFi de Matter: %s · IP: %s · sensor: %s\n",
@@ -54,14 +66,12 @@ void mostrarEstado() {
                 hayGente ? "ABIERTO (ocupado)" : "cerrado (vacío)");
 }
 
-// Se escribe el estado directo en Matter. setContact() de la librería no sirve:
-// Matter guarda el estado del sensor en la memoria y, si al arrancar quedó
-// "abierto" de antes, setContact() cree que ya está y no lo cambia (y
-// getContact() dice otra cosa). Así el sensor se quedaba siempre abierto y la
-// Alexa nunca veía un cambio para correr la rutina.
-// En esta versión de Matter el estado del sensor no se guarda como atributo
-// (por eso cambiarlo daba ESP_ERR_NOT_SUPPORTED): lo lleva el "cluster"
-// BooleanState y se cambia con su SetStateValue(), que además avisa a la Alexa.
+// setContact() de la librería de Arduino no sirve en el núcleo 3.3.11: el
+// estado del sensor no se guarda como atributo (cambiarlo daba
+// ESP_ERR_NOT_SUPPORTED) y la Alexa nunca veía un cambio. Lo lleva el
+// "cluster" BooleanState y se cambia con su SetStateValue(), que además
+// avisa a la Alexa. Se toma el candado de la pila de Matter (CHIP) porque
+// Matter corre en su propia tarea de FreeRTOS.
 bool ponerContacto(MatterContactSensor& sensor, bool cerrado) {
   esp_matter::lock::ScopedChipStackLock candado(portMAX_DELAY);
   chip::app::ServerClusterInterface* c = esp_matter::data_model::provider::get_instance().registry().Get(
@@ -76,6 +86,12 @@ bool ponerContacto(MatterContactSensor& sensor, bool cerrado) {
   return estado->GetStateValue() == cerrado;
 }
 
+// ============================================================
+// SECCIÓN 3 · Reenvío a la C6 de la Alexa (UDP en la red local)
+// En esta sección se manda cada aviso como paquete UDP de difusión
+// (broadcast) al puerto 4210. La red WiFi la dio la Alexa al emparejar
+// (comisionamiento por BLE), así que no hace falta poner usuario y contraseña.
+// ============================================================
 // Con Matter, el WiFi lo maneja Matter (se lo dio la Alexa al emparejar) y
 // WiFi.status() de Arduino puede decir "desconectado" aunque sí haya red: se
 // pregunta a Matter y, de todos modos, se intenta mandar.
@@ -91,6 +107,12 @@ void reenviarAlexa(const String& aviso) {
   Serial.printf("  -> a la C6 de la Alexa: %s\n", ok ? "enviado" : "NO se pudo enviar");
 }
 
+// ============================================================
+// SECCIÓN 4 · Avisos de la LILYGO: decidir si hay gente
+// En esta sección se interpreta cada línea "TIPO|nombre|dentro" que llega
+// por el serial de 9600 y se abre o cierra "Gimnasio ocupado" según cuántos
+// quedan dentro.
+// ============================================================
 // Abierto con la primera persona, cerrado cuando ya no queda nadie.
 // dentro = cuántos quedan (-1 = no se sabe todavía: se queda como está, salvo
 // en una entrada, que sí lo abre).
@@ -120,6 +142,13 @@ void atender(const String& aviso) {
   if (tipo != 'D') reenviarAlexa(aviso);   // el aforo solo le importa a este sensor
 }
 
+// ============================================================
+// SECCIÓN 5 · Arranque (setup) y ciclo principal (loop)
+// setup(): abre el serial de la LILYGO, crea el sensor, arranca Matter y, si
+// no está emparejada, muestra el código para la app Alexa.
+// loop(): cierra el sensor cuando Matter ya está listo, lee los avisos de la
+// LILYGO línea por línea y vigila el botón BOOT (5 s = borrar emparejamiento).
+// ============================================================
 void setup() {
   Serial.begin(115200);
   delay(300);
