@@ -25,6 +25,8 @@
 // Herramientas → Partition Scheme: "Huge APP (3MB No OTA/1MB SPIFFS)".
 
 #include <Matter.h>
+#include <esp_matter_data_model_provider.h>
+#include <app/clusters/boolean-state-server/boolean-state-cluster.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include "secrets.h"
@@ -34,33 +36,75 @@
 #define PUERTO_UDP    4210    // el mismo en c6_alexa
 
 MatterContactSensor ocupado;   // en Matter "contacto = true" es cerrado (gimnasio vacío)
+bool hayGente = false;         // lo que tiene el sensor en Matter
 WiFiUDP udp;
 String linea;
 uint32_t botonDesde = 0;
 uint32_t ultimoAvisoCodigo = 0;
+uint32_t ultimoEstado = 0;
+bool sincronizado = false;
+uint32_t ultimoIntento = 0;
+
+// Cada 10 s: para saber si Matter está bien (emparejada, con WiFi) y cómo está el sensor.
+void mostrarEstado() {
+  Serial.printf("[estado] emparejada: %s · WiFi de Matter: %s · IP: %s · sensor: %s\n",
+                Matter.isDeviceCommissioned() ? "sí" : "NO",
+                Matter.isWiFiConnected() ? "sí" : "NO",
+                WiFi.localIP().toString().c_str(),
+                hayGente ? "ABIERTO (ocupado)" : "cerrado (vacío)");
+}
+
+// Se escribe el estado directo en Matter. setContact() de la librería no sirve:
+// Matter guarda el estado del sensor en la memoria y, si al arrancar quedó
+// "abierto" de antes, setContact() cree que ya está y no lo cambia (y
+// getContact() dice otra cosa). Así el sensor se quedaba siempre abierto y la
+// Alexa nunca veía un cambio para correr la rutina.
+// En esta versión de Matter el estado del sensor no se guarda como atributo
+// (por eso cambiarlo daba ESP_ERR_NOT_SUPPORTED): lo lleva el "cluster"
+// BooleanState y se cambia con su SetStateValue(), que además avisa a la Alexa.
+bool ponerContacto(MatterContactSensor& sensor, bool cerrado) {
+  esp_matter::lock::ScopedChipStackLock candado(portMAX_DELAY);
+  chip::app::ServerClusterInterface* c = esp_matter::data_model::provider::get_instance().registry().Get(
+    chip::app::ConcreteClusterPath(sensor.getEndPointId(), 0x0045));   // 0x0045 = BooleanState
+  if (c == nullptr) {
+    Serial.println("  No encontré el sensor en Matter");
+    return false;
+  }
+  auto* estado = static_cast<chip::app::Clusters::BooleanStateCluster*>(c);
+  if (estado->GetStateValue() != cerrado) estado->SetStateValue(cerrado);
+  if (estado->GetStateValue() != cerrado) Serial.println("  Matter no cambió el sensor");
+  return estado->GetStateValue() == cerrado;
+}
+
+// Con Matter, el WiFi lo maneja Matter (se lo dio la Alexa al emparejar) y
+// WiFi.status() de Arduino puede decir "desconectado" aunque sí haya red: se
+// pregunta a Matter y, de todos modos, se intenta mandar.
+bool hayRed() {
+  return Matter.isWiFiConnected() || WiFi.status() == WL_CONNECTED;
+}
 
 void reenviarAlexa(const String& aviso) {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("Sin WiFi: la C6 de la Alexa no se entera");
-    return;
-  }
-  udp.beginPacket(IPAddress(255, 255, 255, 255), PUERTO_UDP);
+  if (!hayRed()) Serial.println("Aviso: Matter dice que no hay WiFi; se intenta mandar de todos modos");
+  bool ok = udp.beginPacket(IPAddress(255, 255, 255, 255), PUERTO_UDP);
   udp.print(aviso);
-  udp.endPacket();
+  ok = udp.endPacket() && ok;
+  Serial.printf("  -> a la C6 de la Alexa: %s\n", ok ? "enviado" : "NO se pudo enviar");
 }
 
 // Abierto con la primera persona, cerrado cuando ya no queda nadie.
 // dentro = cuántos quedan (-1 = no se sabe todavía: se queda como está, salvo
 // en una entrada, que sí lo abre).
 void actualizarOcupado(char tipo, int dentro) {
-  bool antes = !ocupado.getContact();
+  bool antes = hayGente;
   bool ahora = antes;
   if ((tipo == 'E' || tipo == 'A') && dentro != 0) ahora = true;
   if (dentro > 0) ahora = true;
   if (dentro == 0) ahora = false;
   if (ahora != antes) {
-    ocupado.setContact(!ahora);
-    Serial.printf("Gimnasio ocupado: %s (la rutina %s el foco)\n", ahora ? "ABIERTO" : "cerrado", ahora ? "prende" : "apaga");
+    bool ok = ponerContacto(ocupado, !ahora);
+    if (ok) { hayGente = ahora; sincronizado = true; }   // ya no hace falta cerrarlo al arrancar
+    Serial.printf("Gimnasio ocupado: %s (la rutina %s el foco) -> Matter %s\n", ahora ? "ABIERTO" : "cerrado",
+                  ahora ? "prende" : "apaga", ok ? "lo aceptó" : "LO RECHAZÓ");
   }
 }
 
@@ -79,7 +123,7 @@ void atender(const String& aviso) {
 void setup() {
   Serial.begin(115200);
   delay(300);
-  Serial.println("\n=== ESP32-C6 puente (Matter: Gimnasio ocupado) ===");
+  Serial.println("\n=== ESP32-C6 puente (Matter: Gimnasio ocupado) · diagnostico ===");
   pinMode(BOTON, INPUT_PULLUP);
   Serial1.begin(9600, SERIAL_8N1, RX_LILYGO, -1);
 
@@ -101,6 +145,17 @@ void setup() {
 }
 
 void loop() {
+  // Al arrancar se deja el sensor cerrado (aunque se haya guardado abierto),
+  // pero hasta que Matter ya esté listo: justo al arrancar rechaza los cambios.
+  if (!sincronizado && Matter.isDeviceCommissioned() && millis() > 8000 && millis() - ultimoIntento > 5000) {
+    ultimoIntento = millis();
+    sincronizado = ponerContacto(ocupado, true);
+    if (sincronizado) { hayGente = false; Serial.println("Sensor listo: cerrado (vacío)"); }
+  }
+  if (millis() - ultimoEstado > 10000) {
+    ultimoEstado = millis();
+    mostrarEstado();
+  }
   // Avisos de la LILYGO, una línea a la vez.
   while (Serial1.available()) {
     char c = Serial1.read();
