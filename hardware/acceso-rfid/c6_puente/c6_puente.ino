@@ -25,6 +25,8 @@
 // Herramientas → Partition Scheme: "Huge APP (3MB No OTA/1MB SPIFFS)".
 
 #include <Matter.h>
+#include <esp_matter_data_model_provider.h>
+#include <app/clusters/boolean-state-server/boolean-state-cluster.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include "secrets.h"
@@ -57,15 +59,21 @@ void mostrarEstado() {
 // "abierto" de antes, setContact() cree que ya está y no lo cambia (y
 // getContact() dice otra cosa). Así el sensor se quedaba siempre abierto y la
 // Alexa nunca veía un cambio para correr la rutina.
-// Primero se lee el valor (así trae el tipo que Matter espera) y luego se cambia.
+// En esta versión de Matter el estado del sensor no se guarda como atributo
+// (por eso cambiarlo daba ESP_ERR_NOT_SUPPORTED): lo lleva el "cluster"
+// BooleanState y se cambia con su SetStateValue(), que además avisa a la Alexa.
 bool ponerContacto(MatterContactSensor& sensor, bool cerrado) {
-  esp_matter_attr_val_t valor = esp_matter_invalid(NULL);
-  if (!sensor.getAttributeVal(0x0045, 0x0000, &valor)) return false;   // BooleanState · StateValue
-  if (valor.val.b == cerrado) return true;                             // ya está así
-  valor.val.b = cerrado;
-  esp_err_t err = esp_matter::attribute::update(sensor.getEndPointId(), 0x0045, 0x0000, &valor);
-  if (err != ESP_OK) Serial.printf("  Matter rechazó el cambio: %s (%d)\n", esp_err_to_name(err), err);
-  return err == ESP_OK;
+  esp_matter::lock::ScopedChipStackLock candado(portMAX_DELAY);
+  chip::app::ServerClusterInterface* c = esp_matter::data_model::provider::get_instance().registry().Get(
+    chip::app::ConcreteClusterPath(sensor.getEndPointId(), 0x0045));   // 0x0045 = BooleanState
+  if (c == nullptr) {
+    Serial.println("  No encontré el sensor en Matter");
+    return false;
+  }
+  auto* estado = static_cast<chip::app::Clusters::BooleanStateCluster*>(c);
+  if (estado->GetStateValue() != cerrado) estado->SetStateValue(cerrado);
+  if (estado->GetStateValue() != cerrado) Serial.println("  Matter no cambió el sensor");
+  return estado->GetStateValue() == cerrado;
 }
 
 // Con Matter, el WiFi lo maneja Matter (se lo dio la Alexa al emparejar) y
