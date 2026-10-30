@@ -14,7 +14,7 @@ de la puerta como "Voz" y el panel muestra si el LED está prendido o apagado.
 
 ## Conexión
 - `xiao_deteccion` ya no usa botón: escucha todo el tiempo (ver `UMBRAL_SONIDO` en `modelo_voz.h`). El botón entre **D0** y **GND** solo lo usa `grabar_voz` para grabar muestras.
-- LED: el naranja de la placa. Opcional, uno más visible en **D3** con 220 Ω a GND.
+- LED: el naranja de la placa. Opcional, uno más visible en **D1** con 220 Ω a GND.
 - El cable de la LILYGO a D1 ya no se usa: quítalo.
 
 ## 1. Grabar las muestras (`grabar_voz`)

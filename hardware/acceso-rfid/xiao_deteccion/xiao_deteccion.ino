@@ -15,7 +15,8 @@
 // LTE/2G (LECTOR_AP_SSID); en ese caso le manda el comando a la LILYGO y ella lo
 // reenvía al servidor por el módem.
 //
-// LED: el naranja de la placa y, si quieres uno más visible, un LED en D3
+// LED: el naranja de la placa y, si quieres uno más visible, un LED en D1
+// (en la placa del equipo, D2 y D3 fallan: probablemente una soldadura del header)
 // (con resistencia de 220 Ω a GND). Ya no lleva botón.
 //
 // Monitor serie (115200): cada 3 s, el nivel del ruido de fondo (para ajustar
@@ -51,7 +52,7 @@
 #define IP_LECTOR "http://192.168.4.1"   // la LILYGO en su propia red
 
 #define LED_PLACA      21     // LED naranja de la placa; enciende en LOW
-#define LED_EXTRA      D3     // LED opcional; enciende en HIGH
+#define LED_EXTRA      D1     // LED opcional; enciende en HIGH
 #define MIC_CLK        42     // micrófono PDM de la placa Sense
 #define MIC_DATOS      41
 #define FRECUENCIA     16000
@@ -243,12 +244,12 @@ void revisar() {
 void setup() {
   Serial.begin(115200);
   delay(500);
-  Serial.println("\n=== XIAO DETECCION DE VOZ · version 5 (escucha siempre, sin boton) ===");
+  Serial.println("\n=== XIAO DETECCION DE VOZ · version 6 (LED extra en D1) ===");
   pinMode(LED_PLACA, OUTPUT);
   pinMode(LED_EXTRA, OUTPUT);
-  // Prueba de los LEDs: el naranja de la placa y el de D3 parpadean 3 veces.
+  // Prueba de los LEDs: el naranja de la placa y el de D1 parpadean 3 veces.
   // Si aquí no prenden, el problema es la conexión, no la voz.
-  Serial.println("Prueba de LEDs: deben parpadear 3 veces (el naranja de la placa y el de D3)");
+  Serial.println("Prueba de LEDs: deben parpadear 3 veces (el naranja de la placa y el de D1)");
   for (int i = 0; i < 3; i++) { ponerLed(true); delay(300); ponerLed(false); delay(300); }
   prefs.begin("voz", false);
   ponerLed(prefs.getBool("led", false));
