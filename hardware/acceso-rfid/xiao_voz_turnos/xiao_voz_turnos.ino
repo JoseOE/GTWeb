@@ -56,6 +56,13 @@
 #endif
 #define IP_LECTOR "http://192.168.4.1"   // la LILYGO en su propia red
 
+// ============================================================
+// SECCIÓN 1 · Pines, audio y variables globales
+// Aquí se dice qué pin va a cada cosa (LEDs, pulso a la LILYGO, micrófono PDM),
+// la frecuencia de muestreo (16 kHz, la del modelo) y el búfer circular
+// "anillo" con los últimos 2 s de audio, que comparten la tarea del micrófono
+// y loop().
+// ============================================================
 #define LED_PLACA      21     // LED naranja de la placa; enciende en LOW
 #define LED_EXTRA      D1     // LED opcional; enciende en HIGH
 #define PULSO_LILYGO   D0     // a GPIO 14 de la LILYGO (y GND con GND)
@@ -85,18 +92,24 @@ uint32_t descansoHasta = 0;
 uint32_t ultimoNivel = 0;
 int32_t picoFondo = 0;              // el pico más alto del ruido de fondo desde el último aviso
 
-// ------------------------------------------------------------
-// LED
-// ------------------------------------------------------------
+// ============================================================
+// SECCIÓN 2 · LED de estado
+// En esta sección se prende o apaga el LED: prendido = alguien entró por voz
+// y todavía no sale.
+// ============================================================
 void ponerLed(bool encendido) {
   ledEncendido = encendido;
   digitalWrite(LED_PLACA, encendido ? LOW : HIGH);
   digitalWrite(LED_EXTRA, encendido ? HIGH : LOW);
 }
 
-// ------------------------------------------------------------
-// Red
-// ------------------------------------------------------------
+// ============================================================
+// SECCIÓN 3 · Aviso al servidor GTWeb
+// En esta sección se manda cada comando reconocido a la API
+// (POST /api/lectores/voz) con su confianza. Si la XIAO está en la red propia
+// de la LILYGO (porque ella usa LTE-M o 2G), la petición va a la LILYGO y ella
+// la reenvía por el módem.
+// ============================================================
 // Conectada a la red de la LILYGO (ella usa LTE/2G): todo va a la LILYGO.
 String urlBase() {
   return WiFi.SSID() == LECTOR_AP_SSID ? String(IP_LECTOR) : String(SERVIDOR);
@@ -133,9 +146,12 @@ void avisarServidor(const char* comando, float confianza) {
                 url.startsWith(IP_LECTOR) ? " (por la LILYGO)" : "");
 }
 
-// ------------------------------------------------------------
-// Micrófono (corre aparte, en el núcleo 0, sin parar)
-// ------------------------------------------------------------
+// ============================================================
+// SECCIÓN 4 · Tarea de FreeRTOS: lectura continua del micrófono
+// En esta sección corre una tarea aparte (núcleo 0, prioridad 2) que lee el
+// micrófono PDM por I2S sin parar y va escribiendo en el búfer circular.
+// Así no se pierde audio mientras loop() (núcleo 1) corre el modelo.
+// ============================================================
 void tareaMicrofono(void*) {
   int16_t bloque[256];
   for (;;) {
@@ -147,9 +163,12 @@ void tareaMicrofono(void*) {
   }
 }
 
-// ------------------------------------------------------------
-// Modelo
-// ------------------------------------------------------------
+// ============================================================
+// SECCIÓN 5 · Inferencia TinyML (modelo de Edge Impulse)
+// En esta sección se toma el último segundo de audio, se le quita el nivel
+// de fondo, se ajusta el volumen y se corre el clasificador (run_classifier).
+// Si el sonido es más bajo que UMBRAL_SONIDO ni se corre el modelo.
+// ============================================================
 // Copia el último segundo, le quita el nivel de fondo (DC) del micrófono y
 // devuelve su pico (0 a 32767).
 int32_t tomarUltimoSegundo() {
@@ -214,6 +233,12 @@ bool clasificar(String& etiqueta, float& valor, int32_t pico) {
   return true;
 }
 
+// ============================================================
+// SECCIÓN 6 · Decisión por turnos y aviso a la LILYGO
+// En esta sección se decide si el comando cuenta (por turnos: no dos
+// "entrada" seguidas) y, si cuenta, se prende o apaga el LED, se guarda en
+// la memoria, se manda el pulso a la LILYGO por D0 y se avisa al servidor.
+// ============================================================
 // Le avisa a la LILYGO por un cable: pulso corto = entrada, largo = salida.
 void pulsoLilygo(bool entrada) {
   digitalWrite(PULSO_LILYGO, HIGH);
@@ -266,7 +291,14 @@ void revisar() {
   obedecer(etiqueta, valor);
 }
 
-// ------------------------------------------------------------
+// ============================================================
+// SECCIÓN 7 · Arranque (setup) y ciclo principal (loop)
+// setup(): prueba los LEDs, reserva el audio en PSRAM, inicia el micrófono,
+// crea la tarea de la sección 4 y se conecta al WiFi: prueba las 3 redes de
+// secrets.h y la red propia de la LILYGO (3 intentos de 8 s).
+// loop(): cada 250 ms de audio nuevo revisa el último segundo (sección 5),
+// muestra el ruido de fondo y reintenta el WiFi cada 15 s si se cayó.
+// ============================================================
 void setup() {
   Serial.begin(115200);
   delay(500);
