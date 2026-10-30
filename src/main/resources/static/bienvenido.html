@@ -2649,8 +2649,7 @@
             const TIPOS = {
                 ENTRADA: ['Entrada', 'bg-success-subtle text-success-emphasis', 'bx-log-in-circle'],
                 SALIDA: ['Salida', 'bg-info-subtle text-info-emphasis', 'bx-log-out-circle'],
-                NEGADO: ['Negado', 'bg-danger-subtle text-danger-emphasis', 'bx-block'],
-                VOZ: ['Voz', 'bg-warning-subtle text-warning-emphasis', 'bx-microphone']
+                NEGADO: ['Negado', 'bg-danger-subtle text-danger-emphasis', 'bx-block']
             };
             const ESTADOS = {
                 PENDIENTE: ['Esperando tu decisión', 'bg-warning-subtle text-warning-emphasis'],
@@ -2709,7 +2708,7 @@
                             <i class='bx ${datos.voz.encendido ? 'bxs-bulb' : 'bx-bulb'} fs-4'></i>
                         </div>
                         <div>
-                            <span class="fw-semibold d-block">Comando de voz (XIAO): LED <span class="${datos.voz.encendido ? 'text-warning-emphasis' : 'text-body-secondary'}">${datos.voz.encendido ? 'encendido' : 'apagado'}</span></span>
+                            <span class="fw-semibold d-block">Acceso por voz (XIAO): <span class="${datos.voz.encendido ? 'text-warning-emphasis' : 'text-body-secondary'}">${datos.voz.encendido ? 'alguien dentro · LED encendido' : 'nadie dentro · LED apagado'}</span></span>
                             <small class="text-body-secondary"><i class="bx bx-microphone" aria-hidden="true"></i> ${escapeHtml(datos.voz.detalle || '')} · ${hace(datos.voz.fecha)}</small>
                         </div>
                     </div>` : '') + (llaveNueva ? `
