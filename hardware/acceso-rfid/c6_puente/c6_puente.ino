@@ -1,20 +1,21 @@
-// ESP32-C6 del foco: recibe los avisos de la LILYGO y es un foco Matter.
+// ESP32-C6 puente: recibe los avisos de la LILYGO y es el sensor Matter
+// "Gimnasio ocupado". No lleva relevador: el foco es un foco inteligente que la
+// Alexa prende y apaga con una rutina.
 //
 // La LILYGO le manda por serial (9600) una línea por evento:
 //   "E|Chema|3"  entrada (quedan 3 dentro)      "S|Chema|0"  salida (no queda nadie)
 //   "N|Edwin|-1" acceso negado                   "A|Visitante|-1" abierta desde el panel
 //   "E|Voz|-1"   entrada por comando de voz      "D||2"  solo el aforo: quedan 2 dentro
 // Qué hace:
-//   - Prende el foco (relevador) cuando alguien entra y lo apaga cuando ya no
-//     queda nadie dentro. Como es un foco Matter, la Alexa lo ve, y también se
-//     puede prender o apagar desde la app o con la voz ("Alexa, apaga el foco").
+//   - Sensor de contacto Matter "Gimnasio ocupado": se ABRE cuando entra la
+//     primera persona y se CIERRA cuando ya no queda nadie. En la app Alexa:
+//       "Cuando Gimnasio ocupado se abra → encender la lámpara (foco Steren)"
+//       "Cuando Gimnasio ocupado se cierre → apagar la lámpara"
 //   - Reenvía cada aviso por la red WiFi local (UDP) a la ESP32-C6 de la Alexa
-//     (c6_alexa), que es la que la hace hablar.
+//     (c6_alexa), que tiene los sensores para los anuncios.
 //
 // Conexión: GPIO 13 de la LILYGO → RX_LILYGO de esta C6, y GND con GND.
-// El relevador del foco en RELE. Para la demo puede ser un LED con 220 Ω.
-// ⚠ Si el foco es de 127 V, usa un módulo de relevador para corriente alterna,
-// con su caja, y que la conexión a la corriente la haga alguien que sepa.
+// Se alimenta por su USB-C (un cargador de celular).
 //
 // Emparejar con la Alexa: al arrancar sin emparejar, el monitor muestra el código
 // de 11 dígitos y una URL con el QR. App Alexa → Dispositivos → + → Matter.
@@ -29,28 +30,14 @@
 #include "secrets.h"
 
 #define RX_LILYGO     18      // llega de GPIO 13 de la LILYGO
-#define RELE          19      // relevador o LED del foco
-#define RELE_ACTIVO   HIGH    // cámbialo a LOW si tu módulo de relevador se activa en bajo
 #define BOTON         BOOT_PIN
 #define PUERTO_UDP    4210    // el mismo en c6_alexa
 
-MatterOnOffLight foco;
+MatterContactSensor ocupado;   // en Matter "contacto = true" es cerrado (gimnasio vacío)
 WiFiUDP udp;
 String linea;
 uint32_t botonDesde = 0;
 uint32_t ultimoAvisoCodigo = 0;
-
-bool moverRele(bool prendido) {
-  digitalWrite(RELE, prendido ? RELE_ACTIVO : !RELE_ACTIVO);
-  Serial.printf("Foco %s\n", prendido ? "PRENDIDO" : "apagado");
-  return true;
-}
-
-// Desde la LILYGO: se cambia el foco y se le avisa a Matter (la Alexa lo ve).
-void ponerFoco(bool prendido) {
-  moverRele(prendido);
-  foco.setOnOff(prendido);
-}
 
 void reenviarAlexa(const String& aviso) {
   if (WiFi.status() != WL_CONNECTED) {
@@ -62,6 +49,21 @@ void reenviarAlexa(const String& aviso) {
   udp.endPacket();
 }
 
+// Abierto con la primera persona, cerrado cuando ya no queda nadie.
+// dentro = cuántos quedan (-1 = no se sabe todavía: se queda como está, salvo
+// en una entrada, que sí lo abre).
+void actualizarOcupado(char tipo, int dentro) {
+  bool antes = !ocupado.getContact();
+  bool ahora = antes;
+  if ((tipo == 'E' || tipo == 'A') && dentro != 0) ahora = true;
+  if (dentro > 0) ahora = true;
+  if (dentro == 0) ahora = false;
+  if (ahora != antes) {
+    ocupado.setContact(!ahora);
+    Serial.printf("Gimnasio ocupado: %s (la rutina %s el foco)\n", ahora ? "ABIERTO" : "cerrado", ahora ? "prende" : "apaga");
+  }
+}
+
 void atender(const String& aviso) {
   int p1 = aviso.indexOf('|'), p2 = aviso.indexOf('|', p1 + 1);
   if (p1 != 1 || p2 < 0) return;   // no es un aviso de la LILYGO
@@ -70,21 +72,14 @@ void atender(const String& aviso) {
   int dentro = aviso.substring(p2 + 1).toInt();
   Serial.printf("LILYGO: %c %s (dentro: %d)\n", tipo, nombre.c_str(), dentro);
 
-  if (tipo == 'E' || tipo == 'A') ponerFoco(true);
-  if (tipo == 'S' && dentro == 0) ponerFoco(false);   // -1 = no se sabe: se queda como está
-  if (tipo == 'D') {                                   // solo el aforo (tras un comando de voz)
-    if (dentro >= 0) ponerFoco(dentro > 0);
-    return;                                            // la Alexa no tiene nada que decir
-  }
-  reenviarAlexa(aviso);
+  actualizarOcupado(tipo, dentro);
+  if (tipo != 'D') reenviarAlexa(aviso);   // el aforo solo le importa a este sensor
 }
 
 void setup() {
   Serial.begin(115200);
   delay(300);
-  Serial.println("\n=== ESP32-C6 del foco (Matter) ===");
-  pinMode(RELE, OUTPUT);
-  moverRele(false);
+  Serial.println("\n=== ESP32-C6 puente (Matter: Gimnasio ocupado) ===");
   pinMode(BOTON, INPUT_PULLUP);
   Serial1.begin(9600, SERIAL_8N1, RX_LILYGO, -1);
 
@@ -96,8 +91,7 @@ void setup() {
   Serial.println(" OK");
 #endif
 
-  foco.begin(false);
-  foco.onChange(moverRele);   // la Alexa o la app de Matter lo prenden o apagan
+  ocupado.begin(true);   // cerrado: gimnasio vacío
   Matter.begin();
   udp.begin(PUERTO_UDP);
   if (!Matter.isDeviceCommissioned()) {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Compila los dos programas de las ESP32-C6 (c6_foco y c6_alexa) en Ubuntu (WSL).
+# Compila los dos programas de las ESP32-C6 (c6_puente y c6_alexa) en Ubuntu (WSL).
 #
 # En Windows, el "Control inteligente de aplicaciones" bloquea el compilador
 # RISC-V de la C6. En Ubuntu se usa el compilador de Linux, que no lo revisa.
@@ -37,7 +37,7 @@ fi
 OPCIONES="PartitionScheme=huge_app"
 [ "$PLACA" = "esp32c6" ] && OPCIONES="$OPCIONES,CDCOnBoot=cdc"
 mkdir -p "$SALIDA"
-for sketch in c6_foco c6_alexa; do
+for sketch in c6_puente c6_alexa; do
   if [ ! -f "$AQUI/$sketch/secrets.h" ]; then
     echo "Falta $sketch/secrets.h: copia secrets.example.h como secrets.h y pon tu WiFi." >&2
     exit 1
@@ -49,6 +49,6 @@ done
 
 echo
 echo "Listo. Los archivos para subir quedaron en:"
-echo "  $SALIDA/c6_foco.bin"
+echo "  $SALIDA/c6_puente.bin"
 echo "  $SALIDA/c6_alexa.bin"
-echo "Ahora, en PowerShell de Windows:  .\\subir_c6.ps1 -Puerto COM5 -Programa c6_foco"
+echo "Ahora, en PowerShell de Windows:  .\\subir_c6.ps1 -Puerto COM5 -Programa c6_puente"

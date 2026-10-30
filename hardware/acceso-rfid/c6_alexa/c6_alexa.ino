@@ -2,7 +2,8 @@
 //
 // Una C6 no puede mandarle texto a la Alexa, pero la Alexa sí puede reaccionar
 // a sensores Matter con rutinas. Esta C6 es un dispositivo Matter con un sensor
-// de contacto por socio y uno de "acceso denegado":
+// de contacto por socio y uno de "acceso denegado" (el de "gimnasio ocupado",
+// para el foco, está en la C6 puente):
 //
 //   Sensor               se ABRE cuando...         se CIERRA cuando...
 //   1 Chema              entra Chema               sale Chema
@@ -20,7 +21,7 @@
 //   "Cuando Voz se cierre → Alexa dice: Salida por comando de voz"
 //   "Cuando Acceso denegado se abra → Alexa dice: Acceso denegado"
 //
-// Los avisos llegan de la C6 del foco (c6_foco) por la red WiFi local (UDP).
+// Los avisos llegan de la C6 puente (c6_puente) por la red WiFi local (UDP).
 // Las dos C6 tienen que estar en la misma red.
 //
 // Emparejar con la Alexa: al arrancar sin emparejar, el monitor muestra el código
@@ -36,7 +37,7 @@
 #include "secrets.h"
 
 #define BOTON         BOOT_PIN
-#define PUERTO_UDP    4210        // el mismo en c6_foco
+#define PUERTO_UDP    4210        // el mismo en c6_puente
 #define CIERRE_DENEGADO_MS 5000
 
 // En este orden quedan los sensores en la app Alexa. El nombre tiene que ser
@@ -68,9 +69,11 @@ void atender(const String& aviso) {
   if (p1 != 1 || p2 < 0) return;
   char tipo = aviso[0];
   String nombre = aviso.substring(p1 + 1, p2);
+  int dentro = aviso.substring(p2 + 1).toInt();
   int i = indiceDe(nombre);
-  Serial.printf("Aviso: %c %s\n", tipo, nombre.c_str());
+  Serial.printf("Aviso: %c %s (dentro: %d)\n", tipo, nombre.c_str(), dentro);
 
+  if (tipo == 'D') return;                 // solo el aforo (tras un comando de voz)
   if (tipo == 'N') {
     denegado.setContact(false);           // se abre → "Acceso denegado"
     denegadoDesde = millis();

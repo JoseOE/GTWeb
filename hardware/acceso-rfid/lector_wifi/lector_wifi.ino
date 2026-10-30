@@ -20,11 +20,12 @@
 //
 // Sin internet decide con la lista de tags que descarga cada minuto (/lista).
 //
-// Comandos de voz: la XIAO (xiao_deteccion) manda un pulso por GPIO 14 (corto =
+// Comandos de voz: la XIAO (xiao_voz_turnos) manda un pulso por GPIO 14 (corto =
 // entrada, largo = salida) y aquí se prende el LED verde o el de salida.
 //
-// Cada entrada, salida o negado se le avisa por GPIO 13 a la ESP32-C6 del foco
-// (c6_foco): ella prende el foco y le pasa el aviso a la C6 de la Alexa (c6_alexa),
+// Cada entrada, salida o negado se le avisa por GPIO 13 a la ESP32-C6 puente
+// (c6_puente): ella abre o cierra su sensor Matter "Gimnasio ocupado" (la Alexa prende o
+// apaga el foco con una rutina) y le pasa el aviso a la C6 de la Alexa (c6_alexa),
 // que por Matter hace que la Alexa diga "Bienvenido Chema", "Hasta luego Chema"
 // o "Acceso denegado".
 //
@@ -77,7 +78,7 @@
 #define MODEM_RX        26   // llega del TX del módem (dentro de la placa)
 #define MODEM_TX        27
 #define MODEM_PWR       4    // pulso para encender el módem
-#define AVISO_C6        13   // va al RX de la ESP32-C6 del foco (serial de 9600, solo TX)
+#define AVISO_C6        13   // va al RX de la ESP32-C6 puente (serial de 9600, solo TX)
 #define BAUDIOS_C6      9600
 #define PULSO_XIAO      14   // llega de D0 de la XIAO: pulso corto = entrada por voz, largo = salida
 // Reservados para la versión final, sin conectar todavía:
@@ -659,7 +660,7 @@ bool preguntarAlServidor(const char* epc, String& resultado, String& nombre, Str
 }
 
 // ------------------------------------------------------------
-// Aviso a la ESP32-C6 del foco (y de ahí a la Alexa por Matter)
+// Aviso a la ESP32-C6 puente (y de ahí a la Alexa por Matter)
 // ------------------------------------------------------------
 // Los tres UART del ESP32 ya están ocupados (USB, módem y YRM): este serial
 // de solo transmisión se hace a mano, bit por bit, a 9600 baudios.
@@ -833,7 +834,7 @@ void atenderVoz() {
   aforoPendienteEn = millis() + 3000;   // para entonces la XIAO ya avisó al servidor
 }
 
-// Después de un comando de voz: cuántos quedan dentro, para que la C6 del foco
+// Después de un comando de voz: cuántos quedan dentro, para que la C6 puente
 // sepa si apagarlo ("D||0") o dejarlo prendido.
 void atenderAforo() {
   if (!aforoPendienteEn || (int32_t)(millis() - aforoPendienteEn) < 0) return;

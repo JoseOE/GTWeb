@@ -2,14 +2,14 @@
 # Usa el esptool que ya trae el Arduino IDE (Windows no lo bloquea).
 #
 # Uso, en PowerShell, dentro de la carpeta hardware\acceso-rfid:
-#   .\subir_c6.ps1 -Puerto COM5 -Programa c6_foco
+#   .\subir_c6.ps1 -Puerto COM5 -Programa c6_puente
 #   .\subir_c6.ps1 -Puerto COM6 -Programa c6_alexa
 # -Borrar: borra toda la memoria antes (la primera vez, o para quitar el
 #          emparejamiento Matter).
 # El puerto sale en Arduino IDE → Herramientas → Puerto, o en el Administrador de dispositivos.
 param(
     [Parameter(Mandatory = $true)][string]$Puerto,
-    [Parameter(Mandatory = $true)][ValidateSet('c6_foco', 'c6_alexa')][string]$Programa,
+    [Parameter(Mandatory = $true)][ValidateSet('c6_puente', 'c6_alexa')][string]$Programa,
     [switch]$Borrar
 )
 
