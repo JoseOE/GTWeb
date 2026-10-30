@@ -65,13 +65,13 @@ de la puerta como "Voz" y el panel muestra si el LED está prendido o apagado.
 4. *Model testing* → *Classify all*: prueba con los audios que no se usaron
    para entrenar.
 
-## 6. Ponerlo en la XIAO (`xiao_voz`)
+## 6. Ponerlo en la XIAO (`xiao_deteccion`)
 1. *Deployment* → **Arduino library**, con el compilador EON y el modelo
    cuantizado (int8) → *Build*. Descarga el `.zip`.
 2. Arduino IDE → Sketch → Include Library → **Add .ZIP Library**.
-3. En `xiao_voz/modelo_voz.h` cambia la primera línea por tu librería:
+3. En `xiao_deteccion/modelo_voz.h` cambia la primera línea por tu librería:
    `#include <GymTrackVoz_inferencing.h>`.
-4. Sube `xiao_voz/xiao_voz.ino`. La primera compilación del modelo tarda
+4. Sube `xiao_deteccion/xiao_deteccion.ino`. La primera compilación del modelo tarda
    varios minutos.
 
 ## 7. Probar

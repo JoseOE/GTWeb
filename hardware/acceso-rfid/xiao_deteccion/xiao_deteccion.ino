@@ -15,7 +15,9 @@
 // LED: el naranja de la placa y, si quieres uno más visible, un LED en D3
 // (con resistencia de 220 Ω a GND).
 //
-// Monitor serie (115200): muestra lo que oyó el modelo con el porcentaje de cada clase.
+// Monitor serie (115200): avisa cada vez que se presiona o suelta el botón y
+// muestra lo que oyó el modelo con el porcentaje de cada clase.
+//   g  grabar 1.5 s sin el botón (para probar el micrófono y el modelo)
 // Placa: "XIAO_ESP32S3". En Herramientas, PSRAM: "OPI PSRAM".
 // Antes de subirlo: el secrets.h (el mismo que la LILYGO; ya está copiado) y el
 // nombre de tu librería de Edge Impulse en modelo_voz.h.
@@ -65,6 +67,7 @@ int16_t* grabacion = nullptr;   // lo que se grabó con el botón (PSRAM)
 int16_t* ventana = nullptr;     // el pedazo que ve el modelo
 size_t muestras = 0;
 bool ledEncendido = false;      // sobrevive a los reinicios
+bool botonAntes = false;        // para avisar cada vez que cambia
 
 // ------------------------------------------------------------
 // LED
@@ -121,17 +124,26 @@ void avisarServidor(const char* comando, float confianza) {
 // ------------------------------------------------------------
 // Audio y modelo
 // ------------------------------------------------------------
-// Graba mientras el botón siga presionado (o hasta 2 s).
-void grabar() {
-  Serial.println("Grabando... (suelta el botón al terminar la palabra)");
+// Graba mientras el botón siga presionado (o hasta 2 s). Con conBoton = false
+// (comando 'g' del monitor) graba 1.5 s fijos, para probar sin el botón.
+void grabar(bool conBoton) {
+  Serial.println(conBoton ? "Grabando... (suelta el botón al terminar la palabra)"
+                          : "Grabando 1.5 s... ¡habla ahora!");
   int16_t basura[256];
   mic.readBytes((char*)basura, sizeof(basura));   // lo primero trae basura
   muestras = 0;
-  while (digitalRead(BOTON) == LOW && muestras < MAX_MUESTRAS) {
-    size_t pedir = min((size_t)512, MAX_MUESTRAS - muestras);
-    muestras += mic.readBytes((char*)(grabacion + muestras), pedir * 2) / 2;
+  const size_t limite = conBoton ? MAX_MUESTRAS : (FRECUENCIA * 3) / 2;
+  int lecturasVacias = 0;
+  while ((!conBoton || digitalRead(BOTON) == LOW) && muestras < limite) {
+    size_t pedir = min((size_t)512, limite - muestras);
+    size_t leidas = mic.readBytes((char*)(grabacion + muestras), pedir * 2) / 2;
+    muestras += leidas;
+    if (leidas == 0 && ++lecturasVacias == 20) {
+      Serial.println("         ⚠ el micrófono no entrega audio (¿PSRAM en OPI PSRAM? ¿placa Sense bien puesta?)");
+    }
+    if (lecturasVacias > 200) break;   // no quedarse aquí para siempre
   }
-  while (digitalRead(BOTON) == LOW) delay(10);    // si llegó a 2 s, esperar a que suelte
+  if (conBoton) while (digitalRead(BOTON) == LOW) delay(10);   // si llegó a 2 s, esperar a que suelte
 }
 
 // Quita el nivel de fondo (DC) del micrófono y dice qué tan fuerte llegó el audio.
@@ -221,8 +233,8 @@ bool clasificar(String& etiqueta, float& valor, int32_t pico) {
   return true;
 }
 
-void atenderBoton() {
-  grabar();
+void escuchar(bool conBoton) {
+  grabar(conBoton);
   float segundos = muestras / (float)FRECUENCIA;
   if (muestras < FRECUENCIA / 4) {
     Serial.println("Muy corta (menos de 0.25 s): mantén el botón mientras hablas.");
@@ -256,8 +268,11 @@ void atenderBoton() {
 void setup() {
   Serial.begin(115200);
   delay(500);
-  Serial.println("\n=== Comandos de voz del lector (XIAO ESP32-S3 Sense) ===");
+  Serial.println("\n=== XIAO DETECCION DE VOZ · version 2 (29-oct) ===");
   pinMode(BOTON, INPUT_PULLUP);
+  delay(10);
+  botonAntes = digitalRead(BOTON) == LOW;
+  Serial.printf("Botón en D2 (GPIO %d): %s\n", BOTON, botonAntes ? "PRESIONADO (si no lo estás presionando, revisa las patas)" : "suelto");
   pinMode(LED_PLACA, OUTPUT);
   pinMode(LED_EXTRA, OUTPUT);
   prefs.begin("voz", false);
@@ -289,15 +304,30 @@ void setup() {
     Serial.println("Sin WiFi: los comandos funcionan igual, pero el panel no se entera; se reintenta cada 15 s.");
   }
   Serial.println("Listo: mantén el botón, di \"entrada\" o \"salida\" y suéltalo.");
+  Serial.println("Sin botón: escribe g en el monitor y habla (graba 1.5 s).");
 }
 
 void loop() {
+  // Prueba sin botón: 'g' en el monitor.
+  if (Serial.available() && Serial.read() == 'g') escuchar(false);
+
+  // Cada cambio del botón se avisa, aunque no se grabe nada: así se ve si la
+  // XIAO lo está leyendo.
+  bool presionado = digitalRead(BOTON) == LOW;
+  if (presionado != botonAntes) {
+    botonAntes = presionado;
+    Serial.println(presionado ? "Botón PRESIONADO" : "Botón suelto");
+  }
   // El botón cuenta solo si se lee presionado 60 ms seguidos: un falso contacto
   // o el rebote no disparan grabaciones de unos milisegundos.
-  if (digitalRead(BOTON) == LOW) {
+  if (presionado) {
     bool firme = true;
     for (int i = 0; i < 6 && firme; i++) { delay(10); firme = digitalRead(BOTON) == LOW; }
-    if (firme) atenderBoton();
+    if (firme) {
+      escuchar(true);
+      botonAntes = false;   // escuchar() regresa cuando ya se soltó
+      Serial.println("Botón suelto");
+    }
   }
   // Sin WiFi, otro intento cada 15 s (también si la LILYGO cambió de red).
   if (WiFi.status() != WL_CONNECTED && millis() - ultimoIntentoWifi > 15000) {

@@ -11,11 +11,11 @@
 // El LED naranja de la placa se prende mientras graba.
 //
 // Las muestras salen igual que lo que oirá el modelo: el mismo micrófono, el
-// mismo botón y la misma forma de grabar que xiao_voz.
+// mismo botón y la misma forma de grabar que xiao_deteccion.
 //
 // Conexión: botón entre D2 y GND (sin resistencia: se usa la interna).
 // Placa: "XIAO_ESP32S3". En Herramientas, PSRAM: "OPI PSRAM".
-// Usa el mismo secrets.h que xiao_voz (ya está copiado en esta carpeta).
+// Usa el mismo secrets.h que xiao_deteccion (ya está copiado en esta carpeta).
 
 #include <ESP_I2S.h>
 #include <WiFi.h>
