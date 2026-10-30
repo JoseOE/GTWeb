@@ -1,13 +1,14 @@
-// El modelo de comandos de voz, entrenado en Edge Impulse.
+// El modelo de comandos de voz, entrenado en Edge Impulse (proyecto "GYMTrack",
+// clases: entrada, salida y silencio; ventanas de 1 s a 16 kHz).
 //
-// Cuando exporten su modelo (Deployment → Arduino library) e instalen el .zip
-// en el Arduino IDE (Sketch → Include Library → Add .ZIP Library), cambien esta
-// línea por el nombre de su librería: <nombre-del-proyecto>_inferencing.h
+// La librería se instala en el Arduino IDE con Sketch → Include Library →
+// Add .ZIP Library (el ei-gymtrack-arduino-*.zip que exporta Edge Impulse).
+// Si reentrenan con otro proyecto, cambien esta línea: <nombre-del-proyecto>_inferencing.h
 #pragma once
-#include <XIAO_inferencing.h>
+#include <GYMTrack_inferencing.h>
 
-// Las clases del modelo que hacen algo. Cualquier otra ("ruido", "desconocido")
-// no prende ni apaga nada.
+// Las clases del modelo que hacen algo. Cualquier otra ("silencio") no prende
+// ni apaga nada.
 #define CLASE_ENTRADA  "entrada"   // prende el LED
 #define CLASE_SALIDA   "salida"    // apaga el LED
 
