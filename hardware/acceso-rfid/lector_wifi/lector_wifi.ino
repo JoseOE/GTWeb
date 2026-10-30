@@ -20,6 +20,9 @@
 //
 // Sin internet decide con la lista de tags que descarga cada minuto (/lista).
 //
+// Comandos de voz: la XIAO (xiao_deteccion) manda un pulso por GPIO 14 (corto =
+// entrada, largo = salida) y aquí se prende el LED verde o el de salida.
+//
 // Cada entrada, salida o negado se le avisa por GPIO 13 a la ESP32-C6 del foco
 // (c6_foco): ella prende el foco y le pasa el aviso a la C6 de la Alexa (c6_alexa),
 // que por Matter hace que la Alexa diga "Bienvenido Chema", "Hasta luego Chema"
@@ -76,6 +79,7 @@
 #define MODEM_PWR       4    // pulso para encender el módem
 #define AVISO_C6        13   // va al RX de la ESP32-C6 del foco (serial de 9600, solo TX)
 #define BAUDIOS_C6      9600
+#define PULSO_XIAO      14   // llega de D0 de la XIAO: pulso corto = entrada por voz, largo = salida
 // Reservados para la versión final, sin conectar todavía:
 //   servo de la puerta en GPIO 23; botón "Solicitar acceso" en GPIO 34 (con 10 kΩ a 3V3).
 
@@ -799,6 +803,33 @@ void inventario() {
   }
 }
 
+// ------------------------------------------------------------
+// Comandos de voz de la XIAO (pulso por GPIO 14)
+// ------------------------------------------------------------
+// La XIAO ya decidió y avisó al panel; aquí solo se prende el LED y se abre.
+// El pulso se mide con una interrupción para no perderlo mientras se leen
+// tags o hay un LED encendido: ~100 ms = entrada, ~300 ms = salida.
+volatile uint32_t pulsoDesde = 0;
+volatile uint32_t pulsoDuro = 0;
+
+void IRAM_ATTR cambioPulsoXiao() {
+  uint32_t ahora = millis();
+  if (digitalRead(PULSO_XIAO) == HIGH) pulsoDesde = ahora;
+  else if (pulsoDesde) { pulsoDuro = ahora - pulsoDesde; pulsoDesde = 0; }
+}
+
+void atenderVoz() {
+  uint32_t ms = pulsoDuro;
+  if (!ms) return;
+  pulsoDuro = 0;
+  if (ms < 40) return;                     // ruido en el cable
+  bool entrada = ms < 200;
+  Serial.printf("VOZ      %s (pulso de %lu ms de la XIAO)\n", entrada ? "ENTRADA" : "SALIDA", (unsigned long)ms);
+  avisarC6(entrada ? 'E' : 'S', "Voz", -1);
+  abrirPuerta();
+  senal(entrada ? LED_VERDE : LED_AZUL, entrada ? 1 : 2);
+}
+
 void atenderComando() {
   int c = comandoPendiente;
   if (!c) return;
@@ -824,6 +855,8 @@ void setup() {
   pinMode(LED_ROJO, OUTPUT);  pinMode(BUZZER, OUTPUT);
   pinMode(AVISO_C6, OUTPUT);
   digitalWrite(AVISO_C6, HIGH);   // un serial en reposo está en alto
+  pinMode(PULSO_XIAO, INPUT_PULLDOWN);   // sin la XIAO conectada se queda en bajo
+  attachInterrupt(digitalPinToInterrupt(PULSO_XIAO), cambioPulsoXiao, CHANGE);
 
   // El YRM puede tardar en encender más que la LILYGO: se reintenta unos segundos.
   yrm.begin(115200, SERIAL_8N1, RFID_RX, RFID_TX);
@@ -863,6 +896,7 @@ void loop() {
     if (c == '-' && potenciaDbm > 5)  fijarPotencia(--potenciaDbm);
   }
   atenderComando();
+  atenderVoz();
   if (red == RED_WIFI) {
     vigilarWifi();
   } else {
