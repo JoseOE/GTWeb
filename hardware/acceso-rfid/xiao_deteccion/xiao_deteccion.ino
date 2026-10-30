@@ -17,6 +17,11 @@
 //
 // LED: el naranja de la placa y, si quieres uno más visible, un LED en D1
 // (en la placa del equipo, D2 y D3 fallan: probablemente una soldadura del header)
+//
+// A la LILYGO: D0 → GPIO 14 de la LILYGO, y GND con GND. En cada entrada o
+// salida válida manda un pulso (corto = entrada, largo = salida) y la LILYGO
+// prende su LED verde o el de salida. Por turnos: no cuenta "entrada" dos veces
+// seguidas ni "salida" dos veces seguidas.
 // (con resistencia de 220 Ω a GND). Ya no lleva botón.
 //
 // Monitor serie (115200): cada 3 s, el nivel del ruido de fondo (para ajustar
@@ -53,6 +58,9 @@
 
 #define LED_PLACA      21     // LED naranja de la placa; enciende en LOW
 #define LED_EXTRA      D1     // LED opcional; enciende en HIGH
+#define PULSO_LILYGO   D0     // a GPIO 14 de la LILYGO (y GND con GND)
+#define PULSO_ENTRADA_MS 100  // pulso corto = entrada
+#define PULSO_SALIDA_MS  300  // pulso largo = salida
 #define MIC_CLK        42     // micrófono PDM de la placa Sense
 #define MIC_DATOS      41
 #define FRECUENCIA     16000
@@ -119,7 +127,9 @@ void avisarServidor(const char* comando, float confianza) {
   int code = http.POST(String("{\"comando\":\"") + comando + "\",\"confianza\":" + String(confianza, 3) + "}");
   String respuesta = code > 0 ? http.getString() : "";
   http.end();
-  Serial.printf("         panel: %s%s\n", code == 200 ? ("LED " + campo(respuesta, "led")).c_str() : ("HTTP " + String(code)).c_str(),
+  String resultado = campo(respuesta, "resultado");
+  Serial.printf("         panel: %s%s\n", code == 200 ? (resultado + (resultado == "IGNORADO" ? " (" + campo(respuesta, "motivo") + ")" : "")).c_str()
+                                                   : ("HTTP " + String(code)).c_str(),
                 url.startsWith(IP_LECTOR) ? " (por la LILYGO)" : "");
 }
 
@@ -204,12 +214,28 @@ bool clasificar(String& etiqueta, float& valor, int32_t pico) {
   return true;
 }
 
+// Le avisa a la LILYGO por un cable: pulso corto = entrada, largo = salida.
+void pulsoLilygo(bool entrada) {
+  digitalWrite(PULSO_LILYGO, HIGH);
+  delay(entrada ? PULSO_ENTRADA_MS : PULSO_SALIDA_MS);
+  digitalWrite(PULSO_LILYGO, LOW);
+}
+
+// Por turnos: el LED prendido es "alguien entró por voz y no ha salido".
+// Otro "entrada" con el LED prendido (u otro "salida" con el LED apagado) no
+// cuenta: ni pulso a la LILYGO ni aviso al panel.
 void obedecer(const String& etiqueta, float valor) {
   bool entrada = etiqueta.equalsIgnoreCase(CLASE_ENTRADA);
+  if (entrada == ledEncendido) {
+    Serial.printf("VOZ      \"%s\" (%.0f %%): ya %s, no cuenta otra vez\n", entrada ? CLASE_ENTRADA : CLASE_SALIDA,
+                  valor * 100, entrada ? "entró (falta su salida)" : "salió (falta una entrada)");
+    return;
+  }
   Serial.printf("VOZ      \"%s\" (%.0f %%): LED %s\n", entrada ? CLASE_ENTRADA : CLASE_SALIDA,
                 valor * 100, entrada ? "encendido" : "apagado");
   ponerLed(entrada);
   prefs.putBool("led", entrada);
+  pulsoLilygo(entrada);
   avisarServidor(entrada ? CLASE_ENTRADA : CLASE_SALIDA, valor);
 }
 
@@ -244,9 +270,11 @@ void revisar() {
 void setup() {
   Serial.begin(115200);
   delay(500);
-  Serial.println("\n=== XIAO DETECCION DE VOZ · version 6 (LED extra en D1) ===");
+  Serial.println("\n=== XIAO DETECCION DE VOZ · version 7 (por turnos y pulso a la LILYGO) ===");
   pinMode(LED_PLACA, OUTPUT);
   pinMode(LED_EXTRA, OUTPUT);
+  pinMode(PULSO_LILYGO, OUTPUT);
+  digitalWrite(PULSO_LILYGO, LOW);
   // Prueba de los LEDs: el naranja de la placa y el de D1 parpadean 3 veces.
   // Si aquí no prenden, el problema es la conexión, no la voz.
   Serial.println("Prueba de LEDs: deben parpadear 3 veces (el naranja de la placa y el de D1)");
