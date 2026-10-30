@@ -3,6 +3,7 @@
 // La LILYGO le manda por serial (9600) una línea por evento:
 //   "E|Chema|3"  entrada (quedan 3 dentro)      "S|Chema|0"  salida (no queda nadie)
 //   "N|Edwin|-1" acceso negado                   "A|Visitante|-1" abierta desde el panel
+//   "E|Voz|-1"   entrada por comando de voz      "D||2"  solo el aforo: quedan 2 dentro
 // Qué hace:
 //   - Prende el foco (relevador) cuando alguien entra y lo apaga cuando ya no
 //     queda nadie dentro. Como es un foco Matter, la Alexa lo ve, y también se
@@ -71,6 +72,10 @@ void atender(const String& aviso) {
 
   if (tipo == 'E' || tipo == 'A') ponerFoco(true);
   if (tipo == 'S' && dentro == 0) ponerFoco(false);   // -1 = no se sabe: se queda como está
+  if (tipo == 'D') {                                   // solo el aforo (tras un comando de voz)
+    if (dentro >= 0) ponerFoco(dentro > 0);
+    return;                                            // la Alexa no tiene nada que decir
+  }
   reenviarAlexa(aviso);
 }
 

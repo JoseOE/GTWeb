@@ -10,11 +10,14 @@
 //   3 Yael               entra Yael                sale Yael
 //   4 Eduardo            entra Eduardo             sale Eduardo
 //   5 Edwin              entra Edwin               sale Edwin
-//   6 Acceso denegado    se niega un acceso        5 s después, solo
+//   6 Voz                entrada por voz           salida por voz
+//   7 Acceso denegado    se niega un acceso        5 s después, solo
 //
 // En la app Alexa se le pone a cada sensor su nombre y se crean las rutinas:
 //   "Cuando Chema se abra → Alexa dice: Bienvenido Chema"
 //   "Cuando Chema se cierre → Alexa dice: Hasta luego Chema"
+//   "Cuando Voz se abra → Alexa dice: Entrada por comando de voz"
+//   "Cuando Voz se cierre → Alexa dice: Salida por comando de voz"
 //   "Cuando Acceso denegado se abra → Alexa dice: Acceso denegado"
 //
 // Los avisos llegan de la C6 del foco (c6_foco) por la red WiFi local (UDP).
@@ -38,7 +41,7 @@
 
 // En este orden quedan los sensores en la app Alexa. El nombre tiene que ser
 // el primer nombre del socio en GymTrack (como lo manda la LILYGO).
-const char* SOCIOS[] = {"Chema", "Valeria", "Yael", "Eduardo", "Edwin"};
+const char* SOCIOS[] = {"Chema", "Valeria", "Yael", "Eduardo", "Edwin", "Voz"};
 const int NUM_SOCIOS = sizeof(SOCIOS) / sizeof(SOCIOS[0]);
 
 MatterContactSensor sensores[NUM_SOCIOS];
