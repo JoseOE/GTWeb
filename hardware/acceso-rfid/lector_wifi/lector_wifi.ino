@@ -115,6 +115,10 @@ bool servidorSeguro = true;
 // Lo que deja la tarea de comandos para que loop() lo haga (0 = nada, 1 = abrir, 2 = negar).
 volatile int comandoPendiente = 0;
 char nombreComando[48] = "";
+// Para saber si la tarea de comandos sigue hablando con el servidor: si deja de
+// poder, los "dar acceso" del panel se quedan sin entregar y no se nota nada.
+volatile uint32_t ultimoSondeoOk = 0;
+const uint32_t SIN_SONDEO_REINICIA_MS = 180000;
 
 // Tags vistos hace poco, para no mandar el mismo 4 veces por segundo.
 struct Visto { char epc[65]; uint32_t ultima; };
@@ -535,6 +539,8 @@ void mostrarEstado() {
     xSemaphoreGive(candado);
   }
   Serial.printf("  Servidor: %s · lista local: %d tags\n", SERVIDOR, tamLista);
+  Serial.printf("  Comandos del panel: última consulta buena hace %lu s · memoria libre %u\n",
+                (millis() - ultimoSondeoOk) / 1000, ESP.getFreeHeap());
 }
 
 // ------------------------------------------------------------
@@ -698,6 +704,13 @@ void tareaComandos(void*) {
     bool porModem = red != RED_WIFI;
     Respuesta r = pedir("GET", porModem ? "/api/lectores/comandos?espera=0" : "/api/lectores/comandos?espera=15",
                         nullptr, 0, nullptr, porModem ? ESPERA_MODEM_MS : 20000);
+    if (r.codigo == 200 || r.codigo == 204) {
+      if (millis() - ultimoSondeoOk > 30000) Serial.println("[comandos] el servidor responde otra vez");
+      ultimoSondeoOk = millis();
+    } else {
+      Serial.printf("[comandos] no se pudo preguntar al servidor (código %d, memoria libre %u)\n",
+                    r.codigo, ESP.getFreeHeap());
+    }
     if (r.codigo == 200) {
       String c = campo(r.cuerpo, "comando");
       strlcpy(nombreComando, campo(r.cuerpo, "nombre").c_str(), sizeof(nombreComando));
@@ -916,6 +929,14 @@ void loop() {
   atenderComando();
   atenderVoz();
   atenderAforo();
+  // Con WiFi pero sin poder preguntar por los comandos del panel tanto tiempo:
+  // se reinicia la placa (así se recupera si se quedó sin memoria para el https).
+  if (redLista && red == RED_WIFI && WiFi.status() == WL_CONNECTED &&
+      millis() > SIN_SONDEO_REINICIA_MS && millis() - ultimoSondeoOk > SIN_SONDEO_REINICIA_MS) {
+    Serial.println("[comandos] 3 min sin poder preguntar al servidor: reinicio la placa");
+    delay(200);
+    ESP.restart();
+  }
   if (red == RED_WIFI) {
     vigilarWifi();
   } else {
