@@ -47,6 +47,7 @@ const int NUM_SOCIOS = sizeof(SOCIOS) / sizeof(SOCIOS[0]);
 
 MatterContactSensor sensores[NUM_SOCIOS];
 MatterContactSensor denegado;
+bool abierto[NUM_SOCIOS] = {};  // lo que tiene cada sensor en Matter
 WiFiUDP udp;
 uint32_t denegadoDesde = 0;
 uint32_t botonDesde = 0;
@@ -63,7 +64,22 @@ int indiceDe(const String& nombre) {
   return -1;
 }
 
+// Se escribe el estado directo en Matter. setContact() de la librería no sirve:
+// Matter guarda el estado de los sensores en la memoria y, si al arrancar uno
+// quedó "abierto" de antes, setContact() cree que ya está y no lo cambia (y
+// getContact() dice otra cosa). Así la Alexa nunca veía el cambio.
 // En Matter "contacto = true" es cerrado; la Alexa lo muestra como "cerrado".
+bool ponerContacto(MatterContactSensor& sensor, bool cerrado) {
+  esp_matter_attr_val_t valor = esp_matter_bool(cerrado);
+  bool ok = sensor.updateAttributeVal(0x0045, 0x0000, &valor);   // BooleanState · StateValue
+  if (!ok) Serial.println("  Matter RECHAZÓ el cambio del sensor");
+  return ok;
+}
+
+void abrirSocio(int i, bool abrir) {
+  if (ponerContacto(sensores[i], !abrir)) abierto[i] = abrir;
+}
+
 void atender(const String& aviso) {
   int p1 = aviso.indexOf('|'), p2 = aviso.indexOf('|', p1 + 1);
   if (p1 != 1 || p2 < 0) return;
@@ -75,7 +91,7 @@ void atender(const String& aviso) {
 
   if (tipo == 'D') return;                 // solo el aforo (tras un comando de voz)
   if (tipo == 'N') {
-    denegado.setContact(false);           // se abre → "Acceso denegado"
+    ponerContacto(denegado, false);       // se abre → "Acceso denegado"
     denegadoDesde = millis();
     Serial.println("  Acceso denegado: sensor abierto");
     return;
@@ -87,11 +103,11 @@ void atender(const String& aviso) {
   if (tipo == 'E' || tipo == 'A') {
     // Si ya estaba abierto (no pasó su tag al salir), se cierra y se vuelve a
     // abrir para que la rutina de bienvenida corra otra vez.
-    if (!sensores[i].getContact()) { sensores[i].setContact(true); delay(1500); }
-    sensores[i].setContact(false);
+    if (abierto[i]) { abrirSocio(i, false); delay(1500); }
+    abrirSocio(i, true);
     Serial.printf("  %s: sensor abierto (bienvenida)\n", SOCIOS[i]);
   } else if (tipo == 'S') {
-    sensores[i].setContact(true);
+    abrirSocio(i, false);
     Serial.printf("  %s: sensor cerrado (despedida)\n", SOCIOS[i]);
   }
 }
@@ -112,6 +128,9 @@ void setup() {
   for (int i = 0; i < NUM_SOCIOS; i++) sensores[i].begin(true);   // todos cerrados: nadie dentro
   denegado.begin(true);
   Matter.begin();
+  // Al arrancar: todos cerrados, aunque se hayan guardado abiertos.
+  for (int i = 0; i < NUM_SOCIOS; i++) ponerContacto(sensores[i], true);
+  ponerContacto(denegado, true);
   udp.begin(PUERTO_UDP);
   Serial.printf("Sensores: %d socios + acceso denegado\n", NUM_SOCIOS);
   if (!Matter.isDeviceCommissioned()) {
@@ -132,7 +151,7 @@ void loop() {
   }
 
   if (denegadoDesde && millis() - denegadoDesde > CIERRE_DENEGADO_MS) {
-    denegado.setContact(true);              // listo para el siguiente
+    ponerContacto(denegado, true);          // listo para el siguiente
     denegadoDesde = 0;
   }
 

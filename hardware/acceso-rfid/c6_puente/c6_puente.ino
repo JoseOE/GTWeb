@@ -34,6 +34,7 @@
 #define PUERTO_UDP    4210    // el mismo en c6_alexa
 
 MatterContactSensor ocupado;   // en Matter "contacto = true" es cerrado (gimnasio vacío)
+bool hayGente = false;         // lo que tiene el sensor en Matter
 WiFiUDP udp;
 String linea;
 uint32_t botonDesde = 0;
@@ -46,7 +47,17 @@ void mostrarEstado() {
                 Matter.isDeviceCommissioned() ? "sí" : "NO",
                 Matter.isWiFiConnected() ? "sí" : "NO",
                 WiFi.localIP().toString().c_str(),
-                ocupado.getContact() ? "cerrado (vacío)" : "ABIERTO (ocupado)");
+                hayGente ? "ABIERTO (ocupado)" : "cerrado (vacío)");
+}
+
+// Se escribe el estado directo en Matter. setContact() de la librería no sirve:
+// Matter guarda el estado del sensor en la memoria y, si al arrancar quedó
+// "abierto" de antes, setContact() cree que ya está y no lo cambia (y
+// getContact() dice otra cosa). Así el sensor se quedaba siempre abierto y la
+// Alexa nunca veía un cambio para correr la rutina.
+bool ponerContacto(MatterContactSensor& sensor, bool cerrado) {
+  esp_matter_attr_val_t valor = esp_matter_bool(cerrado);
+  return sensor.updateAttributeVal(0x0045, 0x0000, &valor);   // BooleanState · StateValue
 }
 
 // Con Matter, el WiFi lo maneja Matter (se lo dio la Alexa al emparejar) y
@@ -68,13 +79,14 @@ void reenviarAlexa(const String& aviso) {
 // dentro = cuántos quedan (-1 = no se sabe todavía: se queda como está, salvo
 // en una entrada, que sí lo abre).
 void actualizarOcupado(char tipo, int dentro) {
-  bool antes = !ocupado.getContact();
+  bool antes = hayGente;
   bool ahora = antes;
   if ((tipo == 'E' || tipo == 'A') && dentro != 0) ahora = true;
   if (dentro > 0) ahora = true;
   if (dentro == 0) ahora = false;
   if (ahora != antes) {
-    bool ok = ocupado.setContact(!ahora);
+    bool ok = ponerContacto(ocupado, !ahora);
+    if (ok) hayGente = ahora;
     Serial.printf("Gimnasio ocupado: %s (la rutina %s el foco) -> Matter %s\n", ahora ? "ABIERTO" : "cerrado",
                   ahora ? "prende" : "apaga", ok ? "lo aceptó" : "LO RECHAZÓ");
   }
@@ -109,6 +121,7 @@ void setup() {
 
   ocupado.begin(true);   // cerrado: gimnasio vacío
   Matter.begin();
+  ponerContacto(ocupado, true);   // al arrancar: cerrado, aunque se haya guardado abierto
   udp.begin(PUERTO_UDP);
   if (!Matter.isDeviceCommissioned()) {
     Serial.printf("Sin emparejar. Código para la app Alexa: %s\n", Matter.getManualPairingCode().c_str());
