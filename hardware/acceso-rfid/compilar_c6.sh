@@ -33,8 +33,9 @@ if ! "$CLI" core list | grep -q "^esp32:esp32 *3.3.11"; then
   "$CLI" core install "$NUCLEO"
 fi
 
-# 3. Compilar. Matter necesita la partición grande; el USB CDC deja ver el monitor serie.
-OPCIONES="PartitionScheme=huge_app"
+# 3. Compilar. Matter necesita la partición grande; el USB CDC deja ver el monitor
+# serie; DebugLevel=error muestra en el monitor los fallos internos de Matter.
+OPCIONES="PartitionScheme=huge_app,DebugLevel=error"
 [ "$PLACA" = "esp32c6" ] && OPCIONES="$OPCIONES,CDCOnBoot=cdc"
 mkdir -p "$SALIDA"
 for sketch in c6_puente c6_alexa; do

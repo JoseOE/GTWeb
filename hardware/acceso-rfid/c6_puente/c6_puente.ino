@@ -38,15 +38,30 @@ WiFiUDP udp;
 String linea;
 uint32_t botonDesde = 0;
 uint32_t ultimoAvisoCodigo = 0;
+uint32_t ultimoEstado = 0;
+
+// Cada 10 s: para saber si Matter está bien (emparejada, con WiFi) y cómo está el sensor.
+void mostrarEstado() {
+  Serial.printf("[estado] emparejada: %s · WiFi de Matter: %s · IP: %s · sensor: %s\n",
+                Matter.isDeviceCommissioned() ? "sí" : "NO",
+                Matter.isWiFiConnected() ? "sí" : "NO",
+                WiFi.localIP().toString().c_str(),
+                ocupado.getContact() ? "cerrado (vacío)" : "ABIERTO (ocupado)");
+}
+
+// Con Matter, el WiFi lo maneja Matter (se lo dio la Alexa al emparejar) y
+// WiFi.status() de Arduino puede decir "desconectado" aunque sí haya red: se
+// pregunta a Matter y, de todos modos, se intenta mandar.
+bool hayRed() {
+  return Matter.isWiFiConnected() || WiFi.status() == WL_CONNECTED;
+}
 
 void reenviarAlexa(const String& aviso) {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("Sin WiFi: la C6 de la Alexa no se entera");
-    return;
-  }
-  udp.beginPacket(IPAddress(255, 255, 255, 255), PUERTO_UDP);
+  if (!hayRed()) Serial.println("Aviso: Matter dice que no hay WiFi; se intenta mandar de todos modos");
+  bool ok = udp.beginPacket(IPAddress(255, 255, 255, 255), PUERTO_UDP);
   udp.print(aviso);
-  udp.endPacket();
+  ok = udp.endPacket() && ok;
+  Serial.printf("  -> a la C6 de la Alexa: %s\n", ok ? "enviado" : "NO se pudo enviar");
 }
 
 // Abierto con la primera persona, cerrado cuando ya no queda nadie.
@@ -59,8 +74,9 @@ void actualizarOcupado(char tipo, int dentro) {
   if (dentro > 0) ahora = true;
   if (dentro == 0) ahora = false;
   if (ahora != antes) {
-    ocupado.setContact(!ahora);
-    Serial.printf("Gimnasio ocupado: %s (la rutina %s el foco)\n", ahora ? "ABIERTO" : "cerrado", ahora ? "prende" : "apaga");
+    bool ok = ocupado.setContact(!ahora);
+    Serial.printf("Gimnasio ocupado: %s (la rutina %s el foco) -> Matter %s\n", ahora ? "ABIERTO" : "cerrado",
+                  ahora ? "prende" : "apaga", ok ? "lo aceptó" : "LO RECHAZÓ");
   }
 }
 
@@ -79,7 +95,7 @@ void atender(const String& aviso) {
 void setup() {
   Serial.begin(115200);
   delay(300);
-  Serial.println("\n=== ESP32-C6 puente (Matter: Gimnasio ocupado) ===");
+  Serial.println("\n=== ESP32-C6 puente (Matter: Gimnasio ocupado) · diagnostico ===");
   pinMode(BOTON, INPUT_PULLUP);
   Serial1.begin(9600, SERIAL_8N1, RX_LILYGO, -1);
 
@@ -101,6 +117,10 @@ void setup() {
 }
 
 void loop() {
+  if (millis() - ultimoEstado > 10000) {
+    ultimoEstado = millis();
+    mostrarEstado();
+  }
   // Avisos de la LILYGO, una línea a la vez.
   while (Serial1.available()) {
     char c = Serial1.read();
