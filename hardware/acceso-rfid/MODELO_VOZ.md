@@ -13,7 +13,7 @@ Cada comando se manda a GTWeb (`POST /api/lectores/voz`): sale en el historial
 de la puerta como "Voz" y el panel muestra si el LED está prendido o apagado.
 
 ## Conexión
-- `xiao_deteccion` ya no usa botón: escucha todo el tiempo (ver `UMBRAL_SONIDO` en `modelo_voz.h`). El botón entre **D0** y **GND** solo lo usa `grabar_voz` para grabar muestras.
+- `xiao_voz_turnos` ya no usa botón: escucha todo el tiempo (ver `UMBRAL_SONIDO` en `modelo_voz.h`). El botón entre **D0** y **GND** solo lo usa `grabar_voz` para grabar muestras.
 - LED: el naranja de la placa. Opcional, uno más visible en **D1** con 220 Ω a GND.
 - El cable de la LILYGO a D1 ya no se usa: quítalo.
 
@@ -65,13 +65,13 @@ de la puerta como "Voz" y el panel muestra si el LED está prendido o apagado.
 4. *Model testing* → *Classify all*: prueba con los audios que no se usaron
    para entrenar.
 
-## 6. Ponerlo en la XIAO (`xiao_deteccion`)
+## 6. Ponerlo en la XIAO (`xiao_voz_turnos`)
 1. *Deployment* → **Arduino library**, con el compilador EON y el modelo
    cuantizado (int8) → *Build*. Descarga el `.zip`.
 2. Arduino IDE → Sketch → Include Library → **Add .ZIP Library**.
-3. En `xiao_deteccion/modelo_voz.h` cambia la primera línea por tu librería:
+3. En `xiao_voz_turnos/modelo_voz.h` cambia la primera línea por tu librería:
    `#include <GymTrackVoz_inferencing.h>`.
-4. Sube `xiao_deteccion/xiao_deteccion.ino`. La primera compilación del modelo tarda
+4. Sube `xiao_voz_turnos/xiao_voz_turnos.ino`. La primera compilación del modelo tarda
    varios minutos.
 
 ## 7. Probar
