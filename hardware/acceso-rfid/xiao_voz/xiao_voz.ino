@@ -123,6 +123,7 @@ void avisarServidor(const char* comando, float confianza) {
 // ------------------------------------------------------------
 // Graba mientras el botón siga presionado (o hasta 2 s).
 void grabar() {
+  Serial.println("Grabando... (suelta el botón al terminar la palabra)");
   int16_t basura[256];
   mic.readBytes((char*)basura, sizeof(basura));   // lo primero trae basura
   muestras = 0;
@@ -133,24 +134,65 @@ void grabar() {
   while (digitalRead(BOTON) == LOW) delay(10);    // si llegó a 2 s, esperar a que suelte
 }
 
+// Quita el nivel de fondo (DC) del micrófono y dice qué tan fuerte llegó el audio.
+int32_t prepararAudio() {
+  int64_t suma = 0;
+  for (size_t i = 0; i < muestras; i++) suma += grabacion[i];
+  int32_t media = muestras ? (int32_t)(suma / (int64_t)muestras) : 0;
+  int32_t pico = 0;
+  uint64_t energia = 0;
+  for (size_t i = 0; i < muestras; i++) {
+    int32_t v = (int32_t)grabacion[i] - media;
+    if (v > 32767) v = 32767;
+    if (v < -32768) v = -32768;
+    grabacion[i] = (int16_t)v;
+    int32_t absoluto = v < 0 ? -v : v;
+    if (absoluto > pico) pico = absoluto;
+    energia += (int64_t)v * v;
+  }
+  uint32_t promedio = muestras ? sqrt((double)energia / muestras) : 0;
+  Serial.printf("         nivel del audio: pico %ld, promedio %lu (de 32767)\n", (long)pico, (unsigned long)promedio);
+  if (pico < 30) {
+    Serial.println("         ⚠ el micrófono no capta nada: revisa que la placa de expansión Sense (la de");
+    Serial.println("           la cámara, ahí está el micrófono) esté bien puesta y que PSRAM sea OPI PSRAM.");
+  }
+  return pico;
+}
+
 // El modelo ve EI_CLASSIFIER_RAW_SAMPLE_COUNT muestras (normalmente 1 s). Si se
 // grabó más, se toma el pedazo con más volumen (donde está la palabra); si se
-// grabó menos, se centra y se rellena con silencio.
-void armarVentana() {
+// grabó menos, se centra y se rellena con silencio. Con NORMALIZAR_VOZ, el
+// volumen se sube a un nivel parecido al de las muestras de entrenamiento
+// (el micrófono de la XIAO suena mucho más bajo que el de un celular).
+void armarVentana(int32_t pico) {
   const size_t n = EI_CLASSIFIER_RAW_SAMPLE_COUNT;
   memset(ventana, 0, n * sizeof(int16_t));
+  size_t desde = 0, cuantas = muestras, destino = 0;
   if (muestras <= n) {
-    memcpy(ventana + (n - muestras) / 2, grabacion, muestras * sizeof(int16_t));
-    return;
+    destino = (n - muestras) / 2;
+  } else {
+    uint64_t mayor = 0;
+    for (size_t inicio = 0; inicio + n <= muestras; inicio += FRECUENCIA / 20) {
+      uint64_t energia = 0;
+      for (size_t i = inicio; i < inicio + n; i += 4) energia += (int32_t)grabacion[i] * grabacion[i];
+      if (energia > mayor) { mayor = energia; desde = inicio; }
+    }
+    cuantas = n;
   }
-  size_t mejor = 0;
-  uint64_t mayor = 0;
-  for (size_t inicio = 0; inicio + n <= muestras; inicio += FRECUENCIA / 20) {
-    uint64_t energia = 0;
-    for (size_t i = inicio; i < inicio + n; i += 4) energia += (int32_t)grabacion[i] * grabacion[i];
-    if (energia > mayor) { mayor = energia; mejor = inicio; }
+  float ganancia = 1.0f;
+#if NORMALIZAR_VOZ
+  if (pico > 30) {
+    ganancia = (float)PICO_OBJETIVO / (float)pico;
+    if (ganancia > (float)GANANCIA_MAXIMA) ganancia = (float)GANANCIA_MAXIMA;
   }
-  memcpy(ventana, grabacion + mejor, n * sizeof(int16_t));
+  Serial.printf("         ganancia aplicada: x%.1f\n", ganancia);
+#endif
+  for (size_t i = 0; i < cuantas; i++) {
+    int32_t v = (int32_t)(grabacion[desde + i] * ganancia);
+    if (v > 32767) v = 32767;
+    if (v < -32768) v = -32768;
+    ventana[destino + i] = (int16_t)v;
+  }
 }
 
 static int datosAudio(size_t offset, size_t length, float* out) {
@@ -159,8 +201,8 @@ static int datosAudio(size_t offset, size_t length, float* out) {
 }
 
 // ¿Qué se dijo? false = no se pudo correr el modelo.
-bool clasificar(String& etiqueta, float& valor) {
-  armarVentana();
+bool clasificar(String& etiqueta, float& valor, int32_t pico) {
+  armarVentana(pico);
   ei::signal_t senal;
   senal.total_length = EI_CLASSIFIER_RAW_SAMPLE_COUNT;
   senal.get_data = &datosAudio;
@@ -187,9 +229,10 @@ void atenderBoton() {
     return;
   }
   Serial.printf("VOZ      %.1f s grabados\n", segundos);
+  int32_t pico = prepararAudio();
   String etiqueta;
   float valor = 0;
-  if (!clasificar(etiqueta, valor)) {
+  if (!clasificar(etiqueta, valor, pico)) {
     Serial.println("         no se pudo correr el modelo");
     return;
   }
@@ -249,9 +292,12 @@ void setup() {
 }
 
 void loop() {
+  // El botón cuenta solo si se lee presionado 60 ms seguidos: un falso contacto
+  // o el rebote no disparan grabaciones de unos milisegundos.
   if (digitalRead(BOTON) == LOW) {
-    delay(20);                                   // rebote del botón
-    if (digitalRead(BOTON) == LOW) atenderBoton();
+    bool firme = true;
+    for (int i = 0; i < 6 && firme; i++) { delay(10); firme = digitalRead(BOTON) == LOW; }
+    if (firme) atenderBoton();
   }
   // Sin WiFi, otro intento cada 15 s (también si la LILYGO cambió de red).
   if (WiFi.status() != WL_CONNECTED && millis() - ultimoIntentoWifi > 15000) {

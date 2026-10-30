@@ -14,3 +14,11 @@
 
 // Qué tan seguro tiene que estar el modelo (0 a 1) para obedecer.
 #define UMBRAL_VOZ     0.80f
+
+// Volumen: el micrófono de la XIAO suena mucho más bajo que un celular. Con 1,
+// cada grabación se sube hasta que su pico llegue a PICO_OBJETIVO (de 32767),
+// sin multiplicar más de GANANCIA_MAXIMA veces. Pon 0 si entrenaron con
+// audios grabados con la misma XIAO (grabar_voz) y reconoce bien sin esto.
+#define NORMALIZAR_VOZ   1
+#define PICO_OBJETIVO    16000
+#define GANANCIA_MAXIMA  40
