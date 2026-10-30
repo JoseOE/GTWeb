@@ -40,6 +40,8 @@ String linea;
 uint32_t botonDesde = 0;
 uint32_t ultimoAvisoCodigo = 0;
 uint32_t ultimoEstado = 0;
+bool sincronizado = false;
+uint32_t ultimoIntento = 0;
 
 // Cada 10 s: para saber si Matter está bien (emparejada, con WiFi) y cómo está el sensor.
 void mostrarEstado() {
@@ -61,7 +63,9 @@ bool ponerContacto(MatterContactSensor& sensor, bool cerrado) {
   if (!sensor.getAttributeVal(0x0045, 0x0000, &valor)) return false;   // BooleanState · StateValue
   if (valor.val.b == cerrado) return true;                             // ya está así
   valor.val.b = cerrado;
-  return sensor.updateAttributeVal(0x0045, 0x0000, &valor);
+  esp_err_t err = esp_matter::attribute::update(sensor.getEndPointId(), 0x0045, 0x0000, &valor);
+  if (err != ESP_OK) Serial.printf("  Matter rechazó el cambio: %s (%d)\n", esp_err_to_name(err), err);
+  return err == ESP_OK;
 }
 
 // Con Matter, el WiFi lo maneja Matter (se lo dio la Alexa al emparejar) y
@@ -90,7 +94,7 @@ void actualizarOcupado(char tipo, int dentro) {
   if (dentro == 0) ahora = false;
   if (ahora != antes) {
     bool ok = ponerContacto(ocupado, !ahora);
-    if (ok) hayGente = ahora;
+    if (ok) { hayGente = ahora; sincronizado = true; }   // ya no hace falta cerrarlo al arrancar
     Serial.printf("Gimnasio ocupado: %s (la rutina %s el foco) -> Matter %s\n", ahora ? "ABIERTO" : "cerrado",
                   ahora ? "prende" : "apaga", ok ? "lo aceptó" : "LO RECHAZÓ");
   }
@@ -125,7 +129,6 @@ void setup() {
 
   ocupado.begin(true);   // cerrado: gimnasio vacío
   Matter.begin();
-  ponerContacto(ocupado, true);   // al arrancar: cerrado, aunque se haya guardado abierto
   udp.begin(PUERTO_UDP);
   if (!Matter.isDeviceCommissioned()) {
     Serial.printf("Sin emparejar. Código para la app Alexa: %s\n", Matter.getManualPairingCode().c_str());
@@ -134,6 +137,13 @@ void setup() {
 }
 
 void loop() {
+  // Al arrancar se deja el sensor cerrado (aunque se haya guardado abierto),
+  // pero hasta que Matter ya esté listo: justo al arrancar rechaza los cambios.
+  if (!sincronizado && Matter.isDeviceCommissioned() && millis() > 8000 && millis() - ultimoIntento > 5000) {
+    ultimoIntento = millis();
+    sincronizado = ponerContacto(ocupado, true);
+    if (sincronizado) { hayGente = false; Serial.println("Sensor listo: cerrado (vacío)"); }
+  }
   if (millis() - ultimoEstado > 10000) {
     ultimoEstado = millis();
     mostrarEstado();

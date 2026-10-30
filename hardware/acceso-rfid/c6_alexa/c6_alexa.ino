@@ -52,6 +52,8 @@ WiFiUDP udp;
 uint32_t denegadoDesde = 0;
 uint32_t botonDesde = 0;
 uint32_t ultimoAvisoCodigo = 0;
+bool sincronizado = false;
+uint32_t ultimoIntento = 0;
 
 // "Chema Ortiz" → índice de "Chema"; -1 si no tiene sensor.
 int indiceDe(const String& nombre) {
@@ -73,11 +75,21 @@ int indiceDe(const String& nombre) {
 bool ponerContacto(MatterContactSensor& sensor, bool cerrado) {
   esp_matter_attr_val_t valor = esp_matter_invalid(NULL);
   bool ok = sensor.getAttributeVal(0x0045, 0x0000, &valor);      // BooleanState · StateValue
-  if (ok && valor.val.b != cerrado) {
-    valor.val.b = cerrado;
-    ok = sensor.updateAttributeVal(0x0045, 0x0000, &valor);
+  if (!ok) { Serial.println("  No se pudo leer el sensor en Matter"); return false; }
+  if (valor.val.b == cerrado) return true;                        // ya está así
+  valor.val.b = cerrado;
+  esp_err_t err = esp_matter::attribute::update(sensor.getEndPointId(), 0x0045, 0x0000, &valor);
+  if (err != ESP_OK) Serial.printf("  Matter rechazó el cambio: %s (%d)\n", esp_err_to_name(err), err);
+  return err == ESP_OK;
+}
+
+// Al arrancar se dejan todos cerrados (aunque se hayan guardado abiertos), pero
+// hasta que Matter ya esté listo: justo al arrancar rechaza los cambios.
+bool cerrarTodos() {
+  bool ok = ponerContacto(denegado, true);
+  for (int i = 0; i < NUM_SOCIOS; i++) {
+    if (!abierto[i]) ok = ponerContacto(sensores[i], true) && ok;   // no cierra a quien ya entró
   }
-  if (!ok) Serial.println("  Matter RECHAZÓ el cambio del sensor");
   return ok;
 }
 
@@ -133,9 +145,6 @@ void setup() {
   for (int i = 0; i < NUM_SOCIOS; i++) sensores[i].begin(true);   // todos cerrados: nadie dentro
   denegado.begin(true);
   Matter.begin();
-  // Al arrancar: todos cerrados, aunque se hayan guardado abiertos.
-  for (int i = 0; i < NUM_SOCIOS; i++) ponerContacto(sensores[i], true);
-  ponerContacto(denegado, true);
   udp.begin(PUERTO_UDP);
   Serial.printf("Sensores: %d socios + acceso denegado\n", NUM_SOCIOS);
   if (!Matter.isDeviceCommissioned()) {
@@ -145,6 +154,12 @@ void setup() {
 }
 
 void loop() {
+  if (!sincronizado && Matter.isDeviceCommissioned() && millis() > 8000 && millis() - ultimoIntento > 5000) {
+    ultimoIntento = millis();
+    sincronizado = cerrarTodos();
+    if (sincronizado) Serial.println("Sensores listos: todos cerrados");
+  }
+
   int largo = udp.parsePacket();
   if (largo > 0) {
     char texto[96];
