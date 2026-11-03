@@ -88,9 +88,11 @@ public class CuentaService {
 
     // Responde igual exista o no la cuenta, para no revelar qué correos están
     // registrados. Un segundo pedido en menos de un minuto se ignora en silencio.
+    // Al administrador nunca se le manda: su contraseña es ADMIN_PASSWORD, y
+    // un código en el correo sería otra forma de entrar a su cuenta.
     public void solicitarRecuperacion(String email) {
         User user = userRepository.findByEmail(limpiar(email)).orElse(null);
-        if (user == null) return;
+        if (user == null || esAdministrador(user)) return;
         try {
             Emitido emitido = emitir(user, TokenCuenta.RECUPERAR_CONTRASENA, VIGENCIA_RECUPERACION, null);
             correoService.recuperarContrasena(user, emitido.codigo(),
@@ -105,6 +107,7 @@ public class CuentaService {
         TokenCuenta token = tokenPorEnlace(enlace, TokenCuenta.RECUPERAR_CONTRASENA, error);
         exigirSegura(nueva);
         User user = userRepository.findById(token.getUserId())
+                .filter(u -> !esAdministrador(u))
                 .orElseThrow(() -> new CuentaException(HttpStatus.BAD_REQUEST, error));
 
         user.cambiarContrasena(PasswordUtil.hash(nueva));
@@ -128,6 +131,7 @@ public class CuentaService {
         // Primero la contraseña: una débil no gasta un intento del código.
         exigirSegura(nueva);
         User user = userRepository.findByEmail(limpiar(email))
+                .filter(u -> !esAdministrador(u))
                 .orElseThrow(() -> new CuentaException(HttpStatus.BAD_REQUEST, error));
         TokenCuenta token = tokenRepository.findFirstByUserIdAndTipoOrderByCreadoDesc(user.getId(), TokenCuenta.RECUPERAR_CONTRASENA)
                 .filter(TokenCuenta::vigente)
@@ -152,6 +156,7 @@ public class CuentaService {
     // tokenActual es la sesión de quien la cambia: esa sigue abierta y las demás se cierran.
     public void cambiarContrasena(String userId, String actual, String nueva, String tokenActual) {
         User user = usuario(userId);
+        exigirNoAdministrador(user);
         if (!PasswordUtil.coincide(actual, user.getPassword())) {
             throw new CuentaException(HttpStatus.BAD_REQUEST, "La contraseña actual no es correcta.");
         }
@@ -166,6 +171,7 @@ public class CuentaService {
     // hasta que ese código se confirma.
     public void solicitarCambioDeCorreo(String userId, String password, String nuevoCorreo) {
         User user = usuario(userId);
+        exigirNoAdministrador(user);
         if (!PasswordUtil.coincide(password, user.getPassword())) {
             throw new CuentaException(HttpStatus.BAD_REQUEST, "La contraseña no es correcta.");
         }
@@ -214,6 +220,19 @@ public class CuentaService {
         }
         return userRepository.findById(userId)
                 .orElseThrow(() -> new CuentaException(HttpStatus.NOT_FOUND, "Usuario no encontrado."));
+    }
+
+    // El correo y la contraseña del administrador viven en ADMIN_EMAIL y
+    // ADMIN_PASSWORD (AdministradorService): no se cambian ni se recuperan aquí.
+    private static boolean esAdministrador(User user) {
+        return AdministradorService.ROL.equals(user.getRole());
+    }
+
+    private static void exigirNoAdministrador(User user) {
+        if (esAdministrador(user)) {
+            throw new CuentaException(HttpStatus.BAD_REQUEST,
+                    "La cuenta de administrador se cambia en ADMIN_EMAIL y ADMIN_PASSWORD (Render) y se reinicia el servidor.");
+        }
     }
 
     private static void exigirSegura(String password) {

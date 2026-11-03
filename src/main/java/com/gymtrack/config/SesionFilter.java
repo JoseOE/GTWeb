@@ -6,6 +6,7 @@ import com.gymtrack.repository.MachineRepository;
 import com.gymtrack.repository.RoutineRepository;
 import com.gymtrack.repository.UserRepository;
 import com.gymtrack.service.AccesoService;
+import com.gymtrack.service.AdministradorService;
 import com.gymtrack.service.SesionService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -44,7 +45,8 @@ import java.util.Set;
 //
 // Además de la sesión, aquí se revisa a quién le pertenece cada recurso: el
 // gimnasio a su dueño y cada cuenta a su usuario. La tienda, los recibos y los
-// simuladores lo revisan en sus propios servicios (AccesoService).
+// simuladores lo revisan en sus propios servicios (AccesoService). Lo de
+// /api/admin es solo de la cuenta de administrador (AdministradorService).
 @Component
 public class SesionFilter extends OncePerRequestFilter {
 
@@ -118,7 +120,8 @@ public class SesionFilter extends OncePerRequestFilter {
             regla("POST", "/api/gyms/*/tienda/migrar-medusa"),
             regla(null, "/api/gyms/*/acceso"),
             regla(null, "/api/gyms/*/acceso/**"),
-            regla(null, "/api/simuladores/paynet/**"));
+            regla(null, "/api/simuladores/paynet/**"),
+            regla(null, "/api/admin/**"));
 
     public static final String ATRIBUTO_USUARIO = "gymtrack.sesion.usuario";
 
@@ -223,6 +226,9 @@ public class SesionFilter extends OncePerRequestFilter {
     // A quién le pertenece cada recurso. null = adelante; si no, el motivo.
     private String autorizar(String metodo, String ruta, String usuario) {
         Map<String, String> v;
+        if (RUTAS.match("/api/admin/**", ruta)) {
+            return esAdmin(usuario) ? null : "Solo el equipo de GymTrack puede ver esto.";
+        }
         if ((v = extraer("/api/users/{userId}/**", ruta)) != null) {
             return usuario.equals(v.get("userId")) ? null : "Solo puedes ver o cambiar tu propia cuenta.";
         }
@@ -253,6 +259,10 @@ public class SesionFilter extends OncePerRequestFilter {
 
     private boolean esDueno(String gymId, String usuario) {
         return gyms.findById(gymId).map(g -> usuario.equals(g.getOwnerId())).orElse(false);
+    }
+
+    private boolean esAdmin(String usuario) {
+        return users.findById(usuario).map(u -> AdministradorService.ROL.equals(u.getRole())).orElse(false);
     }
 
     private boolean esMiembro(String gymId, String usuario) {

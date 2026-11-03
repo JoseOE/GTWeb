@@ -31,11 +31,16 @@ public class SesionService {
     // Abre una sesión y devuelve el token. Es lo único que se le da al
     // navegador; aquí solo queda su huella.
     public String abrir(String userId) {
+        return abrir(userId, VIGENCIA);
+    }
+
+    // La del administrador dura menos (ver AdministradorService).
+    public String abrir(String userId, Duration vigencia) {
         byte[] bytes = new byte[32];
         AZAR.nextBytes(bytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         Instant ahora = Instant.now();
-        sesiones.save(new Sesion(huella(token), userId, ahora, ahora.plus(VIGENCIA)));
+        sesiones.save(new Sesion(huella(token), userId, ahora, ahora.plus(vigencia)));
         return token;
     }
 
