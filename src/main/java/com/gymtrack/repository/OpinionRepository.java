@@ -8,6 +8,7 @@ import java.util.Optional;
 
 public interface OpinionRepository extends MongoRepository<Opinion, String> {
     Optional<Opinion> findByUserId(String userId);
-    List<Opinion> findTop40ByEstrellasGreaterThanEqualOrderByActualizadaEnDesc(int estrellas);
+    // Las ocultas no salen (oculta != true: las de antes no tienen el campo).
+    List<Opinion> findTop40ByEstrellasGreaterThanEqualAndOcultaNotOrderByActualizadaEnDesc(int estrellas, boolean oculta);
     void deleteByUserId(String userId);
 }
