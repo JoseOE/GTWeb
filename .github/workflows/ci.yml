@@ -51,6 +51,9 @@ jobs:
     env:
       MONGODB_URI: mongodb://localhost:27017/gymtrackdb
       SPRING_LOG: ${{ github.workspace }}/pruebas/spring.log
+      # Cuenta de administrador solo para las pruebas (pruebas/admin.mjs); la real vive en Render.
+      ADMIN_EMAIL: admin@prueba.mx
+      ADMIN_PASSWORD: Admin#Prueba2026
     steps:
       - name: Descargar el repositorio
         uses: actions/checkout@v4

@@ -23,7 +23,8 @@ import java.util.Set;
 //
 // El carrusel de la página de inicio solo muestra las de MINIMO_DESTACADA
 // estrellas o más (el criterio de "más de 3.8"), con el nombre corto de quien
-// opinó y la foto de su gimnasio. Nunca su correo.
+// opinó y la foto de su gimnasio. Nunca su correo. Las que ocultó el equipo de
+// GymTrack (panel de administración) no salen.
 @Service
 public class OpinionService {
 
@@ -87,7 +88,7 @@ public class OpinionService {
     // Para el carrusel: las más recientes de 4★ o más, una por gimnasio primero
     // (para que no las acapare uno solo) y luego las demás.
     public List<Map<String, Object>> destacadas(int limite) {
-        List<Opinion> candidatas = opiniones.findTop40ByEstrellasGreaterThanEqualOrderByActualizadaEnDesc(MINIMO_DESTACADA);
+        List<Opinion> candidatas = opiniones.findTop40ByEstrellasGreaterThanEqualAndOcultaNotOrderByActualizadaEnDesc(MINIMO_DESTACADA, true);
         List<Opinion> primero = new ArrayList<>();
         List<Opinion> despues = new ArrayList<>();
         Set<String> vistos = new HashSet<>();

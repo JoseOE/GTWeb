@@ -4,6 +4,7 @@ import com.gymtrack.model.Gym;
 import com.gymtrack.model.User;
 import com.gymtrack.repository.GymRepository;
 import com.gymtrack.repository.UserRepository;
+import com.gymtrack.service.AdministradorService;
 import com.gymtrack.service.BitacoraService;
 import com.gymtrack.service.CorreoService;
 import com.gymtrack.service.ConsentimientoService;
@@ -130,7 +131,9 @@ public class UserController {
                 bitacora.registrar(BitacoraService.LOGIN_EXITOSO, user.getId(), user.getEmail(), null);
                 Map<String, Object> view = accountView(user, "Login exitoso");
                 // La sesión: la página la manda en cada llamada (Authorization: Bearer).
-                view.put("token", sesiones.abrir(user.getId()));
+                view.put("token", AdministradorService.ROL.equals(user.getRole())
+                        ? sesiones.abrir(user.getId(), AdministradorService.VIGENCIA_SESION)
+                        : sesiones.abrir(user.getId()));
                 return ResponseEntity.ok(view);
             }
         }

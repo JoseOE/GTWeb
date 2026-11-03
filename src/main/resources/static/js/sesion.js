@@ -50,9 +50,11 @@
             escribir('gymId', cuenta.gymId);
         },
 
-        // A dónde va cada cuenta al entrar: el dueño a su panel, el miembro a su tienda.
+        // A dónde va cada cuenta al entrar: el dueño a su panel, el miembro a su
+        // tienda y el equipo de GymTrack al panel de administración.
         destino(cuenta) {
-            return (cuenta && cuenta.role) === 'member' ? 'tienda.html' : 'bienvenido.html';
+            const rol = cuenta && cuenta.role;
+            return rol === 'member' ? 'tienda.html' : rol === 'admin' ? 'admin.html' : 'bienvenido.html';
         },
 
         // Cierra la sesión en el servidor (para que el token deje de servir) y aquí.

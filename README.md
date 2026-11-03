@@ -173,6 +173,7 @@ Y abre http://localhost:5500. **Ojo:** así no funcionan el catálogo, el regist
 | `PAYPAL_CLIENT_ID` · `PAYPAL_CLIENT_SECRET` · `PAYPAL_MODO` | Con `sandbox` | App de Sandbox de developer.paypal.com. `PAYPAL_MODO=sandbox`. |
 | `OPENPAY_MERCHANT_ID` · `OPENPAY_PRIVATE_KEY` · `OPENPAY_PUBLIC_KEY` · `OPENPAY_MODO` | Con `sandbox` | Llaves del sandbox de Openpay (Paynet). `OPENPAY_MODO=sandbox`. |
 | `EXIGIR_CONSENTIMIENTO_APP` | No | `true` para exigir también en la app la aceptación de los términos de compra al pagar. En la web se exige siempre. Por defecto `false` hasta que GTApp lo mande (ver "Compras conforme a la ley"). |
+| `ADMIN_EMAIL` · `ADMIN_PASSWORD` | No | La cuenta del equipo de GymTrack para el [panel de administración](#-panel-de-administración). Sin las dos no hay administrador. |
 
 \* Sin `BREVO_API_KEY` y `MAIL_USERNAME` la página funciona igual: los códigos de verificación y los enlaces de recuperación se escriben en la consola en lugar de enviarse.
 
@@ -345,6 +346,41 @@ Un CDN o un servicio nuevo en una página se agrega a la CSP, o el navegador lo 
 - `.github/dependabot.yml` abre PRs con las actualizaciones de seguridad.
 
 Cómo se aplica la norma NMX-I-27001-NYCE-2015 (ISO 27001) a todo esto: [docs/iso27001](docs/iso27001/README.md).
+
+---
+
+## 🛡 Panel de administración
+
+El equipo de GymTrack entra en `login.html` con la cuenta de administrador y llega a `admin.html`. Ve toda la plataforma:
+
+- **Resumen:** gimnasios, dueños, miembros, ventas, reseñas buenas y malas, las malas más recientes y los gimnasios que más venden.
+- **Gimnasios:** cada uno con su dueño, sus miembros, sus ventas y sus calificaciones.
+- **Cuentas:** dueños, miembros y administradores, con su gimnasio, su alta y su último acceso. Nunca contraseñas.
+- **Reseñas y opiniones:** todas, buenas (4–5★), regulares (3★), malas (1–2★) y ocultas, con quién las escribió y su correo. Se filtran por tipo, calificación, estado, gimnasio y texto. **Ocultar** saca una reseña del promedio del producto, o una opinión del carrusel de la portada; su autor la sigue viendo. **Volver a mostrar** la regresa.
+- **Bitácora:** la de todos los gimnasios.
+
+**La cuenta.**
+- No se registra en la página. Spring la crea, o la pone al día, al arrancar con `ADMIN_EMAIL` y `ADMIN_PASSWORD`. La contraseña debe tener 8 caracteres o más, con letra, número y símbolo.
+- Para cambiarla, cambia la variable en Render y reinicia. Desde la página no se cambia ni se recupera por correo.
+- Si `ADMIN_EMAIL` ya es la cuenta de un dueño o un miembro, no se convierte en administrador.
+
+**La seguridad.**
+- Su sesión dura 8 horas (las demás, 30 días).
+- `/api/admin/**` exige su token. `SesionFilter` y `AdminController` revisan las dos veces que el rol sea `admin`.
+- Registrarse pidiendo `role: "admin"` da una cuenta de dueño normal.
+- Sus inicios de sesión, lo que oculta o muestra y los intentos de entrar sin permiso quedan en la bitácora.
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| GET | `/api/admin/resumen` | Totales de la plataforma |
+| GET | `/api/admin/gimnasios` | Gimnasios con dueño, miembros, ventas y calificaciones |
+| GET | `/api/admin/usuarios` | Todas las cuentas, sin contraseñas |
+| GET | `/api/admin/resenas` | Reseñas de productos y opiniones de gimnasios, ocultas incluidas |
+| POST | `/api/admin/resenas/{id}/visibilidad` | `{oculta: true|false}` |
+| POST | `/api/admin/opiniones/{id}/visibilidad` | `{oculta: true|false}` |
+| GET | `/api/admin/bitacora?limite=500` | Bitácora de toda la plataforma |
+
+Pruebas: `pruebas/admin.mjs`.
 
 ---
 

@@ -1,0 +1,62 @@
+/* ═══════════════════════════════════════
+   Panel de administración (admin.html)
+   Usa el sistema del panel del dueño (styles.css: dash-*, kpi-tile,
+   ventas-periodos); aquí solo lo propio: reseñas, filtros y miniaturas.
+═══════════════════════════════════════ */
+
+.admin-insignia { letter-spacing: 0.04em; vertical-align: middle; }
+
+/* Búsqueda con lupa adentro */
+.admin-buscar { position: relative; min-width: min(100%, 240px); }
+.admin-buscar i { position: absolute; left: 0.95rem; top: 50%; transform: translateY(-50%); color: #6c757d; pointer-events: none; }
+.admin-buscar .form-control { padding-left: 2.4rem; }
+.admin-select { width: auto; min-width: 200px; max-width: 100%; }
+
+/* Filtros de reseñas: una fila por grupo, con la etiqueta alineada */
+.admin-filtros { display: grid; gap: 0.75rem; }
+.admin-filtro-etiqueta { min-width: 6.5rem; }
+@media (max-width: 575.98px) {
+    .admin-filtro-etiqueta { min-width: 0; width: 100%; }
+    .admin-select { width: 100%; }
+}
+
+/* Estrellas: el mismo dorado de las opiniones (js/opinion.js) */
+.admin-estrellas { color: #F5A524; font-size: 1.05rem; letter-spacing: -0.05em; white-space: nowrap; }
+.admin-estrella { color: #F5A524; }
+
+/* Tarjetas de reseñas: un filo de color dice si es buena, regular o mala */
+.admin-resenas { display: grid; gap: 0.85rem; }
+.admin-resena {
+    background: #fff;
+    border-radius: 1rem;
+    border: 1px solid rgba(20, 20, 25, 0.06);
+    border-left: 4px solid #F5A524;
+    box-shadow: var(--shadow-soft);
+    padding: 1.1rem 1.25rem;
+}
+.admin-resena-buena { border-left-color: #198754; }
+.admin-resena-regular { border-left-color: #F5A524; }
+.admin-resena-mala { border-left-color: #dc3545; }
+.admin-resena-oculta { background: #f6f6f7; }
+.admin-resena-oculta .admin-resena-texto,
+.admin-resena-oculta .admin-estrellas { opacity: 0.6; }
+.admin-resena-texto { white-space: pre-line; overflow-wrap: anywhere; }
+
+/* Listas del resumen */
+.admin-fila { padding: 0.9rem 1.5rem; border-bottom: 1px solid rgba(20, 20, 25, 0.06); }
+.admin-fila:last-child { border-bottom: 0; }
+.admin-texto-corto {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    margin-top: 0.15rem;
+}
+.admin-barra { height: 6px; border-radius: 99px; background: rgba(var(--brand-rgb), 0.12); margin-bottom: 0.3rem; }
+.admin-barra .progress-bar { background: var(--brand); border-radius: 99px; }
+
+/* La primera columna de las tablas no se aprieta: en el teléfono la tabla se desliza. */
+.admin-celda-principal { min-width: 250px; }
+
+.admin-miniatura { width: 44px; height: 44px; border-radius: 0.75rem; object-fit: cover; flex-shrink: 0; }

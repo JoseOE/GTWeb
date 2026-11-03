@@ -49,7 +49,9 @@ public class BitacoraFilter extends OncePerRequestFilter {
             new Regla("POST", "/api/gyms/{gymId}/ventas/pedidos/*/cancelar", "PEDIDO_CANCELADO"),
             new Regla("POST", "/api/gyms/{gymId}/ventas/pedidos/*/entregar", "PEDIDO_ENTREGADO"),
             new Regla(null, "/api/gyms/{gymId}/productos/**", "PRODUCTO_CAMBIADO"),
-            new Regla(null, "/api/gyms/{gymId}/planes/**", "PLAN_CAMBIADO"));
+            new Regla(null, "/api/gyms/{gymId}/planes/**", "PLAN_CAMBIADO"),
+            new Regla("POST", "/api/admin/resenas/*/visibilidad", "RESENA_MODERADA"),
+            new Regla("POST", "/api/admin/opiniones/*/visibilidad", "OPINION_MODERADA"));
 
     private final BitacoraService bitacora;
 

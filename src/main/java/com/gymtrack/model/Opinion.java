@@ -22,6 +22,9 @@ public class Opinion {
     private String rol;
     private int estrellas;
     private String texto;
+    // El equipo de GymTrack puede ocultar una opinión ofensiva o falsa: deja de
+    // salir en el carrusel, pero su autor la sigue viendo y editando.
+    private boolean oculta;
     @Indexed
     private Instant creadaEn;
     private Instant actualizadaEn;
@@ -43,6 +46,9 @@ public class Opinion {
 
     public String getTexto() { return texto; }
     public void setTexto(String texto) { this.texto = texto; }
+
+    public boolean isOculta() { return oculta; }
+    public void setOculta(boolean oculta) { this.oculta = oculta; }
 
     public Instant getCreadaEn() { return creadaEn; }
     public void setCreadaEn(Instant creadaEn) { this.creadaEn = creadaEn; }

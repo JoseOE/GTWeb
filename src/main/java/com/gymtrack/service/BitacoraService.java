@@ -59,7 +59,9 @@ public class BitacoraService {
             Map.entry("PEDIDO_CANCELADO", "Pedido cancelado"),
             Map.entry("PEDIDO_ENTREGADO", "Pedido entregado"),
             Map.entry("PRODUCTO_CAMBIADO", "Producto creado, editado o borrado"),
-            Map.entry("PLAN_CAMBIADO", "Plan creado, editado o borrado"));
+            Map.entry("PLAN_CAMBIADO", "Plan creado, editado o borrado"),
+            Map.entry("RESENA_MODERADA", "Reseña de producto ocultada o mostrada por el administrador"),
+            Map.entry("OPINION_MODERADA", "Opinión ocultada o mostrada por el administrador"));
 
     private final EventoSeguridadRepository eventos;
     private final MongoTemplate mongo;
