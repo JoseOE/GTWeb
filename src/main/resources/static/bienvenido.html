@@ -1217,6 +1217,11 @@
                 window.location.href = 'login.html';
                 return;
             }
+            // La cuenta del equipo de GymTrack no tiene gimnasio: su panel es otro.
+            if (localStorage.getItem('role') === 'admin') {
+                location.replace('admin.html');
+                return;
+            }
             // El panel es del dueño: un miembro que llegue aquí va a la tienda de su gimnasio.
             if (localStorage.getItem('role') === 'member') {
                 window.location.href = 'tienda.html';

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Administración | GymTrack</title>
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/2964/2964514.png">
+    <link rel="stylesheet" href="css/fonts.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/editorial.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <script src="js/sesion.js" data-protegida></script>
+</head>
+<body class="gym-interior bg-body-tertiary d-flex flex-column min-vh-100">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark py-3">
+        <div class="container-fluid px-3 px-lg-4">
+            <a class="navbar-brand fw-bold fs-3 d-flex align-items-center gap-2" href="index.html">
+                <i class='bx bx-dumbbell text-primary fs-2'></i>
+                <span>Gym<span class="text-primary">Track</span></span>
+                <span class="badge rounded-pill bg-primary fs-6 fw-semibold ms-1 admin-insignia">Admin</span>
+            </a>
+            <div class="ms-auto d-flex align-items-center gap-2 gap-sm-3">
+                <a href="index.html" class="btn btn-outline-light btn-sm rounded-pill px-3 d-none d-sm-inline-flex align-items-center gap-1">
+                    <i class='bx bx-globe'></i> Ver sitio público
+                </a>
+                <span class="text-white-50 d-none d-md-inline" id="nav-user-name"></span>
+                <a href="login.html" class="btn btn-outline-danger btn-sm rounded-pill px-3" id="cerrar-sesion">
+                    <i class='bx bx-log-out'></i> <span class="d-none d-sm-inline">Cerrar sesión</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="dash-wrap flex-grow-1">
+        <aside class="dash-sidebar">
+            <nav class="dash-nav" role="tablist" aria-label="Secciones de la administración">
+                <span class="dash-nav-grupo" aria-hidden="true">Plataforma</span>
+                <button type="button" class="dash-nav-link active" role="tab" id="tab-resumen" aria-controls="panel-resumen" aria-selected="true" data-panel="resumen">
+                    <i class='bx bx-grid-alt'></i><span>Resumen</span>
+                </button>
+                <button type="button" class="dash-nav-link" role="tab" id="tab-gimnasios" aria-controls="panel-gimnasios" aria-selected="false" data-panel="gimnasios">
+                    <i class='bx bx-store-alt'></i><span>Gimnasios</span>
+                </button>
+                <button type="button" class="dash-nav-link" role="tab" id="tab-cuentas" aria-controls="panel-cuentas" aria-selected="false" data-panel="cuentas">
+                    <i class='bx bx-group'></i><span>Cuentas</span>
+                </button>
+                <span class="dash-nav-grupo" aria-hidden="true">Calidad</span>
+                <button type="button" class="dash-nav-link" role="tab" id="tab-resenas" aria-controls="panel-resenas" aria-selected="false" data-panel="resenas">
+                    <i class='bx bx-star'></i><span>Reseñas y opiniones</span><span class="badge rounded-pill bg-danger ms-auto d-none" id="resenas-nav-malas" aria-label="Reseñas malas"></span>
+                </button>
+                <span class="dash-nav-grupo" aria-hidden="true">Seguridad</span>
+                <button type="button" class="dash-nav-link" role="tab" id="tab-bitacora" aria-controls="panel-bitacora" aria-selected="false" data-panel="bitacora">
+                    <i class='bx bx-shield-quarter'></i><span>Bitácora</span>
+                </button>
+            </nav>
+        </aside>
+
+        <main class="dash-content">
+
+            <!-- ─── RESUMEN ─── -->
+            <div class="dash-panel active" id="panel-resumen" data-panel="resumen" role="tabpanel" aria-labelledby="tab-resumen" tabindex="0">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+                    <div>
+                        <h2 class="fw-bold mb-1">Hola, <span class="text-primary" id="dash-user-name">…</span></h2>
+                        <p class="text-body-secondary mb-0">Así va GymTrack en todos los gimnasios.</p>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="actualizar-todo">
+                        <i class='bx bx-refresh'></i> Actualizar
+                    </button>
+                </div>
+                <div class="row g-3 mb-4" id="resumen-kpis"></div>
+                <div class="row g-4">
+                    <div class="col-lg-6">
+                        <section class="dash-empty text-start p-0 overflow-hidden h-100" aria-labelledby="resumen-malas-titulo">
+                            <div class="p-4 border-bottom d-flex justify-content-between align-items-center gap-2">
+                                <div>
+                                    <h4 class="fw-bold mb-0 fs-6" id="resumen-malas-titulo"><i class='bx bx-error text-danger me-1'></i> Reseñas malas recientes</h4>
+                                    <small class="text-body-secondary">De 1 y 2 estrellas, para darles seguimiento.</small>
+                                </div>
+                                <button type="button" class="btn btn-link btn-sm text-decoration-none" data-goto="resenas" data-calificacion="malas">Ver todas</button>
+                            </div>
+                            <div id="resumen-malas"></div>
+                        </section>
+                    </div>
+                    <div class="col-lg-6">
+                        <section class="dash-empty text-start p-0 overflow-hidden h-100" aria-labelledby="resumen-top-titulo">
+                            <div class="p-4 border-bottom d-flex justify-content-between align-items-center gap-2">
+                                <div>
+                                    <h4 class="fw-bold mb-0 fs-6" id="resumen-top-titulo"><i class='bx bx-trophy text-primary me-1'></i> Gimnasios con más ventas</h4>
+                                    <small class="text-body-secondary">Pedidos pagados de la tienda y el mostrador.</small>
+                                </div>
+                                <button type="button" class="btn btn-link btn-sm text-decoration-none" data-goto="gimnasios">Ver todos</button>
+                            </div>
+                            <div id="resumen-top"></div>
+                        </section>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── GIMNASIOS ─── -->
+            <div class="dash-panel" id="panel-gimnasios" data-panel="gimnasios" role="tabpanel" aria-labelledby="tab-gimnasios" tabindex="0">
+                <div class="mb-4">
+                    <h3 class="fw-bold mb-1"><i class='bx bx-store-alt text-primary me-1'></i> Gimnasios</h3>
+                    <p class="text-body-secondary mb-0">Todos los gimnasios de la plataforma, con su dueño, sus miembros, sus ventas y sus calificaciones.</p>
+                </div>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <div class="admin-buscar flex-grow-1">
+                        <i class='bx bx-search' aria-hidden="true"></i>
+                        <input type="search" class="form-control rounded-pill" id="gimnasios-buscar" placeholder="Buscar por gimnasio o dueño" aria-label="Buscar gimnasios">
+                    </div>
+                </div>
+                <div class="dash-empty text-start p-0 overflow-hidden">
+                    <div class="p-4 border-bottom">
+                        <h4 class="fw-bold mb-0 fs-6">Gimnasios</h4>
+                        <small class="text-body-secondary d-block" id="gimnasios-conteo" aria-live="polite"></small>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table dash-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="ps-4">Gimnasio</th>
+                                    <th>Dueño</th>
+                                    <th class="text-end">Miembros</th>
+                                    <th class="text-end">Ventas</th>
+                                    <th>Opiniones</th>
+                                    <th class="pe-4">Reseñas</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gimnasios-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── CUENTAS ─── -->
+            <div class="dash-panel" id="panel-cuentas" data-panel="cuentas" role="tabpanel" aria-labelledby="tab-cuentas" tabindex="0">
+                <div class="mb-4">
+                    <h3 class="fw-bold mb-1"><i class='bx bx-group text-primary me-1'></i> Cuentas</h3>
+                    <p class="text-body-secondary mb-0">Dueños, miembros y administradores. Nunca se muestran contraseñas.</p>
+                </div>
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                    <div class="admin-buscar flex-grow-1">
+                        <i class='bx bx-search' aria-hidden="true"></i>
+                        <input type="search" class="form-control rounded-pill" id="cuentas-buscar" placeholder="Buscar por nombre, correo o gimnasio" aria-label="Buscar cuentas">
+                    </div>
+                    <div class="ventas-periodos" role="radiogroup" aria-label="Tipo de cuenta">
+                        <input type="radio" class="btn-check" name="cuentas-rol" id="cuentas-r-todas" value="" autocomplete="off" checked>
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="cuentas-r-todas">Todas</label>
+                        <input type="radio" class="btn-check" name="cuentas-rol" id="cuentas-r-owner" value="owner" autocomplete="off">
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="cuentas-r-owner">Dueños</label>
+                        <input type="radio" class="btn-check" name="cuentas-rol" id="cuentas-r-member" value="member" autocomplete="off">
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="cuentas-r-member">Miembros</label>
+                        <input type="radio" class="btn-check" name="cuentas-rol" id="cuentas-r-admin" value="admin" autocomplete="off">
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="cuentas-r-admin">Administradores</label>
+                    </div>
+                    <div class="form-check form-switch mb-0 ms-1">
+                        <input class="form-check-input" type="checkbox" role="switch" id="cuentas-sin-demo">
+                        <label class="form-check-label small" for="cuentas-sin-demo">Ocultar cuentas demo</label>
+                    </div>
+                </div>
+                <div class="dash-empty text-start p-0 overflow-hidden">
+                    <div class="p-4 border-bottom">
+                        <h4 class="fw-bold mb-0 fs-6">Cuentas</h4>
+                        <small class="text-body-secondary d-block" id="cuentas-conteo" aria-live="polite"></small>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table dash-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="ps-4">Cuenta</th>
+                                    <th>Tipo</th>
+                                    <th>Gimnasio</th>
+                                    <th>Alta</th>
+                                    <th class="pe-4">Último acceso</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cuentas-tbody"></tbody>
+                        </table>
+                    </div>
+                    <div class="p-3 border-top text-center d-none" id="cuentas-mas-caja">
+                        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="cuentas-mas">Ver más</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── RESEÑAS Y OPINIONES ─── -->
+            <div class="dash-panel" id="panel-resenas" data-panel="resenas" role="tabpanel" aria-labelledby="tab-resenas" tabindex="0">
+                <div class="mb-4">
+                    <h3 class="fw-bold mb-1"><i class='bx bx-star text-primary me-1'></i> Reseñas y opiniones</h3>
+                    <p class="text-body-secondary mb-0">Todas: las buenas, las malas y las ocultas. Las reseñas son de productos comprados; las opiniones son sobre el gimnasio y las de 4★ o más salen en el carrusel de la portada.</p>
+                </div>
+                <div class="row g-3 mb-4" id="resenas-kpis"></div>
+
+                <div class="admin-filtros mb-3">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span class="small fw-semibold text-body-secondary admin-filtro-etiqueta" id="resenas-tipo-etiqueta">Qué</span>
+                        <div class="ventas-periodos" role="radiogroup" aria-labelledby="resenas-tipo-etiqueta">
+                            <input type="radio" class="btn-check" name="resenas-tipo" id="resenas-t-todas" value="" autocomplete="off" checked>
+                            <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="resenas-t-todas">Todo</label>
+                            <input type="radio" class="btn-check" name="resenas-tipo" id="resenas-t-producto" value="producto" autocomplete="off">
+                            <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="resenas-t-producto">Productos</label>
+                            <input type="radio" class="btn-check" name="resenas-tipo" id="resenas-t-gimnasio" value="gimnasio" autocomplete="off">
+                            <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="resenas-t-gimnasio">Gimnasios</label>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span class="small fw-semibold text-body-secondary admin-filtro-etiqueta" id="resenas-cal-etiqueta">Calificación</span>
+                        <div class="ventas-periodos" role="radiogroup" aria-labelledby="resenas-cal-etiqueta">
+                            <input type="radio" class="btn-check" name="resenas-cal" id="resenas-c-todas" value="" autocomplete="off" checked>
+                            <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="resenas-c-todas">Todas</label>
+                            <input type="radio" class="btn-check" name="resenas-cal" id="resenas-c-buenas" value="buenas" autocomplete="off">
+                            <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="resenas-c-buenas">Buenas (4–5★)</label>
+                            <input type="radio" class="btn-check" name="resenas-cal" id="resenas-c-regulares" value="regulares" autocomplete="off">
+                            <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="resenas-c-regulares">Regulares (3★)</label>
+                            <input type="radio" class="btn-check" name="resenas-cal" id="resenas-c-malas" value="malas" autocomplete="off">
+                            <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="resenas-c-malas">Malas (1–2★)</label>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span class="small fw-semibold text-body-secondary admin-filtro-etiqueta" id="resenas-vis-etiqueta">Estado</span>
+                        <div class="ventas-periodos" role="radiogroup" aria-labelledby="resenas-vis-etiqueta">
+                            <input type="radio" class="btn-check" name="resenas-vis" id="resenas-v-todas" value="" autocomplete="off" checked>
+                            <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="resenas-v-todas">Todas</label>
+                            <input type="radio" class="btn-check" name="resenas-vis" id="resenas-v-visibles" value="visibles" autocomplete="off">
+                            <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="resenas-v-visibles">Visibles</label>
+                            <input type="radio" class="btn-check" name="resenas-vis" id="resenas-v-ocultas" value="ocultas" autocomplete="off">
+                            <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="resenas-v-ocultas">Ocultas</label>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <div class="admin-buscar flex-grow-1">
+                            <i class='bx bx-search' aria-hidden="true"></i>
+                            <input type="search" class="form-control rounded-pill" id="resenas-buscar" placeholder="Buscar en el texto, el autor o el producto" aria-label="Buscar reseñas">
+                        </div>
+                        <select class="form-select rounded-pill admin-select" id="resenas-gym" aria-label="Gimnasio">
+                            <option value="">Todos los gimnasios</option>
+                        </select>
+                    </div>
+                </div>
+
+                <small class="text-body-secondary d-block mb-2" id="resenas-conteo" aria-live="polite"></small>
+                <div class="admin-resenas" id="resenas-lista"></div>
+                <div class="text-center mt-3 d-none" id="resenas-mas-caja">
+                    <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="resenas-mas">Ver más</button>
+                </div>
+            </div>
+
+            <!-- ─── BITÁCORA ─── -->
+            <div class="dash-panel" id="panel-bitacora" data-panel="bitacora" role="tabpanel" aria-labelledby="tab-bitacora" tabindex="0">
+                <div class="mb-4">
+                    <h3 class="fw-bold mb-1"><i class='bx bx-shield-quarter text-primary me-1'></i> Bitácora de toda la plataforma</h3>
+                    <p class="text-body-secondary mb-0">Inicios de sesión, accesos negados y cambios en los paneles de todos los gimnasios. Se guarda 180 días.</p>
+                </div>
+                <div class="row g-3 mb-4" id="bitacora-kpis"></div>
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                    <div class="ventas-periodos" role="radiogroup" aria-label="Qué eventos ver">
+                        <input type="radio" class="btn-check" name="bitacora-filtro" id="bitacora-f-todo" value="" autocomplete="off" checked>
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="bitacora-f-todo">Todo</label>
+                        <input type="radio" class="btn-check" name="bitacora-filtro" id="bitacora-f-alertas" value="alertas" autocomplete="off">
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="bitacora-f-alertas">Alertas</label>
+                        <input type="radio" class="btn-check" name="bitacora-filtro" id="bitacora-f-sesion" value="sesion" autocomplete="off">
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="bitacora-f-sesion">Inicios de sesión</label>
+                        <input type="radio" class="btn-check" name="bitacora-filtro" id="bitacora-f-admin" value="admin" autocomplete="off">
+                        <label class="btn btn-outline-secondary btn-sm rounded-pill px-3" for="bitacora-f-admin">Moderación</label>
+                    </div>
+                    <div class="admin-buscar flex-grow-1">
+                        <i class='bx bx-search' aria-hidden="true"></i>
+                        <input type="search" class="form-control rounded-pill" id="bitacora-buscar" placeholder="Buscar por correo, gimnasio o IP" aria-label="Buscar en la bitácora">
+                    </div>
+                </div>
+                <div class="dash-empty text-start p-0 overflow-hidden">
+                    <div class="p-4 border-bottom">
+                        <h4 class="fw-bold mb-0 fs-6">Eventos</h4>
+                        <small class="text-body-secondary d-block" id="bitacora-conteo" aria-live="polite"></small>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table dash-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="ps-4">Evento</th>
+                                    <th>Cuándo</th>
+                                    <th>Gimnasio</th>
+                                    <th class="pe-4">Desde</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bitacora-tbody"></tbody>
+                        </table>
+                    </div>
+                    <div class="p-3 border-top text-center d-none" id="bitacora-mas-caja">
+                        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="bitacora-mas">Ver más</button>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div class="toast align-items-center text-bg-dark border-0" id="admin-aviso" role="status" aria-live="polite" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body" id="admin-aviso-texto"></div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>
