@@ -116,6 +116,8 @@ public class SesionFilter extends OncePerRequestFilter {
             regla(null, "/api/gyms/*/ventas/**"),
             regla("GET", "/api/gyms/*/bitacora"),
             regla(null, "/api/gyms/*/resenas"),
+            regla(null, "/api/gyms/*/anuncios"),
+            regla(null, "/api/gyms/*/anuncios/**"),
             regla(null, "/api/gyms/*/resenas/**"),
             regla("POST", "/api/gyms/*/tienda/migrar-medusa"),
             regla(null, "/api/gyms/*/acceso"),
