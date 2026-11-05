@@ -10,6 +10,7 @@
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/editorial.css">
+    <link rel="stylesheet" href="css/portada.css">
     <script src="js/sesion.js" data-protegida></script>
 </head>
 <body class="gym-interior bg-body-tertiary d-flex flex-column min-vh-100">
@@ -228,20 +229,31 @@
                             </div>
                             <small class="text-body-secondary d-block">Si lo apagas, solo se pueden unir con tu código.</small>
                         </div>
+                        <div class="col-12"><hr class="my-2"></div>
                         <div class="col-12">
-                            <label for="gym-foto-input" class="form-label fw-semibold small">Foto del gimnasio</label>
-                            <div class="d-flex flex-wrap align-items-center gap-3">
-                                <div id="gym-foto-preview" class="rounded-3 border d-flex align-items-center justify-content-center bg-body-tertiary" style="width:160px;height:100px;overflow:hidden;flex:none">
-                                    <i class='bx bx-image-add fs-2 text-body-secondary'></i>
-                                </div>
-                                <div class="flex-grow-1" style="min-width:220px">
-                                    <input type="file" id="gym-foto-input" class="form-control form-control-sm" accept="image/png,image/jpeg,image/webp">
-                                    <div class="d-flex gap-2 mt-2">
-                                        <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3 d-none" id="gym-foto-clear">Quitar foto</button>
-                                    </div>
-                                    <small class="text-body-secondary d-block mt-1" id="gym-foto-ayuda">Una foto de tu gimnasio por dentro o por fuera. Sale con las opiniones de tu gimnasio en la página de inicio de GymTrack.</small>
-                                </div>
+                            <h4 class="fw-bold fs-6 mb-1"><i class='bx bx-mobile-alt text-primary me-1'></i> Portada de la app</h4>
+                            <p class="text-body-secondary small mb-0">Lo primero que ven tus miembros al abrir la app: tus fotos en carrusel y el nombre del gimnasio con la letra que elijas. La primera foto también sale con tus opiniones en la página de inicio de GymTrack.</p>
+                        </div>
+                        <div class="col-md-5">
+                            <div class="portada-vista" id="portada-vista" aria-label="Vista previa de la portada">
+                                <span class="portada-nombre" id="portada-nombre">Tu gimnasio</span>
                             </div>
+                            <small class="text-body-secondary d-block mt-1">Así se ve arriba de la app (con la primera foto).</small>
+                        </div>
+                        <div class="col-md-7">
+                            <label for="gym-tipografia" class="form-label fw-semibold small">Letra del nombre</label>
+                            <select id="gym-tipografia" class="form-select">
+                                <option value="poppins">Poppins (la de GymTrack)</option>
+                                <option value="bebas-neue">Bebas Neue (deportiva, alta)</option>
+                                <option value="oswald">Oswald (deportiva)</option>
+                                <option value="anton">Anton (gruesa)</option>
+                                <option value="montserrat">Montserrat (moderna)</option>
+                                <option value="playfair">Playfair Display (elegante)</option>
+                            </select>
+                            <label for="gym-foto-input" class="form-label fw-semibold small mt-3">Fotos del carrusel <span class="fw-normal text-body-secondary">(hasta 6)</span></label>
+                            <div class="portada-fotos mb-2" id="gym-fotos"></div>
+                            <input type="file" id="gym-foto-input" class="form-control form-control-sm" accept="image/png,image/jpeg,image/webp" multiple>
+                            <small class="text-body-secondary d-block mt-1" id="gym-foto-ayuda">Horizontales se ven mejor. Con las flechas cambias el orden; la primera es la principal.</small>
                         </div>
 
                         <div class="col-12"><hr class="my-2"></div>
@@ -1486,48 +1498,100 @@
             const logoPreview = document.getElementById('gym-logo-preview');
             const logoClear = document.getElementById('gym-logo-clear');
             let logoDataUrl = null;
+            // ─── Portada de la app: fotos del carrusel y letra del nombre ───
             const fotoInput = document.getElementById('gym-foto-input');
-            const fotoPreview = document.getElementById('gym-foto-preview');
-            const fotoClear = document.getElementById('gym-foto-clear');
+            const fotosBox = document.getElementById('gym-fotos');
             const fotoAyuda = document.getElementById('gym-foto-ayuda');
-            // undefined = sin cambios (el servidor la conserva); '' = quitarla.
-            let fotoUrl;
+            const tipografiaSel = document.getElementById('gym-tipografia');
+            const portadaVista = document.getElementById('portada-vista');
+            const portadaNombre = document.getElementById('portada-nombre');
+            // Gym.TIPOGRAFIAS → la familia de css/portada.css (los mismos archivos que la app).
+            const FAMILIAS = {
+                poppins: 'Portada Poppins', 'bebas-neue': 'Portada Bebas Neue', oswald: 'Portada Oswald',
+                anton: 'Portada Anton', montserrat: 'Portada Montserrat', playfair: 'Portada Playfair'
+            };
+            const MAX_FOTOS = 6;
+            const AYUDA_FOTOS = fotoAyuda.textContent;
+            // Las fotos en orden. Si no se tocan, no se mandan y el servidor las conserva.
+            let fotos = [];
+            let fotosCambiadas = false;
 
-            function showFoto(url) {
-                if (url) {
-                    fotoPreview.innerHTML = '<img src="' + escapeHtml(url) + '" alt="Foto del gimnasio" style="width:100%;height:100%;object-fit:cover">';
-                    fotoClear.classList.remove('d-none');
-                } else {
-                    fotoPreview.innerHTML = '<i class="bx bx-image-add fs-2 text-body-secondary"></i>';
-                    fotoClear.classList.add('d-none');
+            function pintarPortada() {
+                portadaNombre.style.fontFamily = "'" + (FAMILIAS[tipografiaSel.value] || FAMILIAS.poppins) + "', sans-serif";
+                portadaNombre.textContent = fields.nombre.value.trim() || 'Tu gimnasio';
+                portadaVista.style.setProperty('--portada-color', colorInput.value);
+                let img = portadaVista.querySelector('img');
+                if (fotos[0]) {
+                    if (!img) {
+                        img = document.createElement('img');
+                        img.alt = '';
+                        portadaVista.prepend(img);
+                    }
+                    img.src = fotos[0];
+                } else if (img) {
+                    img.remove();
                 }
             }
-            fotoClear.addEventListener('click', () => { fotoUrl = ''; showFoto(null); fotoInput.value = ''; });
-            // La foto se reduce a 1280 px y se sube como imagen del gimnasio
-            // (POST /api/gyms/{id}/imagenes); al guardar se manda su dirección.
-            fotoInput.addEventListener('change', () => {
-                const file = fotoInput.files && fotoInput.files[0];
+
+            function pintarFotos() {
+                fotosBox.innerHTML = fotos.map((url, i) =>
+                    '<div class="portada-foto"><img src="' + escapeHtml(url) + '" alt="Foto ' + (i + 1) + ' del gimnasio">'
+                    + '<div class="portada-acciones">'
+                    + '<button type="button" data-mover="' + i + '" data-hacia="-1" aria-label="Mover a la izquierda"' + (i === 0 ? ' disabled' : '') + '><i class="bx bx-chevron-left"></i></button>'
+                    + '<button type="button" data-quitar="' + i + '" aria-label="Quitar foto ' + (i + 1) + '"><i class="bx bx-trash"></i></button>'
+                    + '<button type="button" data-mover="' + i + '" data-hacia="1" aria-label="Mover a la derecha"' + (i === fotos.length - 1 ? ' disabled' : '') + '><i class="bx bx-chevron-right"></i></button>'
+                    + '</div></div>').join('');
+                fotoInput.disabled = fotos.length >= MAX_FOTOS;
+                pintarPortada();
+            }
+
+            fotosBox.addEventListener('click', (e) => {
+                const boton = e.target.closest('button');
+                if (!boton) return;
+                if (boton.dataset.quitar !== undefined) {
+                    fotos.splice(Number(boton.dataset.quitar), 1);
+                } else if (boton.dataset.mover !== undefined) {
+                    const i = Number(boton.dataset.mover);
+                    const j = i + Number(boton.dataset.hacia);
+                    if (j < 0 || j >= fotos.length) return;
+                    [fotos[i], fotos[j]] = [fotos[j], fotos[i]];
+                }
+                fotosCambiadas = true;
+                pintarFotos();
+            });
+
+            // Cada foto se reduce a 1280 px y se sube como imagen del gimnasio
+            // (POST /api/gyms/{id}/imagenes); al guardar se manda la lista.
+            fotoInput.addEventListener('change', async () => {
                 const id = localStorage.getItem('gymId');
-                if (!file) return;
+                const archivos = [...(fotoInput.files || [])].slice(0, MAX_FOTOS - fotos.length);
+                fotoInput.value = '';
+                if (!archivos.length) return;
                 if (!id) {
-                    alertBox.textContent = 'Guarda primero tu gimnasio y después sube su foto.';
+                    alertBox.textContent = 'Guarda primero tu gimnasio y después sube sus fotos.';
                     alertBox.classList.remove('d-none');
-                    fotoInput.value = '';
                     return;
                 }
-                fotoAyuda.textContent = 'Subiendo la foto…';
-                reducirImagen(file, 1280)
-                    .then(dataUrl => apiTienda('/api/gyms/' + id + '/imagenes', { method: 'POST', body: JSON.stringify({ dataUrl }) }))
-                    .then(r => {
-                        fotoUrl = r.url;
-                        showFoto(r.url);
-                        fotoAyuda.textContent = 'Lista. Guarda los cambios para usarla.';
-                    })
-                    .catch(err => {
+                for (const [n, file] of archivos.entries()) {
+                    fotoAyuda.textContent = 'Subiendo la foto ' + (n + 1) + ' de ' + archivos.length + '…';
+                    try {
+                        const dataUrl = await reducirImagen(file, 1280);
+                        const r = await apiTienda('/api/gyms/' + id + '/imagenes', { method: 'POST', body: JSON.stringify({ dataUrl }) });
+                        fotos.push(r.url);
+                        fotosCambiadas = true;
+                        pintarFotos();
+                    } catch (err) {
                         fotoAyuda.textContent = err.message || 'No se pudo subir la foto.';
-                        fotoInput.value = '';
-                    });
+                        return;
+                    }
+                }
+                fotoAyuda.textContent = 'Listas. Guarda los cambios para usarlas en la app.';
+                setTimeout(() => { fotoAyuda.textContent = AYUDA_FOTOS; }, 5000);
             });
+
+            tipografiaSel.addEventListener('change', pintarPortada);
+            fields.nombre.addEventListener('input', pintarPortada);
+            colorInput.addEventListener('input', pintarPortada);
 
             colorInput.addEventListener('input', () => { colorHex.value = colorInput.value.toUpperCase(); });
             colorHex.addEventListener('input', () => {
@@ -1627,7 +1691,9 @@
                         cuotaInput.value = gym.cuotaMensual != null ? gym.cuotaMensual : '';
                         directorioInput.checked = !!gym.enDirectorio;
                         showLogo(gym.logo);
-                        showFoto(gym.foto);
+                        fotos = (gym.fotos && gym.fotos.length ? gym.fotos : (gym.foto ? [gym.foto] : [])).slice(0, MAX_FOTOS);
+                        tipografiaSel.value = FAMILIAS[gym.tipografia] ? gym.tipografia : 'poppins';
+                        pintarFotos();
                         showCode(gym.codigo);
                         setBadge('saved');
                     })
@@ -1651,7 +1717,8 @@
                         equipamiento: fields.equipamiento.value.trim(),
                         maquinas: fields.maquinas.value.split('\n').map(s => s.trim()).filter(Boolean),
                         logo: logoDataUrl,
-                        foto: fotoUrl,
+                        fotos: fotosCambiadas ? fotos : undefined,
+                        tipografia: tipografiaSel.value,
                         colorPrimario: colorInput.value,
                         enDirectorio: directorioInput.checked,
                         cuotaMensual: cuotaInput.value === '' ? null : parseFloat(cuotaInput.value),
@@ -1666,6 +1733,7 @@
                     btn.disabled = false;
                     btn.innerHTML = '<i class="bx bx-save"></i> Guardar cambios';
                     if (response.status === 200) {
+                        fotosCambiadas = false;
                         const primeraVez = !localStorage.getItem('gymId');
                         localStorage.setItem('gymId', response.body.id);
                         showCode(response.body.codigo);

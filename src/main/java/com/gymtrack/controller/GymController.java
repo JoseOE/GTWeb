@@ -74,6 +74,30 @@ public class GymController {
             }
             gym.setFoto(foto.isEmpty() ? null : m.group(1));
         }
+        // Las fotos de la portada (en orden) solo cambian si vienen; [] las quita.
+        // La primera queda también como "foto" (la de las opiniones).
+        if (request.getFotos() != null) {
+            if (request.getFotos().size() > Gym.MAX_FOTOS) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Puedes poner hasta " + Gym.MAX_FOTOS + " fotos del gimnasio."));
+            }
+            List<String> fotos = new ArrayList<>();
+            for (String f : request.getFotos()) {
+                Matcher m = FOTO.matcher(f == null ? "" : f.trim());
+                if (!m.matches()) {
+                    return ResponseEntity.badRequest().body(Map.of("error", "Las fotos del gimnasio deben subirse desde el panel."));
+                }
+                if (!fotos.contains(m.group(1))) fotos.add(m.group(1));
+            }
+            gym.setFotos(fotos);
+            gym.setFoto(fotos.isEmpty() ? null : fotos.get(0));
+        }
+        if (request.getTipografia() != null) {
+            String tipografia = request.getTipografia().trim().toLowerCase();
+            if (!tipografia.isEmpty() && !Gym.TIPOGRAFIAS.contains(tipografia)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Elige una de las tipografías de la lista."));
+            }
+            gym.setTipografia(tipografia.isEmpty() ? null : tipografia);
+        }
         gym.setColorPrimario(request.getColorPrimario());
         gym.setEnDirectorio(Boolean.TRUE.equals(request.getEnDirectorio()));
         gym.setCuotaMensual(request.getCuotaMensual());
@@ -163,6 +187,8 @@ public class GymController {
         v.put("maquinas", gym.getMaquinas());
         v.put("logo", gym.getLogo());
         v.put("foto", gym.getFoto());
+        v.put("fotos", gym.fotosPortada());
+        v.put("tipografia", gym.getTipografia());
         v.put("colorPrimario", gym.getColorPrimario());
         v.put("cuotaMensual", gym.getCuotaMensual());
         // Quién vende: la tienda lo muestra antes de comprar.
@@ -208,6 +234,8 @@ public class GymController {
         private List<String> maquinas;
         private String logo;
         private String foto;
+        private List<String> fotos;
+        private String tipografia;
         private String colorPrimario;
         private Boolean enDirectorio;
         private Double cuotaMensual;
@@ -227,6 +255,12 @@ public class GymController {
 
         public String getFoto() { return foto; }
         public void setFoto(String foto) { this.foto = foto; }
+
+        public List<String> getFotos() { return fotos; }
+        public void setFotos(List<String> fotos) { this.fotos = fotos; }
+
+        public String getTipografia() { return tipografia; }
+        public void setTipografia(String tipografia) { this.tipografia = tipografia; }
 
         public String getLogo() { return logo; }
         public void setLogo(String logo) { this.logo = logo; }

@@ -207,6 +207,9 @@ public class UserController {
                 // en pendiente o dado de baja: esas pantallas también lo usan.
                 gymView.put("logo", gym.getLogo());
                 gymView.put("colorPrimario", gym.getColorPrimario());
+                // La portada de Inicio en la app: fotos y tipografía del nombre.
+                gymView.put("fotos", gym.fotosPortada());
+                gymView.put("tipografia", gym.getTipografia());
                 if (user.tieneAccesoAlGimnasio()) {
                     // Los datos completos solo viajan si la membresía está activa:
                     // un usuario dado de baja deja de recibirlos, no solo de verlos.

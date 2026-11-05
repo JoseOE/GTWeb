@@ -799,6 +799,8 @@ Cada cuenta con gimnasio (el dueño, o un miembro ya aceptado) tiene **una opini
 
 La página de inicio las muestra en el carrusel "Lo que dicen los gimnasios" (`js/opiniones.js`); si no hay ninguna, la sección no aparece. La foto del gimnasio se sube en Mi Gimnasio (`foto` en `POST /api/gyms`; solo se acepta una imagen subida a GymTrack).
 
+> **Portada de la app.** En Mi Gimnasio → "Portada de la app" el dueño sube hasta 6 fotos (con su orden) y elige la letra del nombre del gimnasio entre las que trae la app: Poppins, Bebas Neue, Oswald, Anton, Montserrat y Playfair Display (`Gym.TIPOGRAFIAS`). Se guardan con `fotos` (lista; `[]` las quita) y `tipografia` en `POST /api/gyms`; la primera foto queda también como `foto`. La app las recibe en `gym.fotos` y `gym.tipografia` de `/api/users/{id}/me` y arma el carrusel de Inicio. Las letras viven en `static/fonts/portada` (licencia SIL OFL), las mismas que la app, para que la vista previa del panel se vea igual.
+
 ### Datos de demostración
 
 `pruebas/demo-datos.mjs` crea 6 gimnasios completos para mostrar la plataforma: Maximus, Alfa, Lunas, Spartans, Vikings y Titanium Sport. Cada uno lleva:
