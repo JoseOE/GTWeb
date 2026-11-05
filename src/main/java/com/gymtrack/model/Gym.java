@@ -30,7 +30,14 @@ public class Gym {
     // antes de subirlo, así no hace falta contratar almacenamiento aparte.
     private String logo;
     // Foto del gimnasio (/api/imagenes/{id}): sale con las opiniones de la página de inicio.
+    // Es siempre la primera de "fotos".
     private String foto;
+    // Portada de la app: hasta 6 fotos (/api/imagenes/{id}) que pasan en el
+    // carrusel de Inicio, en el orden que eligió el dueño.
+    private List<String> fotos = new ArrayList<>();
+    // Tipografía del nombre del gimnasio en esa portada (ver TIPOGRAFIAS).
+    // null = la de GymTrack (Poppins).
+    private String tipografia;
     // Color de acento del gimnasio en hex (#RRGGBB). La app tiñe su interfaz con él.
     private String colorPrimario;
     // Si aparece en el directorio público de gimnasios de la app.
@@ -50,10 +57,27 @@ public class Gym {
     // Correo para dudas, cancelaciones y aclaraciones de compras.
     private String correoContacto;
 
+    // Las que la app trae incluidas: el panel solo ofrece estas.
+    public static final java.util.Set<String> TIPOGRAFIAS =
+            java.util.Set.of("poppins", "bebas-neue", "oswald", "anton", "montserrat", "playfair");
+    public static final int MAX_FOTOS = 6;
+
     public Gym() {}
 
     public String getFoto() { return foto; }
     public void setFoto(String foto) { this.foto = foto; }
+
+    public List<String> getFotos() { return fotos; }
+    public void setFotos(List<String> fotos) { this.fotos = fotos; }
+
+    public String getTipografia() { return tipografia; }
+    public void setTipografia(String tipografia) { this.tipografia = tipografia; }
+
+    // Las fotos de la portada; un gimnasio de antes, con una sola foto, la usa.
+    public List<String> fotosPortada() {
+        if (fotos != null && !fotos.isEmpty()) return fotos;
+        return foto == null ? List.of() : List.of(foto);
+    }
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
