@@ -801,6 +801,8 @@ La página de inicio las muestra en el carrusel "Lo que dicen los gimnasios" (`j
 
 > **Portada de la app.** En Mi Gimnasio → "Portada de la app" el dueño sube hasta 6 fotos (con su orden) y elige la letra del nombre del gimnasio entre las que trae la app: Poppins, Bebas Neue, Oswald, Anton, Montserrat y Playfair Display (`Gym.TIPOGRAFIAS`). Se guardan con `fotos` (lista; `[]` las quita) y `tipografia` en `POST /api/gyms`; la primera foto queda también como `foto`. La app las recibe en `gym.fotos` y `gym.tipografia` de `/api/users/{id}/me` y arma el carrusel de Inicio. Las letras viven en `static/fonts/portada` (licencia SIL OFL), las mismas que la app, para que la vista previa del panel se vea igual.
 
+> **Anuncios del gimnasio.** En la pestaña Anuncios del panel el dueño publica avisos para sus miembros: título (3 a 60 caracteres), texto (hasta 400), tipo (`aviso`, `promocion` o `cierre`) y vigencia (`desde`; `hasta` es opcional). Cada uno queda vigente, programado, vencido o pausado. Con "Avisar a mis miembros" sale una notificación, una sola vez y solo si ya está vigente, a los miembros activos con la app. Rutas: `/api/gyms/{gymId}/anuncios` (panel: listar, crear, `PUT /{id}`, `POST /{id}/pausa`, `DELETE /{id}`) y `GET /api/anuncios` (la app: los vigentes del gimnasio de quien tiene la sesión). Prueba: `pruebas/anuncios.mjs`.
+
 ### Datos de demostración
 
 `pruebas/demo-datos.mjs` crea 6 gimnasios completos para mostrar la plataforma: Maximus, Alfa, Lunas, Spartans, Vikings y Titanium Sport. Cada uno lleva:
