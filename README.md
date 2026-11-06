@@ -1124,7 +1124,7 @@ El lector habla con el backend por HTTPS (TLS) sobre WiFi, o por LTE-M / 2G con 
 
 | Tecnología | Uso |
 |---|---|
-| Java 17 + Spring Boot 3.2 | API REST y servidor de la página |
+| Java 17 + Spring Boot 3.5 | API REST y servidor de la página |
 | MongoDB Atlas + Spring Data MongoDB | Base de datos NoSQL en la nube |
 | API de Brevo + Thymeleaf | Correos de la cuenta con plantillas HTML |
 | BCrypt (spring-security-crypto) | Cifrado de contraseñas |
