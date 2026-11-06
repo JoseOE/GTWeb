@@ -48,7 +48,7 @@ GitHub Pages solo sirve archivos estáticos, así que ahí funcionan la página 
 | `verificar.html` | Verificar el correo con el código de 6 dígitos o con el botón del correo. |
 | `login.html` | Iniciar sesión; incluye "¿Olvidaste tu contraseña?". |
 | `recuperar.html` y `restablecer.html` | Pedir un enlace por correo y crear una contraseña nueva. |
-| `bienvenido.html` | Panel del gimnasio: datos del gimnasio, miembros, pagos, máquinas, rutinas y la tienda (mostrador, ventas, productos y planes). |
+| `bienvenido.html` | Panel del gimnasio: datos del gimnasio, miembros, pagos, máquinas, rutinas y la tienda (mostrador, ventas, productos y planes). Su código está en `js/panel/`, un archivo por pestaña, cargados en orden. |
 | `cuenta.html` | Mi cuenta: cambiar contraseña y correo. |
 | `tienda.html` | Tienda del gimnasio para sus miembros: planes, productos, categorías y búsqueda. |
 | `producto.html` | Detalle de un producto o plan: presentación, sabor, precio, stock y cantidad. |
