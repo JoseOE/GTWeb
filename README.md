@@ -439,32 +439,9 @@ Cada variante guarda `existencias` y `apartadas`; `disponible = existencias − 
 - **Atómico.** Cada movimiento es un `findAndModify` condicionado a `disponible >= cantidad`. Si dos personas compran la última pieza a la vez, solo una pasa; la otra recibe 409 "Ya no hay suficientes piezas de «…»". Un pedido de varias partidas toma todo o nada.
 - **Una sola vez.** El pedido guarda qué tomó (`Pedido.inventario`) y su estado (`apartado`, `descontado`, `devuelto`); devolverlo cambia ese estado primero, así que nunca se devuelve dos veces.
 
-### Migrar la tienda de Medusa (una sola vez)
+### De dónde viene la tienda
 
-Los gimnasios que ya vendían con Medusa se traen a MongoDB con un endpoint de un solo uso. Lo corre el dueño de cada gimnasio, con sesión:
-
-```http
-POST /api/gyms/{gymId}/tienda/migrar-medusa
-Authorization: Bearer <token del dueño>
-Content-Type: application/json
-
-{"medusaUrl": "https://<servicio de Medusa>.onrender.com", "adminToken": "sk_..."}
-```
-
-- **Qué trae.** Productos, planes, stock y pedidos de ese gimnasio, con el mismo id. Lo que ya está en MongoDB no se duplica, así que se puede correr otra vez sin problema. Al final alinea el folio para que los pedidos nuevos sigan la numeración.
-- **Qué responde.** `productosNuevos`, `planesNuevos`, `productosYaEstaban`, `pedidosNuevos`, `pedidosCompletados`, `pedidosYaEstaban` y `avisos` (p. ej. un plan pagado que nunca se aplicó).
-- **La llave.** La `sk_...` viaja solo en esa petición y no se guarda.
-- **Cuándo.** Justo después de desplegar esta versión y antes de apagar Medusa. Los recibos de los pedidos migrados se siguen descargando igual.
-
-### Apagar Medusa en Render y Neon
-
-Cuando la migración de todos los gimnasios terminó y los pedidos aparecen en Ventas:
-
-1. **Comprueba.** En el panel, Ventas muestra los pedidos de antes con sus recibos, y Productos y Planes muestran lo migrado con su stock.
-2. **Variables de `gtweb`.** En Render → `gtweb` → **Environment**, borra `MEDUSA_URL`, `MEDUSA_ADMIN_TOKEN` y `MEDUSA_WEBHOOK_SECRET` y guarda con **Save, rebuild, and deploy**. Spring ya no las lee.
-3. **Servicio de Medusa.** En Render → el servicio de la tienda (`gymtrack-tienda`) → **Settings** → **Suspend Web Service**. Déjalo suspendido unos días (si hiciera falta volver a migrar, se reanuda con **Resume**); después, **Delete Web Service**.
-4. **Base en Neon.** En https://console.neon.tech, abre el proyecto de la tienda. Si quieres un respaldo, descárgalo antes (`pg_dump "<cadena de Neon>" > medusa-respaldo.sql`). Luego **Settings** → **Delete project**.
-5. **Secretos.** Revoca la `sk_...` de Medusa si la guardaste en otro lado. La cadena de Neon deja de servir al borrar el proyecto.
+La tienda empezó en Medusa.js con PostgreSQL y se migró a MongoDB en 2026 (PRs #38 a #42). La migración ya se hizo y su código se quitó (`MigracionMedusaService`); los pedidos y productos de entonces conservan su id y sus recibos.
 
 ### API de la tienda
 
@@ -674,7 +651,6 @@ Los rechazos llegan al checkout como 402 con el mensaje para el comprador, y el 
 |---|---|---|
 | GET | `/api/tienda/estado` | Siempre `{"lista": true}` (se conserva para las versiones de la app que lo consultan) |
 | GET | `/api/tienda/categorias` | `[{handle, nombre}]`: suplementos, bebidas, snacks, accesorios, membresias |
-| POST | `/api/gyms/{gymId}/tienda/migrar-medusa` | Migración de un solo uso desde Medusa (solo el dueño). Ver "Migrar la tienda de Medusa". |
 
 **Producto** (lo que reciben y mandan el panel y la app):
 
@@ -875,7 +851,6 @@ El recibo se descarga de `GET /api/recibos/pedidos/{orderId}.pdf` con `fetch` y 
 | 409 "Ya no hay suficientes piezas de «…»" al pagar | Alguien más se llevó las últimas piezas. El carrito se corrige al volver a abrirlo. |
 | 409 "Tu pago ya se está procesando" | El mismo carrito se está cobrando en otra pestaña o dispositivo. Espera unos segundos y revisa "Mis pedidos". |
 | Una ficha Paynet vencida sigue "Pendiente de pago" | Se cancelan cada 15 minutos; para hacerlo en el acto, `POST /api/simuladores/paynet/vencidas` como dueño. |
-| La migración responde 401 o 404 de Medusa | Revisa `medusaUrl` (sin `/` al final) y que la `sk_...` sea de esa base. |
 
 ---
 
