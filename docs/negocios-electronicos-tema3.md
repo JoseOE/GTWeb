@@ -35,7 +35,7 @@ La tienda vive en **MongoDB Atlas** (NoSQL, documentos). Cada documento guarda j
 | `bitacora` | Eventos de seguridad (ISO 27001) | `tipo`, `userId`, `gymId`, `ip`, `fecha` (TTL de 180 días) |
 | `tokens_tarjeta`, `vinculos_paypal` | Solo los simuladores del CI (`PAGOS_MODO=simulado`) | Token de un solo uso, cuenta vinculada |
 
-Antes, la tienda corría en **Medusa.js con PostgreSQL** (modelo relacional, SQL). Se migró a MongoDB sin cambiar la API: la tienda se volvió más rápida y se quitó un servicio que costaba memoria en Render. `MigracionMedusaService` pasa los pedidos de las tablas de Postgres a documentos.
+Antes, la tienda corría en **Medusa.js con PostgreSQL** (modelo relacional, SQL). Se migró a MongoDB sin cambiar la API: la tienda se volvió más rápida y se quitó un servicio que costaba memoria en Render. La migración pasó los pedidos de las tablas de Postgres a documentos; ya se hizo y su código se quitó.
 
 ### 02. Catálogo y búsqueda de productos
 
