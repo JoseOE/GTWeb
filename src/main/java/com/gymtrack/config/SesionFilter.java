@@ -1,6 +1,6 @@
 package com.gymtrack.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.gymtrack.repository.GymRepository;
 import com.gymtrack.repository.MachineRepository;
 import com.gymtrack.repository.RoutineRepository;
