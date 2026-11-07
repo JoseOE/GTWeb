@@ -17,6 +17,9 @@ public class PushService {
 
     private static final Logger log = LoggerFactory.getLogger(PushService.class);
     private static final String EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
+    // Canal de Android que crea la app con importancia máxima (lib/notifications.ts
+    // en GTApp): con él y prioridad alta, el aviso sale flotante aunque la app esté cerrada.
+    static final String CANAL_ANDROID = "gymtrack-alertas";
 
     private final RestClient restClient = RestClient.create();
 
@@ -35,6 +38,8 @@ public class PushService {
                             "title", titulo,
                             "body", cuerpo,
                             "sound", "default",
+                            "channelId", CANAL_ANDROID,
+                            "priority", "high",
                             "data", data == null ? Map.of() : data
                     ))
                     .retrieve()
