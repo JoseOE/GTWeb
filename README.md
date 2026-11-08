@@ -925,8 +925,25 @@ Al arrancar sin emparejar, el monitor muestra el código de 11 dígitos para la 
 | POST · DELETE | `/api/gyms/{gymId}/acceso/tarjetas` · `/tarjetas/{id}` | Ligar un tag a un socio · quitarlo |
 | POST · DELETE | `/api/gyms/{gymId}/acceso/lectores/{lectorId}/registro` | Modo registro: el siguiente tag que pase se captura para asignarlo |
 | POST | `/api/gyms/{gymId}/acceso/solicitudes/{id}/abrir` · `/negar` | Atender una alerta de acceso negado |
+| GET · POST | `/api/tienda/renovacion` | App: ver y preparar la renovación tras un acceso negado por membresía vencida (ver abajo) |
 
 Las rutas `/api/lectores/*` piden el encabezado `X-Lector-Key`; las del panel, la sesión del dueño. Para probar sin placas: `node pruebas/lector-rfid.mjs preparar|probar|limpiar`.
+
+### Renovar desde la puerta
+
+Si el lector niega la entrada por **membresía vencida**, el socio puede renovar en ese momento desde la app y la puerta se abre sola:
+
+1. **El aviso.** Al negarse la entrada se crea la alerta de siempre para el dueño y, además, al socio le llega un **push**: "Tu membresía venció · Renueva tu Mensual por $480.00 desde la app y la puerta se abre en cuanto se confirme el pago". Solo sale con una alerta nueva: si vuelve a pasar la tarjeta, no le llegan más avisos.
+   - El `data` del push es `{tipo: "renovar_membresia", gymId, solicitudId, planId, varianteId, venceEn}`.
+   - El plan sugerido es el que tenía, si sigue a la venta; si no, el destacado, el de un mes o el más barato.
+2. **La pantalla de renovación.** Al tocar el aviso, la app pide `GET /api/tienda/renovacion` → `{vencida, fechaProximoPago, planActual, plan, planes, puerta}`. En `puerta` viene la alerta (`PENDIENTE`, `APROBADA` o `EXPIRADA`) con `venceEn`, para mostrar cuánto tiempo queda.
+3. **Preparar el pago.** `POST /api/tienda/renovacion?canal=app {planId?}` deja el carrito de la app con ese plan solo y lo devuelve en `carrito`. De ahí se paga con el checkout de siempre: tarjeta, PayPal o efectivo en tienda.
+4. **La puerta se abre.** Al confirmarse el pago, la membresía se extiende y, si la alerta sigue pendiente (10 minutos), se aprueba sola. El lector recibe `abrir` por `/api/lectores/comandos` y queda la ENTRADA "Abierta al renovar desde la app" en el historial.
+   - Con efectivo en tienda la puerta solo se abre si la ficha se paga dentro de esos 10 minutos.
+   - Si ya pasaron, la membresía queda al día y basta con volver a pasar la tarjeta.
+   - Lo mismo pasa si el dueño le vende el plan en el mostrador mientras el socio espera en la puerta.
+
+Prueba: `pruebas/renovar-puerta.mjs`, incluida en `correr-todas`.
 
 ---
 

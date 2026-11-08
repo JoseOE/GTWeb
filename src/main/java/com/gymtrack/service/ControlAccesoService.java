@@ -45,12 +45,18 @@ import java.util.stream.Collectors;
 //   - socio dentro                         -> SALIDA (salir no se valida)
 //   - membresía vencida o tag desconocido  -> NEGADO, y queda una solicitud
 //     para que el dueño vea las fotos de la XIAO y decida si abre.
+//   - membresía vencida: además le llega al socio un push para renovar desde
+//     la app; si paga mientras la alerta sigue vigente, se abre sola
+//     (RenovacionAccesoService y abrirTrasRenovar).
 // La decisión del dueño le llega al lector por /api/lectores/comandos, que el
 // lector consulta todo el tiempo (long polling): así no hace falta MQTT.
 @Service
 public class ControlAccesoService {
 
     public static final String LLAVE = "X-Lector-Key";
+    public static final String MOTIVO_VENCIDA = "Membresía vencida";
+    // Quién "atendió" una alerta que se abrió sola porque el socio renovó.
+    public static final String ATENDIDA_POR_RENOVACION = "renovacion";
 
     // Entre un pase y el siguiente del mismo socio (en la puerta real, 2 min).
     static final Duration MINIMO_ENTRE_PASES = Duration.ofSeconds(10);
@@ -78,17 +84,19 @@ public class ControlAccesoService {
     private final SolicitudAccesoRepository solicitudes;
     private final FotoAccesoRepository fotos;
     private final UserRepository users;
+    private final RenovacionAccesoService renovacion;
     private final MongoTemplate mongo;
 
     public ControlAccesoService(LectorRepository lectores, TarjetaRepository tarjetas, AccesoRepository accesos,
                                 SolicitudAccesoRepository solicitudes, FotoAccesoRepository fotos, UserRepository users,
-                                MongoTemplate mongo) {
+                                MongoTemplate mongo, RenovacionAccesoService renovacion) {
         this.lectores = lectores;
         this.tarjetas = tarjetas;
         this.accesos = accesos;
         this.solicitudes = solicitudes;
         this.fotos = fotos;
         this.users = users;
+        this.renovacion = renovacion;
         this.mongo = mongo;
     }
 
@@ -188,7 +196,7 @@ public class ControlAccesoService {
             return conAforo(respuesta(Acceso.SALIDA, socio.getNombre(), null, null), lector.getGymId());
         }
         if (!membresiaVigente(socio)) {
-            return negar(lector, epc, socio, "Membresía vencida");
+            return negar(lector, epc, socio, MOTIVO_VENCIDA);
         }
         guardarAcceso(lector, epc, socio.getId(), socio.getNombre(), Acceso.ENTRADA, null, null);
         return conAforo(respuesta(Acceso.ENTRADA, socio.getNombre(), null, null), lector.getGymId());
@@ -232,6 +240,8 @@ public class ControlAccesoService {
         s.setCreadaEn(ahora);
         s = solicitudes.save(s);
         guardarAcceso(lector, epc, s.getUserId(), nombre, Acceso.NEGADO, motivo, s.getId());
+        // Solo con una alerta nueva: si vuelve a pasar la tarjeta, no le llegan más avisos.
+        if (socio != null && MOTIVO_VENCIDA.equals(motivo)) renovacion.avisarVencida(socio, s);
         Map<String, Object> r = respuesta(Acceso.NEGADO, nombre, motivo, s.getId());
         r.put("fotos", true);
         return r;
@@ -492,33 +502,72 @@ public class ControlAccesoService {
     public Map<String, Object> atender(String gymId, String solicitudId, boolean abrir, String duenoId) {
         SolicitudAcceso s = solicitudes.findById(solicitudId).filter(x -> gymId.equals(x.getGymId()))
                 .orElseThrow(() -> new TiendaException(HttpStatus.NOT_FOUND, "Esa alerta no existe."));
-        Instant ahora = Instant.now();
-        String estado = estadoDe(s, ahora);
+        String estado = estadoDe(s, Instant.now());
         if (!SolicitudAcceso.PENDIENTE.equals(estado)) {
             throw new TiendaException(HttpStatus.CONFLICT, "EXPIRADA".equals(estado)
                     ? "Pasaron más de 10 minutos: la persona ya no está en la puerta."
                     : "Esa alerta ya se atendió.");
         }
+        decidir(s, abrir, duenoId, "Abierta desde el panel");
+        return Map.of("id", s.getId(), "estado", s.getEstado());
+    }
+
+    // Aprueba o rechaza la alerta. El lector recibe el comando por
+    // /api/lectores/comandos; al abrir, queda la ENTRADA en el historial.
+    private void decidir(SolicitudAcceso s, boolean abrir, String atendidaPor, String motivoEntrada) {
+        Instant ahora = Instant.now();
         s.setEstado(abrir ? SolicitudAcceso.APROBADA : SolicitudAcceso.RECHAZADA);
         s.setAtendidaEn(ahora);
-        s.setAtendidaPor(duenoId);
+        s.setAtendidaPor(atendidaPor);
         s.setComandoEntregado(false);
         solicitudes.save(s);
         if (abrir) {
             Lector lector = lectores.findById(s.getLectorId()).orElse(null);
             Acceso a = new Acceso();
-            a.setGymId(gymId);
+            a.setGymId(s.getGymId());
             a.setLectorId(s.getLectorId());
             a.setEpc(s.getEpc());
             a.setUserId(s.getUserId());
             a.setNombre(s.getNombre() == null ? "Visitante" : s.getNombre());
             a.setTipo(Acceso.ENTRADA);
-            a.setMotivo("Abierta desde el panel" + (lector == null ? "" : " (" + lector.getNombre() + ")"));
+            a.setMotivo(motivoEntrada + (lector == null ? "" : " (" + lector.getNombre() + ")"));
             a.setSolicitudId(s.getId());
             a.setFecha(ahora);
             accesos.save(a);
         }
-        return Map.of("id", s.getId(), "estado", s.getEstado());
+    }
+
+    // ─────────────────────────── Renovar desde la puerta ───────────────────────────
+
+    // La alerta más reciente de la puerta para este socio, si es de los últimos 10 minutos.
+    public Optional<SolicitudAcceso> alertaReciente(String userId) {
+        return solicitudes.findFirstByUserIdAndCreadaEnAfterOrderByCreadaEnDesc(userId, Instant.now().minus(VIGENCIA_SOLICITUD));
+    }
+
+    // Lo que ve la app de esa alerta: si sigue esperando, si ya se abrió o si venció.
+    public Map<String, Object> vistaAlerta(SolicitudAcceso s) {
+        Map<String, Object> v = new LinkedHashMap<>();
+        v.put("solicitudId", s.getId());
+        v.put("estado", estadoDe(s, Instant.now()));
+        v.put("motivo", s.getMotivo());
+        v.put("creadaEn", s.getCreadaEn());
+        v.put("venceEn", s.getCreadaEn().plus(VIGENCIA_SOLICITUD));
+        v.put("abiertaPorRenovacion", ATENDIDA_POR_RENOVACION.equals(s.getAtendidaPor()));
+        v.put("lector", lectores.findById(s.getLectorId()).map(Lector::getNombre).orElse(null));
+        return v;
+    }
+
+    // Se acaba de confirmar un pago que extendió la membresía: si el socio sigue
+    // en la puerta (su alerta por membresía vencida sigue pendiente) y ya está al
+    // día, se abre sin que vuelva a pasar la tarjeta. true si abrió.
+    public boolean abrirTrasRenovar(User socio) {
+        if (socio == null || !membresiaVigente(socio)) return false;
+        Instant ahora = Instant.now();
+        Optional<SolicitudAcceso> alerta = alertaReciente(socio.getId())
+                .filter(s -> MOTIVO_VENCIDA.equals(s.getMotivo()) && SolicitudAcceso.PENDIENTE.equals(estadoDe(s, ahora)));
+        if (alerta.isEmpty()) return false;
+        decidir(alerta.get(), true, ATENDIDA_POR_RENOVACION, "Abierta al renovar desde la app");
+        return true;
     }
 
     public FotoAcceso foto(String gymId, String id) {
@@ -528,7 +577,7 @@ public class ControlAccesoService {
 
     // ─────────────────────────── Reglas ───────────────────────────
 
-    static boolean membresiaVigente(User u) {
+    public static boolean membresiaVigente(User u) {
         return Boolean.TRUE.equals(u.getMembershipActive())
                 && (u.getFechaProximoPago() == null || !u.getFechaProximoPago().isBefore(Fechas.hoy()));
     }
