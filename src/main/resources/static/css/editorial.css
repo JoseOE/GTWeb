@@ -1988,6 +1988,55 @@ button,a,input,summary {
     }
 }
 
+/* Soluciones destacadas: en tinta, para que la fila tenga jerarquía y no sean
+   once tarjetas iguales. Contraste sobre #20221f: papel 14.3:1, texto 9.4:1,
+   verde 9.1:1. */
+.solucion.es-destacado {
+    background:var(--ink);
+    border-color:var(--ink);
+    color:var(--paper)
+}
+.solucion.es-destacado h3,
+.solucion.es-destacado .solucion-precio {
+    color:var(--paper)
+}
+.solucion.es-destacado p {
+    color:#c6c7bd
+}
+.solucion.es-destacado .solucion-precio .text-body-secondary {
+    color:#c6c7bd!important
+}
+.solucion.es-destacado .solucion-precio .text-success {
+    color:#86d49f!important
+}
+.solucion.es-destacado .solucion-pie {
+    border-top-color:rgba(244,242,235,.16)
+}
+.solucion.es-destacado .solucion-icono {
+    background:var(--brand);
+    color:var(--ink);
+    box-shadow:0 0 0 4px var(--ink)
+}
+.solucion.es-destacado .solucion-foto img {
+    filter:saturate(.85)
+}
+.solucion.es-destacado .solucion-cta {
+    border-color:var(--paper);
+    color:var(--paper)
+}
+.solucion.es-destacado:hover {
+    border-color:var(--ink)
+}
+.solucion.es-destacado:hover .solucion-cta,
+.solucion.es-destacado .solucion-cta:focus-visible {
+    background:var(--brand);
+    border-color:var(--brand);
+    color:var(--ink)
+}
+.solucion.es-destacado:hover .solucion-icono {
+    background:var(--paper)
+}
+
 /* ─── Modal del detalle de una solución ─── */
 .solucion-modal .modal-content {
     border-radius:16px!important

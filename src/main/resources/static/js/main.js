@@ -345,7 +345,7 @@ function renderServices() {
             const nombre = s.nombre || 'Servicio sin nombre';
             const cotizable = cat === 'hardware' && s.precio > 0;
             return `
-                <article class="solucion" role="group" aria-roledescription="diapositiva" aria-label="${posicion + 1} de ${visibles.length}: ${escapeHtml(nombre)}" style="--orden:${posicion}">
+                <article class="solucion${s.destacado ? ' es-destacado' : ''}" role="group" aria-roledescription="diapositiva" aria-label="${posicion + 1} de ${visibles.length}: ${escapeHtml(nombre)}" style="--orden:${posicion}">
                     <figure class="solucion-foto">
                         <img src="${escapeHtml(s.imagen || IMAGEN_SERVICIO_DEFECTO)}" alt="" loading="lazy" decoding="async" data-fallback="${IMAGEN_SERVICIO_DEFECTO}">
                         ${cat ? `<span class="solucion-cat">${escapeHtml(etiquetaCategoria(cat))}</span>` : ''}
