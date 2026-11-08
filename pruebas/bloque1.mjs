@@ -106,6 +106,7 @@ const antes = (await api('GET', `/api/users/${member.id}/me`)).body;
 r = await comprar([{ varianteId: planes.Mensual.varianteId }, { varianteId: bote.id, cantidad: 2 }], 'stripe', '4242424242424242');
 const orden1 = r.body;
 ok(r.status === 200 && orden1.estado === 'pagado' && /^order_/.test(orden1.orderId), 'pedido pagado', { folio: orden1.folio, estado: orden1.estado });
+ok(orden1.folio === 1, 'cada gimnasio numera sus pedidos: el primero es el #1', orden1.folio);
 let yo = (await api('GET', `/api/users/${member.id}/me`)).body;
 ok(yo.planActual === 'Mensual' && yo.fechaProximoPago, 'membresía extendida al pagar', { antes: antes.fechaProximoPago, despues: yo.fechaProximoPago, dia: yo.diaDePago });
 let pagos = (await api('GET', `/api/gyms/${gymId}/members/${member.id}/payments`, null, owner.id)).body;

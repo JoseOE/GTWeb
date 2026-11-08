@@ -121,7 +121,7 @@ public class PedidoService {
         Instant ahora = Instant.now();
         Pedido p = new Pedido();
         p.setOrderId(orderId);
-        p.setFolio(folios.siguiente());
+        p.setFolio(folios.siguiente(v.gymId()));
         p.setGymId(v.gymId());
         p.setUserId(v.userId());
         p.setEmail(v.email());

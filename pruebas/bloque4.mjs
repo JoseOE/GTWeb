@@ -87,8 +87,8 @@ ok(venceDespues !== venceAntes, 'la Visita del pedido Paynet se aplicó al pagar
 r = await api('POST', `/api/simuladores/paynet/${ficha.orderId}/pagar`, null, owner);
 ok(r.status === 409, 'pagar dos veces → 409', r.body.error);
 await espera(2500);
-ok(lineasLog('Tu ficha de pago en efectivo').some(l => l.includes('#' + ficha.folio)), 'correo con la ficha', lineasLog('Tu ficha de pago en efectivo').slice(-1)[0]?.slice(-70));
-ok(lineasLog('Recibimos tu pago').some(l => l.includes('#' + ficha.folio)), 'correo "Recibimos tu pago" con recibo', lineasLog('Recibimos tu pago').slice(-1)[0]?.slice(-70));
+ok(lineasLog('Tu ficha de pago en efectivo').some(l => l.includes('pedido #' + ficha.folio + '"')), 'correo con la ficha', lineasLog('Tu ficha de pago en efectivo').slice(-1)[0]?.slice(-70));
+ok(lineasLog('Recibimos tu pago').some(l => l.includes('pedido #' + ficha.folio + '"')), 'correo "Recibimos tu pago" con recibo', lineasLog('Recibimos tu pago').slice(-1)[0]?.slice(-70));
 b = await binario(`/api/recibos/pedidos/${ficha.orderId}.pdf`, member);
 ok(b.status === 200, 'ahora sí tiene recibo');
 
@@ -127,9 +127,12 @@ ok(lineasLog('Tu recibo de').length >= 1, 'correo del recibo de mensualidad', li
 console.log('\n5. Sin duplicados');
 for (let i = 0; i < 3; i++) await api('GET', `/api/tienda/pedidos/${ficha.orderId}`, null, member);
 await espera(1500);
-const veces = lineasLog('Recibimos tu pago').filter(l => l.includes('#' + ficha.folio + ' ') || l.endsWith('#' + ficha.folio + '"')).length;
-const compras = lineasLog('Tu compra en').filter(l => l.includes('#' + pagado.folio)).length;
-ok(lineasLog('Recibimos tu pago').filter(l => l.includes('pedido #' + ficha.folio + '"')).length === 1, 'el aviso de pago Paynet salió una sola vez', veces);
+// Los folios son por gimnasio: el correo del miembro distingue sus avisos de los de otros gimnasios.
+const correoMiembro = (await api('GET', `/api/users/${member}/me`)).body.email;
+const delMiembro = (asunto, folio) => lineasLog(asunto).filter(l => l.includes('pedido #' + folio + '"') && l.includes(correoMiembro));
+const veces = delMiembro('Recibimos tu pago', ficha.folio).length;
+const compras = delMiembro('Tu compra en', pagado.folio).length;
+ok(veces === 1, 'el aviso de pago Paynet salió una sola vez', veces);
 ok(compras === 2, 'compra: un correo automático + el reenvío pedido', compras);
 ok(lineasLog('La plantilla de correo').length === 0, 'las plantillas se arman sin errores', lineasLog('La plantilla de correo').slice(-1)[0]);
 

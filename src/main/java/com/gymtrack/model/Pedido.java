@@ -24,6 +24,8 @@ import java.util.Map;
 @CompoundIndexes({
         // Lista de ventas del panel: los pedidos de un gimnasio, del más nuevo al más viejo.
         @CompoundIndex(name = "gimnasio_creado", def = "{'gymId': 1, 'creadoEn': -1}"),
+        // Folio por gimnasio: buscar "#12" en Ventas y arrancar su contador.
+        @CompoundIndex(name = "gimnasio_folio", def = "{'gymId': 1, 'folio': -1}"),
         // Resumen de ventas: lo pagado de un gimnasio por fecha de pago.
         @CompoundIndex(name = "gimnasio_estado_pagado", def = "{'gymId': 1, 'estado': 1, 'pagadoEn': -1}"),
         // Fichas Paynet pendientes (las revisa el cancelador de vencidas).
@@ -45,7 +47,7 @@ public class Pedido {
     // Id público del pedido (order_...), con el mismo formato que usaba Medusa.
     @Indexed(unique = true)
     private String orderId;
-    // Folio corto que ve el cliente (#12).
+    // Folio corto que ve el cliente (#12). Cada gimnasio lleva su numeración (FolioService).
     private Long folio;
     private String gymId;
     // null en ventas de mostrador a "Público en general".
