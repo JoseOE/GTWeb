@@ -2038,3 +2038,92 @@ button,a,input,summary {
     position:absolute;
     inset:-17px -6px
 }
+
+/* ═══════════════════════════════════════
+   Pulido global (toda la web carga este archivo)
+   ───────────────────────────────────────
+   - Respuesta al presionar: el control reacciona en cuanto el dedo o el
+     botón del mouse baja, no hasta soltarlo.
+   - Barra de navegación translúcida al bajar, con versión sólida para
+     quien pide menos transparencia o más contraste.
+   - Modales que aparecen con una escala corta y sin rebote; con "reducir
+     movimiento", solo un desvanecido.
+   - Títulos sin palabras sueltas y números tabulares en precios y conteos.
+═══════════════════════════════════════ */
+.gt-button:active,
+.btn:not(.input-group-text):active,
+.slider-flecha:active:not(:disabled),
+.opiniones-flecha:active,
+.catalog-filters button:active,
+.solucion-cta:active,
+.nav-login:active,
+.dash-nav-link:active {
+    transform:scale(.97)!important;
+    transition-duration:80ms!important
+}
+.gt-button,.slider-flecha,.opiniones-flecha,.catalog-filters button,.solucion-cta {
+    -webkit-tap-highlight-color:transparent
+}
+
+/* Barra de la portada: material translúcido sobre el contenido. */
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+    .gym-editorial #main-navbar {
+        transition:background-color .3s var(--ease-out),border-color .3s var(--ease-out)
+    }
+    .gym-editorial #main-navbar.scrolled {
+        background:rgba(32,34,31,.82);
+        -webkit-backdrop-filter:blur(18px) saturate(160%);
+        backdrop-filter:blur(18px) saturate(160%);
+        border-bottom-color:rgba(255,255,255,.08)
+    }
+}
+@media (prefers-reduced-transparency:reduce),(prefers-contrast:more) {
+    .gym-editorial #main-navbar.scrolled {
+        background:var(--ink);
+        -webkit-backdrop-filter:none;
+        backdrop-filter:none
+    }
+}
+
+/* Modales: entran con escala corta desde casi su lugar final. */
+.modal.fade .modal-dialog {
+    transform:translateY(14px) scale(.97);
+    transition:transform .34s var(--ease-out),opacity .22s ease-out
+}
+.modal.show .modal-dialog {
+    transform:none
+}
+.modal-backdrop.show {
+    opacity:.6
+}
+@media (prefers-reduced-motion:reduce) {
+    .modal.fade .modal-dialog {
+        transform:none;
+        transition:opacity .2s ease
+    }
+}
+
+/* Títulos de las páginas de acceso: la segunda línea se equilibra sola
+   ("ESTAMOS AQUÍ / PARA TI." en lugar de dejar "TI." sola). */
+.gym-interior .font-display .text-primary {
+    display:inline-block;
+    text-wrap:balance
+}
+.gym-interior .font-display {
+    text-wrap:balance;
+    letter-spacing:-.01em
+}
+
+/* Cifras que cambian (precios, conteos, totales) sin brincar de ancho. */
+.solucion-precio,.soluciones-conteo,.kpi-value,.ventas-dinero,.catalog-filters button span {
+    font-variant-numeric:tabular-nums
+}
+
+/* Mapa de la portada: los controles de Leaflet con la marca. */
+.gym-editorial .leaflet-bar a {
+    color:var(--ink)
+}
+.gym-editorial .leaflet-bar a:hover {
+    background:var(--brand);
+    color:var(--ink)
+}
