@@ -58,11 +58,13 @@ public class PedidoService {
     private final FolioService folios;
     private final ProductoRepository productoRepository;
     private final MongoTemplate mongo;
+    private final ControlAccesoService controlAcceso;
 
     public PedidoService(PedidoRepository pedidoRepository, GymRepository gymRepository,
                          UserRepository userRepository, BillingService billingService,
                          AvisosPedidoService avisos, InventarioService inventario, PagosService pagos,
-                         FolioService folios, ProductoRepository productoRepository, MongoTemplate mongo) {
+                         FolioService folios, ProductoRepository productoRepository, MongoTemplate mongo,
+                         ControlAccesoService controlAcceso) {
         this.pedidoRepository = pedidoRepository;
         this.gymRepository = gymRepository;
         this.userRepository = userRepository;
@@ -73,6 +75,7 @@ public class PedidoService {
         this.folios = folios;
         this.productoRepository = productoRepository;
         this.mongo = mongo;
+        this.controlAcceso = controlAcceso;
     }
 
     // ═══════════════════════════ COBRAR ═══════════════════════════
@@ -179,8 +182,25 @@ public class PedidoService {
     public void confirmarPago(Pedido p) {
         if (Pedido.ESTADO_PAGADO.equals(p.getEstado()) && !p.isPlanAplicado() && p.incluyePlan()) {
             aplicarPlan(p);
+            abrirPuertaSiEspera(p);
         }
         avisos.alActualizar(p, vista(p));
+    }
+
+    // Renovó parado en la puerta (el lector lo negó por membresía vencida hace
+    // menos de 10 minutos): ya está al día, así que se abre sin volver a pasar
+    // la tarjeta. Nunca hace fallar el pago.
+    private void abrirPuertaSiEspera(Pedido p) {
+        if (p.getUserId() == null) return;
+        try {
+            userRepository.findById(p.getUserId()).ifPresent(socio -> {
+                if (controlAcceso.abrirTrasRenovar(socio)) {
+                    log.info("Pedido #{}: {} renovó desde la puerta y se le abrió.", p.getFolio(), socio.getEmail());
+                }
+            });
+        } catch (RuntimeException e) {
+            log.warn("Pedido #{}: no se pudo abrir la puerta tras renovar: {}", p.getFolio(), e.getMessage());
+        }
     }
 
     private void aplicarPlan(Pedido p) {
