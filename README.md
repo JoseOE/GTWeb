@@ -711,7 +711,7 @@ Para crear o editar se manda `nombre`, `descripcion`, `categoria` (el handle), `
 
 **Pedidos (colección `pedidos`).** Cada pedido de la tienda, la app o el mostrador:
 
-- `orderId`, `folio` (contador atómico en `contadores`), `gymId`, `userId` (null en mostrador a público en general), `canal` (`web`, `app` o `mostrador`);
+- `orderId`, `folio` (cada gimnasio lleva su numeración desde el #1: un contador atómico por gimnasio en `contadores`, `folio:<gymId>`; los pedidos de antes se renumeraron una vez al desplegar, en el orden en que se crearon), `gymId`, `userId` (null en mostrador a público en general), `canal` (`web`, `app` o `mostrador`);
 - `estado`: `pendiente_pago`, `pagado`, `cancelado` o `reembolsado`. Cada cambio se condiciona al estado anterior, así que dos acciones a la vez no se pisan;
 - `proveedorPago`, `total`, `subtotal` (sin IVA), `iva` y `partidas` congeladas al cobrar;
 - `datosPago`: lo que guardó el simulador, sin nada sensible (`marca` y `ultimos4`; `recibido` y `cambio` en efectivo; los reembolsos). `PedidoService.detallePago(pedido)` lo convierte en texto ("Visa •••• 4242", "Efectivo · recibido $500.00, cambio $42.00", "Paynet · referencia 9301 2345 …", "PayPal · ana.compradora@sim-paypal.test");
