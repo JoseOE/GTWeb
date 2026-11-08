@@ -254,31 +254,6 @@ a:focus-visible, button:focus-visible, .btn:focus-visible,
 .icon-circle.icon-info    { background: rgba(13, 202, 240, 0.14); color: #087990; }
 .icon-circle.icon-success { background: rgba(25, 135, 84, 0.12); color: #146c43; }
 
-/* — Tarjetas de Servicios — */
-.service-card {
-    overflow: hidden;
-    transition: transform 0.35s var(--ease-out), box-shadow 0.35s var(--ease-out);
-    border-top: 3px solid transparent !important;
-}
-.service-card:hover {
-    transform: translateY(-10px);
-    box-shadow: var(--shadow-hover) !important;
-    border-top-color: var(--brand) !important;
-}
-.service-card .card-img-top-wrap { position: relative; overflow: hidden; }
-.service-card .card-img-top-wrap::after {
-    content: '';
-    position: absolute; inset: 0;
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.45) 100%);
-}
-.service-card .card-img-top {
-    height: 180px;
-    object-fit: cover;
-    transition: transform 0.6s var(--ease-out);
-}
-.service-card:hover .card-img-top {
-    transform: scale(1.08);
-}
 .service-icon {
     font-size: 1.7rem;
     color: #fff;
@@ -398,7 +373,7 @@ footer.bg-dark::before {
     .carousel-control-prev, .carousel-control-next { display: none; }
     .whatsapp-float { width: 52px; height: 52px; font-size: 28px; bottom: 18px; right: 18px; }
     section.py-5 { padding-top: 3rem !important; padding-bottom: 3rem !important; }
-    .card-hover:hover, .service-card:hover { transform: translateY(-4px); }
+    .card-hover:hover { transform: translateY(-4px); }
     .scroll-cue { display: none; }
 }
 

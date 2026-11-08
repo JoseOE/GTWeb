@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initScrollAnimations();
     initCounters();
     initServiceModal();
+    initSolucionesSlider();
     fetchServices();
     initServiceAutoRefresh();
     initMap();
@@ -305,10 +306,13 @@ function fetchServices(opciones = {}) {
 
 function renderServices() {
     const container = document.getElementById('services-container');
+    const filtrosCaja = document.getElementById('soluciones-filtros');
     if (!container) return;
 
     if (!currentServices.length) {
+        if (filtrosCaja) filtrosCaja.innerHTML = '';
         container.innerHTML = '<div class="catalog-state"><i class="bx bx-layer" aria-hidden="true"></i><div><h3>Estamos preparando el catálogo</h3><p>Cuéntanos qué necesita tu gimnasio y te orientamos.</p></div><a class="text-link dark-link" href="https://wa.me/527721013839" target="_blank" rel="noopener noreferrer">Consultar al equipo <i class="bx bx-right-arrow-alt" aria-hidden="true"></i></a></div>';
+        actualizarSlider();
         return;
     }
 
@@ -317,16 +321,16 @@ function renderServices() {
     const categorias = [...new Set(currentServices.map(s => normalizarCategoria(s.categoria)).filter(Boolean))];
     if (categoriaActiva !== 'todas' && !categorias.includes(categoriaActiva)) categoriaActiva = 'todas';
 
-    const filtros = categorias.length > 1 ? `
-        <div class="col-12">
+    if (filtrosCaja) {
+        filtrosCaja.innerHTML = categorias.length > 1 ? `
             <div class="catalog-filters" role="group" aria-label="Filtrar soluciones por categoría">
                 ${['todas', ...categorias].map(cat => `
                     <button type="button" data-categoria="${escapeHtml(cat)}" aria-pressed="${cat === categoriaActiva}">
                         ${cat === 'todas' ? 'Todas' : escapeHtml(etiquetaCategoria(cat))}
                         <span>${cat === 'todas' ? currentServices.length : currentServices.filter(s => normalizarCategoria(s.categoria) === cat).length}</span>
                     </button>`).join('')}
-            </div>
-        </div>` : '';
+            </div>` : '';
+    }
 
     // El índice original se conserva para que el modal abra el servicio correcto.
     const visibles = currentServices
@@ -337,39 +341,37 @@ function renderServices() {
     // solo se omite esa tarjeta y el resto del catálogo se sigue viendo.
     const tarjetas = visibles.map(({ s, i }, posicion) => {
         try {
-            const cat = normalizarCategoria(s.categoria).toUpperCase();
+            const cat = normalizarCategoria(s.categoria);
             const nombre = s.nombre || 'Servicio sin nombre';
-            const star = s.destacado ? '<span class="badge bg-warning text-dark position-absolute top-0 end-0 m-2 shadow-sm" style="z-index:2">⭐ Destacado</span>' : '';
-            const btn = cat === 'HARDWARE' ? 'Cotizar equipo' : 'Ver Detalles';
+            const cotizable = cat === 'hardware' && s.precio > 0;
             return `
-                <div class="col-md-6 col-lg-3 card-animate stagger-${(posicion % 8) + 1}">
-                    <div class="card h-100 border-0 shadow rounded-4 text-center position-relative bg-white service-card">
-                        ${star}
-                        <div class="overflow-hidden rounded-top-4 card-img-top-wrap">
-                            <img src="${escapeHtml(s.imagen || IMAGEN_SERVICIO_DEFECTO)}" class="card-img-top w-100" alt="${escapeHtml(nombre)}" loading="lazy" data-fallback="${IMAGEN_SERVICIO_DEFECTO}">
-                        </div>
-                        <div class="card-body p-4 position-relative pt-5">
-                            <div class="position-absolute top-0 start-50 translate-middle">
-                                <i class="bx ${escapeHtml(s.icono || 'bx-layer')} service-icon"></i>
-                            </div>
-                            ${cat ? `<span class="badge bg-body-tertiary text-body-secondary border mb-2">${escapeHtml(cat)}</span>` : ''}
-                            <h5 class="card-title fw-bold mb-2">${escapeHtml(nombre)}</h5>
-                            <p class="card-text text-body-secondary small">${escapeHtml(s.descripcion)}</p>
-                            <h5 class="text-primary fw-bold mt-3 mb-1">${precioHtml(s.precio)}</h5>
-                            ${s.duracion ? '<small class="text-body-secondary"><i class="bx bx-time-five"></i> ' + escapeHtml(s.duracion) + '</small>' : ''}
-                        </div>
-                        <div class="card-footer bg-white border-0 pb-4 pt-0 px-4">
-                            <button type="button" class="btn btn-outline-primary btn-sm rounded-pill w-100 fw-semibold" data-bs-toggle="modal" data-bs-target="#serviceModal" data-index="${i}">${btn}</button>
+                <article class="solucion${s.destacado ? ' es-destacado' : ''}" role="group" aria-roledescription="diapositiva" aria-label="${posicion + 1} de ${visibles.length}: ${escapeHtml(nombre)}" style="--orden:${posicion}">
+                    <figure class="solucion-foto">
+                        <img src="${escapeHtml(s.imagen || IMAGEN_SERVICIO_DEFECTO)}" alt="" loading="lazy" decoding="async" data-fallback="${IMAGEN_SERVICIO_DEFECTO}">
+                        ${cat ? `<span class="solucion-cat">${escapeHtml(etiquetaCategoria(cat))}</span>` : ''}
+                        ${s.destacado ? '<span class="solucion-destacado"><i class="bx bxs-star" aria-hidden="true"></i> Destacado</span>' : ''}
+                    </figure>
+                    <div class="solucion-cuerpo">
+                        <span class="solucion-icono" aria-hidden="true"><i class="bx ${escapeHtml(s.icono || 'bx-layer')}"></i></span>
+                        <h3>${escapeHtml(nombre)}</h3>
+                        <p>${escapeHtml(s.descripcion)}</p>
+                        <div class="solucion-pie">
+                            <span class="solucion-precio">${precioHtml(s.precio)}</span>
+                            <button type="button" class="solucion-cta" data-bs-toggle="modal" data-bs-target="#serviceModal" data-index="${i}">
+                                ${cotizable ? 'Cotizar' : 'Ver detalles'}<span class="visually-hidden"> de ${escapeHtml(nombre)}</span>
+                                <i class="bx bx-right-arrow-alt" aria-hidden="true"></i>
+                            </button>
                         </div>
                     </div>
-                </div>`;
+                </article>`;
         } catch (e) {
             console.warn('Servicio omitido por datos inválidos:', s, e);
             return '';
         }
     }).join('');
 
-    container.innerHTML = filtros + tarjetas;
+    container.innerHTML = tarjetas;
+    container.scrollLeft = 0;
 
     // Si la URL de imagen que alguien puso en la base no carga, se usa la de respaldo.
     container.querySelectorAll('img[data-fallback]').forEach(img => {
@@ -378,8 +380,12 @@ function renderServices() {
         }, { once: true });
     });
 
-    const obs = createRevealObserver();
-    container.querySelectorAll('.card-animate').forEach(el => obs.observe(el));
+    actualizarSlider();
+    const anuncio = document.getElementById('soluciones-anuncio');
+    if (anuncio && filtrosCaja && filtrosCaja.dataset.anunciar) {
+        anuncio.textContent = visibles.length === 1 ? '1 solución' : visibles.length + ' soluciones';
+        delete filtrosCaja.dataset.anunciar;
+    }
 }
 
 // Filtros por categoría (delegado: los botones se regeneran con cada repintado).
@@ -387,8 +393,110 @@ document.addEventListener('click', (e) => {
     const boton = e.target.closest('.catalog-filters [data-categoria]');
     if (!boton) return;
     categoriaActiva = boton.dataset.categoria;
+    const caja = document.getElementById('soluciones-filtros');
+    if (caja) caja.dataset.anunciar = '1';
     renderServices();
+    // El foco vuelve al filtro elegido (los botones se acaban de redibujar).
+    document.querySelector(`.catalog-filters [data-categoria="${CSS.escape(categoriaActiva)}"]`)?.focus();
 });
+
+/* ═══════════════════════════════════════
+   SLIDER DE SOLUCIONES
+   La pista se desliza sola con scroll-snap (dedo, rueda, trackpad o flechas
+   del teclado con la pista enfocada). Los botones avanzan una vista completa
+   y la barra de abajo dice en qué parte del catálogo vas. Sin avance
+   automático: nadie pierde una tarjeta mientras la lee.
+═══════════════════════════════════════ */
+function pasoSlider(pista) {
+    const tarjeta = pista.querySelector('.solucion');
+    if (!tarjeta) return { ancho: pista.clientWidth, porVista: 1 };
+    const gap = parseFloat(getComputedStyle(pista).columnGap) || 0;
+    const ancho = tarjeta.getBoundingClientRect().width + gap;
+    const porVista = Math.max(1, Math.floor((pista.clientWidth + gap) / ancho + 0.05));
+    return { ancho, porVista };
+}
+
+function moverSlider(direccion) {
+    const pista = document.getElementById('services-container');
+    if (!pista) return;
+    const { ancho, porVista } = pasoSlider(pista);
+    const total = pista.querySelectorAll('.solucion').length;
+    // Se va a una tarjeta exacta (no "N píxeles más"): dos clics rápidos no
+    // dejan la pista a medias entre dos tarjetas.
+    const actual = Math.round(pista.scrollLeft / ancho);
+    const destino = Math.max(0, Math.min(total - porVista, actual + direccion * porVista));
+    const reducir = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const desde = pista.scrollLeft;
+    pista.scrollTo({ left: destino * ancho, behavior: reducir ? 'auto' : 'smooth' });
+    // Si el navegador no anima (pestaña en segundo plano, ahorro de energía),
+    // se salta directo para que la flecha nunca parezca no hacer nada.
+    if (!reducir) {
+        setTimeout(() => {
+            if (Math.abs(pista.scrollLeft - desde) < 2 && Math.abs(destino * ancho - desde) > 2) {
+                pista.scrollTo({ left: destino * ancho, behavior: 'auto' });
+            }
+        }, 700);
+    }
+}
+
+function actualizarSlider() {
+    const pista = document.getElementById('services-container');
+    const anterior = document.getElementById('soluciones-anterior');
+    const siguiente = document.getElementById('soluciones-siguiente');
+    if (!pista || !anterior || !siguiente) return;
+    const max = pista.scrollWidth - pista.clientWidth;
+    const desliza = max > 4;
+    anterior.disabled = !desliza || pista.scrollLeft <= 4;
+    siguiente.disabled = !desliza || pista.scrollLeft >= max - 4;
+    const seccion = pista.closest('.solutions-section');
+    if (seccion) seccion.classList.toggle('sin-desplazar', !desliza);
+
+    const barra = document.querySelector('.soluciones-progreso span');
+    if (barra) {
+        const visible = Math.min(1, pista.clientWidth / Math.max(1, pista.scrollWidth));
+        const avance = desliza ? pista.scrollLeft / max : 0;
+        barra.style.width = (visible * 100) + '%';
+        barra.style.transform = `translateX(${visible < 1 ? avance * (1 / visible - 1) * 100 : 0}%)`;
+    }
+
+    const conteo = document.getElementById('soluciones-conteo');
+    const total = pista.querySelectorAll('.solucion').length;
+    if (conteo) {
+        if (!total || !desliza) {
+            conteo.textContent = total ? (total === 1 ? '1 solución' : total + ' soluciones') : '';
+        } else {
+            const { ancho, porVista } = pasoSlider(pista);
+            const primera = Math.min(total, Math.round(pista.scrollLeft / ancho) + 1);
+            const ultima = Math.min(total, primera + porVista - 1);
+            conteo.textContent = (primera === ultima ? primera : primera + '–' + ultima) + ' de ' + total;
+        }
+    }
+}
+
+function initSolucionesSlider() {
+    const pista = document.getElementById('services-container');
+    if (!pista) return;
+    document.getElementById('soluciones-anterior')?.addEventListener('click', () => moverSlider(-1));
+    document.getElementById('soluciones-siguiente')?.addEventListener('click', () => moverSlider(1));
+    let pendiente = false;
+    pista.addEventListener('scroll', () => {
+        if (pendiente) return;
+        pendiente = true;
+        requestAnimationFrame(() => { pendiente = false; actualizarSlider(); });
+    }, { passive: true });
+    window.addEventListener('resize', actualizarSlider);
+    // Con la pista enfocada: ← → avanzan una vista; Inicio y Fin van a los extremos.
+    pista.addEventListener('keydown', (e) => {
+        if (e.target !== pista) return;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+            e.preventDefault();
+            moverSlider(e.key === 'ArrowRight' ? 1 : -1);
+        } else if (e.key === 'Home' || e.key === 'End') {
+            e.preventDefault();
+            pista.scrollTo({ left: e.key === 'Home' ? 0 : pista.scrollWidth, behavior: 'auto' });
+        }
+    });
+}
 
 // Si alguien agrega un servicio en la base de datos mientras la página está
 // abierta, aparece al volver a la pestaña o, a más tardar, en 30 segundos.
@@ -482,7 +590,7 @@ function populateServiceModal(s) {
     document.getElementById('sm-title').textContent = s.nombre || 'Servicio sin nombre';
     document.getElementById('sm-desc').textContent = s.descripcion || '';
     document.getElementById('sm-star').innerHTML = s.destacado
-        ? '<span class="badge bg-warning text-dark shadow-sm">⭐ Destacado</span>' : '';
+        ? '<span class="solucion-destacado"><i class="bx bxs-star" aria-hidden="true"></i> Destacado</span>' : '';
 
     const duracionWrap = document.getElementById('sm-duracion');
     if (s.duracion) {
