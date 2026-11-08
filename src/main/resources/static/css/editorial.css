@@ -552,34 +552,6 @@ button,a,input,summary {
     background:#dbe9d3;
     color:#24451f
 }
-.solutions-section .service-card {
-    box-shadow:none!important;
-    border:1px solid var(--line)!important;
-    border-radius:12px!important;
-    transform:none;
-    overflow:hidden
-}
-.solutions-section .service-card:hover {
-    transform:translateY(-4px);
-    border-color:#969b89!important;
-    box-shadow:none!important
-}
-.service-card .service-icon {
-    background:var(--ink);
-    box-shadow:none;
-    color:var(--brand);
-    border-radius:8px
-}
-.service-card .btn {
-    border-radius:4px!important
-}
-.service-card .card-img-top {
-    filter:saturate(.6)
-}
-.service-card h5 {
-    font-family:var(--identity);
-    letter-spacing:-.03em
-}
 .catalog-state {
     width:100%;
     padding:40px;
@@ -1474,7 +1446,7 @@ button,a,input,summary {
         clip-path:none;
         transform:none
     }
-    .gt-button:hover,.service-card:hover {
+    .gt-button:hover {
         transform:none!important
     }
     
@@ -1674,4 +1646,395 @@ button,a,input,summary {
     .opiniones-puntos button,.opiniones-flecha {
         transition:none
     }
+}
+
+/* ─── Soluciones: slider del catálogo (js/main.js · renderServices y el slider) ───
+   Una fila que se desliza con scroll-snap: 4 tarjetas en escritorio, 3 en
+   laptop, 2 y un poco de la siguiente en tablet, y una con la orilla de la
+   siguiente en celular, para que se note que hay más. */
+.soluciones-barra {
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px 24px;
+    margin-bottom:24px
+}
+.soluciones-barra .catalog-filters {
+    padding-bottom:0
+}
+.soluciones-nav {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-left:auto
+}
+.soluciones-conteo {
+    min-width:76px;
+    text-align:right;
+    font:600 13px/1 var(--identity);
+    color:var(--muted);
+    font-variant-numeric:tabular-nums
+}
+.slider-flecha {
+    width:48px;
+    height:48px;
+    flex:none;
+    border-radius:50%;
+    border:1px solid #b8bcaf;
+    background:transparent;
+    color:var(--ink);
+    font-size:22px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    transition:background-color .2s var(--ease-out),border-color .2s var(--ease-out),color .2s var(--ease-out),opacity .2s
+}
+.slider-flecha:hover:not(:disabled) {
+    background:var(--brand);
+    border-color:var(--brand);
+    color:var(--ink)
+}
+.slider-flecha:active:not(:disabled) {
+    transform:scale(.94)
+}
+.slider-flecha:disabled {
+    opacity:.35;
+    cursor:not-allowed
+}
+.soluciones-carrusel {
+    position:relative
+}
+.soluciones-pista {
+    display:grid;
+    grid-auto-flow:column;
+    grid-auto-columns:calc((100% - 72px) / 4);
+    gap:24px;
+    overflow-x:auto;
+    overscroll-behavior-x:contain;
+    scroll-snap-type:x mandatory;
+    scroll-padding-inline:6px;
+    scrollbar-width:none;
+    /* Aire para que la tarjeta que sube al pasar el mouse y el foco no se corten. */
+    padding:8px 6px 12px;
+    margin:-8px -6px -12px
+}
+.soluciones-pista::-webkit-scrollbar {
+    display:none
+}
+.soluciones-pista:focus-visible {
+    outline:3px solid var(--brand);
+    outline-offset:4px;
+    border-radius:14px
+}
+.soluciones-pista:has(.catalog-state) {
+    display:block
+}
+.solucion {
+    position:relative;
+    scroll-snap-align:start;
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:14px;
+    overflow:hidden;
+    transition:transform .3s var(--ease-out),border-color .3s var(--ease-out),box-shadow .3s var(--ease-out)
+}
+.solucion-foto {
+    position:relative;
+    margin:0;
+    aspect-ratio:16/10;
+    overflow:hidden;
+    background:#2b2d29
+}
+.solucion-foto img {
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    filter:saturate(.6);
+    transition:transform .6s var(--ease-out),filter .6s var(--ease-out)
+}
+.solucion-foto::after {
+    content:"";
+    position:absolute;
+    inset:0;
+    background:linear-gradient(180deg,rgba(32,34,31,.35) 0%,rgba(32,34,31,0) 45%);
+    pointer-events:none
+}
+.solucion-cat,.solucion-destacado {
+    position:absolute;
+    top:12px;
+    z-index:1;
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    padding:7px 11px;
+    border-radius:999px;
+    font:700 11px/1 var(--identity);
+    letter-spacing:.08em;
+    text-transform:uppercase
+}
+.solucion-cat {
+    left:12px;
+    background:rgba(32,34,31,.86);
+    color:var(--paper)
+}
+.solucion-destacado {
+    right:12px;
+    background:var(--brand);
+    color:var(--ink)
+}
+.solucion-destacado .bx {
+    font-size:13px
+}
+.solucion-cuerpo {
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    padding:0 22px 20px
+}
+.solucion-icono {
+    position:relative;
+    z-index:1;
+    width:52px;
+    height:52px;
+    margin-top:-26px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    background:var(--ink);
+    color:var(--brand);
+    border-radius:12px;
+    box-shadow:0 0 0 4px #fff;
+    font-size:25px;
+    transition:background-color .3s var(--ease-out),color .3s var(--ease-out)
+}
+.solucion h3 {
+    margin:16px 0 8px;
+    font:800 19px/1.2 var(--identity);
+    letter-spacing:-.02em;
+    color:var(--ink)
+}
+.solucion p {
+    margin:0 0 18px;
+    color:var(--muted);
+    font-size:14.5px;
+    line-height:1.6;
+    display:-webkit-box;
+    -webkit-line-clamp:4;
+    -webkit-box-orient:vertical;
+    overflow:hidden
+}
+.solucion-pie {
+    margin-top:auto;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding-top:16px;
+    border-top:1px solid var(--line)
+}
+.solucion-precio {
+    font:800 16px/1.3 var(--identity);
+    color:var(--ink);
+    font-variant-numeric:tabular-nums
+}
+.solucion-precio small {
+    font-size:11px
+}
+.solucion-precio .text-success {
+    color:#1d6b3a!important;
+    font-weight:700;
+    font-size:14px
+}
+.solucion-cta {
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    flex:none;
+    min-height:44px;
+    padding:0 16px;
+    border-radius:999px;
+    border:1px solid var(--ink);
+    background:transparent;
+    color:var(--ink);
+    font:600 14px/1 var(--body);
+    white-space:nowrap;
+    cursor:pointer;
+    transition:background-color .2s var(--ease-out),color .2s var(--ease-out)
+}
+.solucion-cta .bx {
+    font-size:18px;
+    transition:transform .2s var(--ease-out)
+}
+/* Toda la tarjeta abre el detalle: el botón la cubre con su ::after. */
+.solucion-cta::after {
+    content:"";
+    position:absolute;
+    inset:0;
+    border-radius:14px
+}
+.solucion:hover {
+    border-color:#969b89
+}
+.solucion:hover .solucion-cta,.solucion-cta:focus-visible {
+    background:var(--ink);
+    color:var(--paper)
+}
+.solucion:hover .solucion-cta .bx {
+    transform:translateX(3px)
+}
+.solucion:hover .solucion-icono {
+    background:var(--brand);
+    color:var(--ink)
+}
+@media (hover:hover) and (pointer:fine) {
+    .solucion:hover {
+        transform:translateY(-4px);
+        box-shadow:0 22px 40px -28px rgba(32,34,31,.55)
+    }
+    .solucion:hover .solucion-foto img {
+        transform:scale(1.05);
+        filter:saturate(.9)
+    }
+}
+.soluciones-progreso {
+    position:relative;
+    height:3px;
+    margin-top:28px;
+    background:var(--line);
+    border-radius:999px;
+    overflow:hidden
+}
+.soluciones-progreso span {
+    display:block;
+    width:25%;
+    height:100%;
+    background:var(--brand);
+    border-radius:inherit;
+    will-change:transform
+}
+.sin-desplazar .soluciones-progreso,.sin-desplazar .slider-flecha {
+    display:none
+}
+@media (prefers-reduced-motion:no-preference) {
+    .solucion {
+        animation:solucion-entra .5s var(--ease-out) backwards;
+        animation-delay:calc(min(var(--orden,0),5) * 70ms)
+    }
+}
+/* Solo se desplaza: la tarjeta siempre está visible aunque la animación se
+   atrase (pestaña en segundo plano, equipo lento). */
+@keyframes solucion-entra {
+    from {
+        transform:translateY(18px)
+    }
+}
+@media (max-width:1199px) {
+    .soluciones-pista {
+        grid-auto-columns:calc((100% - 48px) / 3)
+    }
+}
+@media (max-width:991px) {
+    .soluciones-pista {
+        grid-auto-columns:calc((100% - 24px) / 2.25)
+    }
+}
+@media (max-width:767px) {
+    .soluciones-barra {
+        flex-direction:column;
+        align-items:stretch
+    }
+    /* Los filtros se deslizan en una sola fila en lugar de ocupar tres renglones. */
+    .soluciones-barra .catalog-filters {
+        flex-wrap:nowrap;
+        overflow-x:auto;
+        scrollbar-width:none;
+        margin-inline:-16px;
+        padding-inline:16px
+    }
+    .soluciones-barra .catalog-filters::-webkit-scrollbar {
+        display:none
+    }
+    .soluciones-barra .catalog-filters button {
+        flex:none
+    }
+    .soluciones-nav {
+        margin-left:0;
+        justify-content:space-between
+    }
+    .soluciones-conteo {
+        text-align:left;
+        margin-right:auto
+    }
+}
+@media (max-width:575px) {
+    .soluciones-pista {
+        grid-auto-columns:84%;
+        gap:16px
+    }
+    .solucion-cuerpo {
+        padding:0 18px 18px
+    }
+}
+@media (prefers-reduced-motion:reduce) {
+    .solucion,.solucion-foto img,.solucion-cta,.solucion-cta .bx,.slider-flecha,.solucion-icono {
+        transition:none
+    }
+}
+
+/* ─── Modal del detalle de una solución ─── */
+.solucion-modal .modal-content {
+    border-radius:16px!important
+}
+.solucion-modal #sm-img {
+    filter:saturate(.7)
+}
+.solucion-modal #sm-cat {
+    background:rgba(32,34,31,.86)!important;
+    color:var(--paper)!important;
+    border-radius:999px;
+    padding:8px 12px;
+    font:700 11px/1 var(--identity);
+    letter-spacing:.08em
+}
+.solucion-modal #sm-star .solucion-destacado {
+    position:static
+}
+.solucion-modal .service-icon {
+    width:52px;
+    height:52px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    background:var(--ink);
+    color:var(--brand);
+    border-radius:12px;
+    font-size:25px
+}
+.solucion-modal #sm-title {
+    font-family:var(--identity);
+    letter-spacing:-.02em
+}
+.solucion-modal .modal-footer .gt-button {
+    gap:10px
+}
+.solucion-modal .modal-footer .gt-button:hover {
+    background:var(--ink);
+    color:var(--paper)
+}
+
+/* Puntos del carrusel de opiniones: área de toque de 44 px aunque el punto mida 10. */
+.opiniones-puntos button {
+    position:relative
+}
+.opiniones-puntos button::before {
+    content:"";
+    position:absolute;
+    inset:-17px -6px
 }
