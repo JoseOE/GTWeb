@@ -2176,3 +2176,25 @@ button,a,input,summary {
     background:var(--brand);
     color:var(--ink)
 }
+
+/* Botón principal deshabilitado: se lee (5.6:1) y se nota que todavía no se
+   puede usar. Antes era blanco sobre naranja claro (2:1). */
+.btn-primary:disabled,
+.btn-primary.disabled,
+fieldset:disabled .btn-primary {
+    background:#e4e2d9!important;
+    background-image:none!important;
+    border-color:#e4e2d9!important;
+    color:#55574f!important;
+    box-shadow:none!important;
+    opacity:1;
+    cursor:not-allowed
+}
+
+/* Botones con área de toque de 44 px: el texto centrado en su altura. */
+.btn.tocable {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px
+}

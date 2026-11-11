@@ -568,7 +568,7 @@ footer.bg-dark::before {
 .mostrador-tile:hover:not(:disabled) { border-color: var(--brand); }
 .mostrador-tile:active:not(:disabled) { transform: scale(0.98); }
 .mostrador-tile:disabled { opacity: 0.5; }
-@media (min-width: 992px) {
+@media (min-width: 1200px) {
     .mostrador-ticket { position: sticky; top: 1rem; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -658,3 +658,6 @@ footer.bg-dark::before {
     font-variant-numeric: tabular-nums;
 }
 .min-w-0 { min-width: 0; }
+
+/* Producto sin foto en el panel: una franja corta en lugar de un hueco 16:9. */
+.ratio.producto-sin-foto { --bs-aspect-ratio: 28%; }
