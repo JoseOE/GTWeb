@@ -228,6 +228,7 @@ function initGymForm() {
                 pintarFotos();
                 showCode(gym.codigo);
                 setBadge('saved');
+                pintarIdentidad(gym.nombre, gym.logo);
             })
             .catch(() => { /* el gimnasio pudo eliminarse; se deja el formulario vacío */ });
     }
@@ -270,6 +271,7 @@ function initGymForm() {
                 localStorage.setItem('gymId', response.body.id);
                 showCode(response.body.codigo);
                 setBadge('saved');
+                pintarIdentidad(fields.nombre.value.trim(), logoDataUrl);
                 // La primera vez se activan todas las pestañas; después solo
                 // cambian los precios sugeridos de los planes (salen de la cuota).
                 if (primeraVez) {
@@ -294,6 +296,23 @@ function initGymForm() {
             alertBox.classList.remove('d-none');
         });
     });
+}
+
+// El gimnasio en lo alto del menú: su logo (o sus iniciales) y su nombre.
+function pintarIdentidad(nombre, logo) {
+    const marca = document.getElementById('panel-gym-logo');
+    document.getElementById('panel-gym-nombre').textContent = nombre || 'Tu gimnasio';
+    marca.classList.toggle('con-logo', !!logo);
+    if (logo) {
+        const img = document.createElement('img');
+        img.src = logo;
+        img.alt = '';
+        marca.replaceChildren(img);
+    } else if (nombre) {
+        marca.textContent = iniciales(nombre);
+    } else {
+        marca.innerHTML = "<i class='bx bx-dumbbell'></i>";
+    }
 }
 
 function unlockGymFeatures(gymId) {

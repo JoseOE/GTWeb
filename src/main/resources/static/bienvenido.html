@@ -10,27 +10,32 @@
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/editorial.css">
+    <link rel="stylesheet" href="css/panel.css">
     <link rel="stylesheet" href="css/portada.css">
     <script src="js/sesion.js" data-protegida></script>
 </head>
-<body class="gym-interior bg-body-tertiary d-flex flex-column min-vh-100">
+<body class="gym-interior panel-pagina bg-body-tertiary d-flex flex-column">
 
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark py-3">
+    <nav class="navbar navbar-dark bg-dark panel-barra">
         <div class="container-fluid px-3 px-lg-4">
             <a class="navbar-brand fw-bold fs-3 d-flex align-items-center gap-2" href="index.html">
                 <i class='bx bx-dumbbell text-primary fs-2'></i>
                 <span>Gym<span class="text-primary">Track</span></span>
             </a>
-            <div class="ms-auto d-flex align-items-center gap-2 gap-sm-3">
-                <a href="index.html" class="btn btn-outline-light btn-sm rounded-pill px-3 d-none d-sm-inline-flex align-items-center gap-1">
-                    <i class='bx bx-globe'></i> Ver sitio público
+            <div class="ms-auto d-flex align-items-center gap-1 gap-sm-2">
+                <a href="index.html" class="panel-barra-enlace d-none d-sm-inline-flex">
+                    <i class='bx bx-globe' aria-hidden="true"></i> Ver sitio público
                 </a>
-                <span class="text-white-50 d-none d-md-inline" id="nav-user-name"></span>
-                <a href="cuenta.html" class="btn btn-outline-light btn-sm rounded-pill px-3 d-inline-flex align-items-center gap-1">
-                    <i class='bx bx-user-circle'></i> <span class="d-none d-sm-inline">Mi cuenta</span>
+                <a href="cuenta.html" class="panel-cuenta" title="Mi cuenta">
+                    <span class="panel-avatar" id="nav-avatar" aria-hidden="true"></span>
+                    <span class="panel-cuenta-texto d-none d-md-flex">
+                        <span class="panel-cuenta-nombre" id="nav-user-name"></span>
+                        <span class="panel-cuenta-nota">Mi cuenta</span>
+                    </span>
+                    <span class="visually-hidden d-md-none">Mi cuenta</span>
                 </a>
-                <a href="login.html" class="btn btn-outline-danger btn-sm rounded-pill px-3" onclick="Sesion.cerrar(); return false;">
-                    <i class='bx bx-log-out'></i> <span class="d-none d-sm-inline">Cerrar Sesión</span>
+                <a href="login.html" class="panel-barra-enlace panel-salir" onclick="Sesion.cerrar(); return false;">
+                    <i class='bx bx-log-out' aria-hidden="true"></i> <span class="d-none d-sm-inline">Cerrar sesión</span><span class="visually-hidden d-sm-none">Cerrar sesión</span>
                 </a>
             </div>
         </div>
@@ -39,6 +44,13 @@
     <div class="dash-wrap flex-grow-1">
         <!-- ═══════ SIDEBAR ═══════ -->
         <aside class="dash-sidebar">
+            <div class="panel-identidad">
+                <span class="panel-identidad-logo" id="panel-gym-logo" aria-hidden="true"><i class='bx bx-dumbbell'></i></span>
+                <span class="panel-identidad-texto">
+                    <span class="panel-identidad-nombre" id="panel-gym-nombre">Tu gimnasio</span>
+                    <span class="panel-identidad-nota">Panel del dueño</span>
+                </span>
+            </div>
             <nav class="dash-nav" role="tablist" aria-label="Secciones del panel">
                 <span class="dash-nav-grupo" aria-hidden="true">Gimnasio</span>
                 <button type="button" class="dash-nav-link active" role="tab" id="tab-resumen" aria-controls="panel-resumen" aria-selected="true" data-panel="resumen">
@@ -94,9 +106,12 @@
                  Lo que el dueño necesita hoy: primeros pasos (mientras falte alguno),
                  sus números reales, lo pendiente y accesos rápidos. -->
             <div class="dash-panel active" id="panel-resumen" data-panel="resumen" role="tabpanel" aria-labelledby="tab-resumen" tabindex="0">
-                <div class="mb-4">
-                    <h2 class="fw-bold mb-1">Hola, <span class="text-primary" id="dash-user-name">…</span></h2>
-                    <p class="text-body-secondary mb-0" id="resumen-subtitulo">Así va tu gimnasio hoy.</p>
+                <div class="resumen-cabeza mb-4">
+                    <div>
+                        <h2 class="fw-bold mb-1">Hola, <span class="text-primary" id="dash-user-name">…</span></h2>
+                        <p class="text-body-secondary mb-0" id="resumen-subtitulo">Así va tu gimnasio hoy.</p>
+                    </div>
+                    <p class="resumen-fecha mb-0" id="resumen-fecha"></p>
                 </div>
 
                 <section class="dash-empty text-start p-4 mb-4 d-none" id="resumen-pasos" aria-labelledby="resumen-pasos-titulo">
@@ -113,24 +128,60 @@
                     <ol class="list-unstyled mb-0 resumen-pasos" id="resumen-pasos-lista"></ol>
                 </section>
 
-                <div class="row g-3 mb-4" id="resumen-kpis"></div>
+                <div class="resumen-atajos mb-4" role="group" aria-label="Accesos rápidos">
+                    <button type="button" class="resumen-atajo es-principal" data-goto="mostrador">
+                        <i class='bx bx-store' aria-hidden="true"></i>
+                        <span><strong>Vender en mostrador</strong><small>Cobra en recepción</small></span>
+                    </button>
+                    <button type="button" class="resumen-atajo" data-goto="usuarios" data-abrir="member-new-btn">
+                        <i class='bx bx-user-plus' aria-hidden="true"></i>
+                        <span><strong>Agregar usuario</strong><small>Alta en recepción</small></span>
+                    </button>
+                    <button type="button" class="resumen-atajo" data-goto="membresias">
+                        <i class='bx bx-dollar' aria-hidden="true"></i>
+                        <span><strong>Registrar un pago</strong><small>Renueva una membresía</small></span>
+                    </button>
+                    <button type="button" class="resumen-atajo" data-goto="productos" data-abrir="producto-nuevo-btn">
+                        <i class='bx bx-package' aria-hidden="true"></i>
+                        <span><strong>Nuevo producto</strong><small>Para tienda y mostrador</small></span>
+                    </button>
+                </div>
 
-                <div class="row g-3">
+                <div class="row g-3 mb-3" id="resumen-kpis"></div>
+
+                <div class="row g-3 mb-3">
                     <div class="col-lg-7">
+                        <section class="dash-empty text-start p-4 h-100" aria-labelledby="resumen-ventas-titulo">
+                            <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-1">
+                                <h3 class="fw-bold fs-6 mb-0" id="resumen-ventas-titulo">Ventas de los últimos 14 días</h3>
+                                <button type="button" class="btn btn-link btn-sm p-0" data-goto="ventas">Ver ventas</button>
+                            </div>
+                            <p class="small text-body-secondary mb-3" id="resumen-ventas-total">&nbsp;</p>
+                            <div id="resumen-ventas"></div>
+                        </section>
+                    </div>
+                    <div class="col-lg-5">
                         <section class="dash-empty text-start p-4 h-100" aria-labelledby="resumen-pendientes-titulo">
                             <h3 class="fw-bold fs-6 mb-3" id="resumen-pendientes-titulo">Pendientes</h3>
                             <div id="resumen-pendientes"></div>
                         </section>
                     </div>
-                    <div class="col-lg-5">
-                        <section class="dash-empty text-start p-4 h-100" aria-labelledby="resumen-atajos-titulo">
-                            <h3 class="fw-bold fs-6 mb-3" id="resumen-atajos-titulo">Accesos rápidos</h3>
-                            <div class="d-grid gap-2">
-                                <button type="button" class="btn btn-primary rounded-pill" data-goto="mostrador"><i class='bx bx-store'></i> Vender en mostrador</button>
-                                <button type="button" class="btn btn-outline-primary rounded-pill" data-goto="usuarios" data-abrir="member-new-btn"><i class='bx bx-user-plus'></i> Agregar usuario</button>
-                                <button type="button" class="btn btn-outline-primary rounded-pill" data-goto="membresias"><i class='bx bx-dollar'></i> Registrar un pago</button>
-                                <button type="button" class="btn btn-outline-primary rounded-pill" data-goto="productos" data-abrir="producto-nuevo-btn"><i class='bx bx-package'></i> Nuevo producto</button>
+                </div>
+
+                <div class="row g-3" id="resumen-detalle">
+                    <div class="col-lg-7">
+                        <section class="dash-empty text-start p-4 h-100" aria-labelledby="resumen-vencen-titulo">
+                            <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-3">
+                                <h3 class="fw-bold fs-6 mb-0" id="resumen-vencen-titulo">Próximos vencimientos</h3>
+                                <button type="button" class="btn btn-link btn-sm p-0" data-goto="membresias">Ver membresías</button>
                             </div>
+                            <div id="resumen-vencen"></div>
+                        </section>
+                    </div>
+                    <div class="col-lg-5">
+                        <section class="dash-empty text-start p-4 h-100" aria-labelledby="resumen-top-titulo">
+                            <h3 class="fw-bold fs-6 mb-3" id="resumen-top-titulo">Lo más vendido en 14 días</h3>
+                            <div id="resumen-top"></div>
                         </section>
                     </div>
                 </div>

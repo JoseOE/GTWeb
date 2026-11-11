@@ -19,7 +19,8 @@ document.addEventListener("DOMContentLoaded", () => {
         window.location.href = 'tienda.html';
         return;
     }
-    document.getElementById('nav-user-name').innerHTML = `<i class='bx bx-user-circle'></i> ${escapeHtml(userName)}`;
+    document.getElementById('nav-user-name').textContent = userName;
+    document.getElementById('nav-avatar').textContent = iniciales(userName);
     document.getElementById('dash-user-name').textContent = userName;
 
     const navLinks = document.querySelectorAll('.dash-nav-link');
