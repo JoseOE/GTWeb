@@ -289,7 +289,7 @@ function renderProductos() {
         return `
         <div class="col-sm-6 col-xl-4">
             <div class="dash-empty text-start h-100 d-flex flex-column p-0 overflow-hidden">
-                <div class="ratio ratio-16x9 bg-body-tertiary">
+                <div class="ratio ${p.imagen ? 'ratio-16x9' : 'producto-sin-foto'} bg-body-tertiary">
                     ${p.imagen
                         ? '<img src="' + escapeHtml(p.imagen) + '" alt="" style="object-fit:cover">'
                         : '<div class="d-flex align-items-center justify-content-center"><i class="bx bx-package fs-1 text-body-secondary opacity-50"></i></div>'}
