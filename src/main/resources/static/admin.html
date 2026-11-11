@@ -11,25 +11,32 @@
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/editorial.css">
+    <link rel="stylesheet" href="css/panel.css">
     <link rel="stylesheet" href="css/admin.css">
     <script src="js/sesion.js" data-protegida></script>
 </head>
-<body class="gym-interior bg-body-tertiary d-flex flex-column min-vh-100">
+<body class="gym-interior panel-pagina bg-body-tertiary d-flex flex-column">
 
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark py-3">
+    <nav class="navbar navbar-dark bg-dark panel-barra">
         <div class="container-fluid px-3 px-lg-4">
             <a class="navbar-brand fw-bold fs-3 d-flex align-items-center gap-2" href="index.html">
                 <i class='bx bx-dumbbell text-primary fs-2'></i>
                 <span>Gym<span class="text-primary">Track</span></span>
                 <span class="badge rounded-pill bg-primary fs-6 fw-semibold ms-1 admin-insignia">Admin</span>
             </a>
-            <div class="ms-auto d-flex align-items-center gap-2 gap-sm-3">
-                <a href="index.html" class="btn btn-outline-light btn-sm rounded-pill px-3 d-none d-sm-inline-flex align-items-center gap-1">
-                    <i class='bx bx-globe'></i> Ver sitio público
+            <div class="ms-auto d-flex align-items-center gap-1 gap-sm-2">
+                <a href="index.html" class="panel-barra-enlace d-none d-sm-inline-flex">
+                    <i class='bx bx-globe' aria-hidden="true"></i> Ver sitio público
                 </a>
-                <span class="text-white-50 d-none d-md-inline" id="nav-user-name"></span>
-                <a href="login.html" class="btn btn-outline-danger btn-sm rounded-pill px-3" id="cerrar-sesion">
-                    <i class='bx bx-log-out'></i> <span class="d-none d-sm-inline">Cerrar sesión</span>
+                <span class="panel-cuenta">
+                    <span class="panel-avatar" id="nav-avatar" aria-hidden="true"></span>
+                    <span class="panel-cuenta-texto d-none d-md-flex">
+                        <span class="panel-cuenta-nombre" id="nav-user-name"></span>
+                        <span class="panel-cuenta-nota">Administración</span>
+                    </span>
+                </span>
+                <a href="login.html" class="panel-barra-enlace panel-salir" id="cerrar-sesion">
+                    <i class='bx bx-log-out' aria-hidden="true"></i> <span class="d-none d-sm-inline">Cerrar sesión</span><span class="visually-hidden d-sm-none">Cerrar sesión</span>
                 </a>
             </div>
         </div>
@@ -37,6 +44,13 @@
 
     <div class="dash-wrap flex-grow-1">
         <aside class="dash-sidebar">
+            <div class="panel-identidad">
+                <span class="panel-identidad-logo" id="panel-gym-logo" aria-hidden="true"><i class='bx bx-shield-quarter'></i></span>
+                <span class="panel-identidad-texto">
+                    <span class="panel-identidad-nombre" id="panel-gym-nombre">Equipo GymTrack</span>
+                    <span class="panel-identidad-nota">Toda la plataforma</span>
+                </span>
+            </div>
             <nav class="dash-nav" role="tablist" aria-label="Secciones de la administración">
                 <span class="dash-nav-grupo" aria-hidden="true">Plataforma</span>
                 <button type="button" class="dash-nav-link active" role="tab" id="tab-resumen" aria-controls="panel-resumen" aria-selected="true" data-panel="resumen">

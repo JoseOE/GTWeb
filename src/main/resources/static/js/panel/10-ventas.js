@@ -94,13 +94,10 @@ function pintarResumenVentas(r) {
     document.getElementById('ventas-kpis').innerHTML = tiles.map((t, i) => `
         <div class="${i === tiles.length - 1 && tiles.length % 2 ? 'col-12' : 'col-6'} col-md-4 col-xl">
             <div class="kpi-tile h-100">
-                <div class="icon-circle ${t.color} rounded-circle d-flex align-items-center justify-content-center mb-3" style="width:42px;height:42px">
-                    <i class='bx ${t.icono}' aria-hidden="true"></i>
+                    <div class="kpi-cabeza"><span class="kpi-titulo">${t.texto}</span><i class="bx ${t.icono}" aria-hidden="true"></i></div>
+                    <div class="kpi-value">${escapeHtml(t.valor)}</div>
+                    <small class="kpi-detalle">${escapeHtml(t.detalle)}</small>
                 </div>
-                <div class="ventas-dinero fw-bold">${escapeHtml(t.valor)}</div>
-                <div class="small fw-semibold">${t.texto}</div>
-                <small class="text-body-secondary">${escapeHtml(t.detalle)}</small>
-            </div>
         </div>`).join('');
 
     // Con 12 meses el periodo cruza de año: "Del 15 oct 2025 al 14 oct 2026".

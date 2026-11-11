@@ -161,16 +161,16 @@ function loadBilling(gymId) {
             const sinPagos = members.filter(m => m.diasParaVencer == null).length;
 
             kpis.innerHTML = [
-                { n: vencidos, l: 'Vencidas', i: 'bx-error-circle', c: 'text-danger' },
-                { n: porVencer, l: 'Vencen esta semana', i: 'bx-time-five', c: 'text-warning' },
-                { n: alCorriente, l: 'Al corriente', i: 'bx-check-circle', c: 'text-success' },
-                { n: sinPagos, l: 'Sin pagos registrados', i: 'bx-minus-circle', c: 'text-body-secondary' }
+                { n: vencidos, l: 'Vencidas', i: 'bx-error-circle', d: 'Hay que cobrarles', alerta: true },
+                { n: porVencer, l: 'Vencen pronto', i: 'bx-time-five', d: 'En los próximos 5 días' },
+                { n: alCorriente, l: 'Al corriente', i: 'bx-check-circle', d: 'Con más de 5 días' },
+                { n: sinPagos, l: 'Sin pagos registrados', i: 'bx-minus-circle', d: 'Falta su primer pago' }
             ].map(k => `
                 <div class="col-6 col-lg-3">
-                    <div class="kpi-tile h-100">
-                        <i class="bx ${k.i} fs-3 ${k.c}"></i>
-                        <div class="fs-3 fw-bold">${k.n}</div>
-                        <small class="text-body-secondary">${k.l}</small>
+                    <div class="kpi-tile h-100${k.alerta && k.n ? ' es-alerta' : ''}">
+                        <div class="kpi-cabeza"><span class="kpi-titulo">${k.l}</span><i class="bx ${k.i}" aria-hidden="true"></i></div>
+                        <div class="kpi-value">${k.n}</div>
+                        <small class="kpi-detalle">${k.d}</small>
                     </div>
                 </div>`).join('');
 
@@ -185,7 +185,7 @@ function loadBilling(gymId) {
                 const est = estadoDePago(m);
                 return `
                 <tr>
-                    <td class="ps-4 fw-semibold">${escapeHtml(m.nombre)}<div class="text-body-secondary fw-normal small">${escapeHtml(m.email)}</div></td>
+                    <td class="ps-4"><div class="persona">${avatar(m.nombre)}<div class="persona-texto"><div class="fw-semibold">${escapeHtml(m.nombre)}</div><div class="text-body-secondary small">${escapeHtml(m.email)}</div></div></div></td>
                     <td class="text-body-secondary">${m.diaDePago ? 'Día ' + m.diaDePago : '—'}</td>
                     <td class="text-body-secondary">${m.fechaProximoPago ? escapeHtml(fechaCorta(m.fechaProximoPago)) : '—'}</td>
                     <td><span class="badge rounded-pill ${est.clase} px-3 py-2"><i class="bx ${est.icono}"></i> ${est.texto}</span></td>

@@ -73,13 +73,10 @@ function initBitacora() {
         ];
         document.getElementById('bitacora-kpis').innerHTML = tiles.map(t => `
             <div class="col-6 col-xl-3">
-                <div class="kpi-tile h-100">
-                    <div class="icon-circle ${t.color} rounded-circle d-flex align-items-center justify-content-center mb-3" style="width:42px;height:42px">
-                        <i class='bx ${t.icono}' aria-hidden="true"></i>
-                    </div>
-                    <div class="ventas-dinero fw-bold">${t.valor}</div>
-                    <div class="small fw-semibold">${t.texto}</div>
-                    <small class="text-body-secondary">Últimos 7 días</small>
+                <div class="kpi-tile h-100${t.color === 'icon-danger' && t.valor ? ' es-alerta' : ''}">
+                    <div class="kpi-cabeza"><span class="kpi-titulo">${t.texto}</span><i class="bx ${t.icono}" aria-hidden="true"></i></div>
+                    <div class="kpi-value">${t.valor}</div>
+                    <small class="kpi-detalle">Últimos 7 días</small>
                 </div>
             </div>`).join('');
     }

@@ -129,7 +129,7 @@ function loadMembers(gymId) {
                 const pago = estadoDePago(m);
                 return `
                 <tr${esSolicitud ? ' class="table-warning bg-opacity-10"' : ''}>
-                    <td class="ps-4 fw-semibold">${escapeHtml(m.nombre)}</td>
+                    <td class="ps-4"><div class="persona">${avatar(m.nombre)}<span class="fw-semibold">${escapeHtml(m.nombre)}</span></div></td>
                     <td class="text-body-secondary">${escapeHtml(m.email)}</td>
                     <td>${estado.badge}</td>
                     <td>

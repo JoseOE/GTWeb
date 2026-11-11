@@ -86,16 +86,18 @@
             + c.promedio.toFixed(1) + '</strong> <span class="small text-body-secondary">(' + c.total + ')</span></span>';
     }
 
+    function iniciales(nombre) {
+        const p = (nombre || '').trim().split(/\s+/).filter(Boolean);
+        return ((p[0] || '?')[0] + (p.length > 1 ? p[1][0] : '')).toUpperCase();
+    }
+
     function tile(t) {
         return `
             <div class="col-6 col-xl-3">
-                <div class="kpi-tile h-100">
-                    <div class="icon-circle ${t.color} rounded-circle d-flex align-items-center justify-content-center mb-3" style="width:42px;height:42px">
-                        <i class='bx ${t.icono}' aria-hidden="true"></i>
-                    </div>
-                    <div class="ventas-dinero fw-bold">${t.valor}</div>
-                    <div class="small fw-semibold">${t.texto}</div>
-                    <small class="text-body-secondary">${t.nota || ''}</small>
+                <div class="kpi-tile h-100${t.color === 'icon-danger' && String(t.valor) !== '0' ? ' es-alerta' : ''}">
+                    <div class="kpi-cabeza"><span class="kpi-titulo">${t.texto}</span><i class="bx ${t.icono}" aria-hidden="true"></i></div>
+                    <div class="kpi-value">${t.valor}</div>
+                    <small class="kpi-detalle">${t.nota || ''}</small>
                 </div>
             </div>`;
     }
@@ -517,7 +519,8 @@
     const CARGAS = { resumen: cargarResumen, gimnasios: cargarGimnasios, cuentas: cargarCuentas, resenas: cargarResenas, bitacora: cargarBitacora };
 
     const nombre = localStorage.getItem('userName') || 'equipo';
-    document.getElementById('nav-user-name').innerHTML = "<i class='bx bx-user-circle'></i> " + escapeHtml(nombre);
+    document.getElementById('nav-user-name').textContent = nombre;
+    document.getElementById('nav-avatar').textContent = iniciales(nombre);
     document.getElementById('dash-user-name').textContent = nombre;
     document.getElementById('cerrar-sesion').addEventListener('click', e => { e.preventDefault(); Sesion.cerrar(); });
     document.getElementById('actualizar-todo').addEventListener('click', () => {

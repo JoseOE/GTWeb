@@ -1,0 +1,373 @@
+/* ═══════════════════════════════════════
+   Paneles de trabajo: el del dueño (bienvenido.html) y el del equipo
+   de GymTrack (admin.html).
+   Va después de styles.css y editorial.css y solo trae lo que es del
+   armazón: barra superior, menú lateral, cifras, personas y Resumen.
+   Los colores y las letras son los de editorial.css (--brand, --ink,
+   --paper, --muted, --line).
+═══════════════════════════════════════ */
+
+/* ─── Armazón: la barra arriba, el menú fijo y el contenido que se desliza ─── */
+.panel-pagina { min-height: 100vh; min-height: 100dvh; }
+.panel-barra {
+    min-height: 64px;
+    padding-block: 10px;
+    border-bottom: 1px solid rgba(244, 242, 235, .1);
+}
+.panel-barra .navbar-brand { margin-right: 0; }
+
+.panel-barra-enlace {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 0 12px;
+    border-radius: 8px;
+    color: #c6c7bd;
+    font-size: .875rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background-color .2s var(--ease-out), color .2s var(--ease-out);
+}
+.panel-barra-enlace .bx { font-size: 1.15rem; }
+.panel-barra-enlace:hover,
+.panel-barra-enlace:focus-visible { background: rgba(244, 242, 235, .1); color: var(--paper); }
+.panel-salir:hover,
+.panel-salir:focus-visible { color: #ffb199; }
+
+.panel-cuenta {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 4px 12px 4px 4px;
+    border-radius: 999px;
+    color: var(--paper);
+    text-decoration: none;
+    transition: background-color .2s var(--ease-out);
+}
+a.panel-cuenta:hover,
+a.panel-cuenta:focus-visible { background: rgba(244, 242, 235, .1); color: var(--paper); }
+.panel-avatar {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--brand);
+    color: var(--ink);
+    font-family: var(--identity);
+    font-size: .8125rem;
+    font-weight: 800;
+    letter-spacing: .02em;
+    flex-shrink: 0;
+}
+.panel-cuenta-texto { flex-direction: column; line-height: 1.2; min-width: 0; }
+.panel-cuenta-nombre {
+    max-width: 22ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: .875rem;
+    font-weight: 600;
+}
+.panel-cuenta-nota { font-size: .75rem; color: #b5b6ab; }
+.panel-barra a:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* El gimnasio (o el equipo) en lo alto del menú. */
+.panel-identidad { display: none; }
+
+@media (min-width: 992px) {
+    body.panel-pagina { height: 100vh; height: 100dvh; overflow: hidden; }
+    .panel-pagina .dash-wrap { flex: 1 1 auto; min-height: 0; }
+    .panel-pagina .dash-sidebar {
+        display: flex;
+        flex-direction: column;
+        width: 252px;
+        min-height: 0;
+        border-right: 1px solid var(--line);
+    }
+    .panel-pagina .dash-nav {
+        position: static;
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 6px 12px 20px;
+        scrollbar-width: thin;
+    }
+    .panel-pagina .dash-content {
+        max-height: none;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 28px clamp(20px, 3vw, 44px) 56px;
+        scroll-padding-top: 16px;
+    }
+    .panel-pagina .dash-panel { max-width: 1280px; margin-inline: auto; }
+
+    .panel-identidad {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 16px 12px 8px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--paper);
+    }
+    .panel-identidad-logo {
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: var(--ink);
+        color: var(--paper);
+        font-family: var(--identity);
+        font-size: .875rem;
+        font-weight: 800;
+        flex-shrink: 0;
+        overflow: hidden;
+    }
+    .panel-identidad-logo .bx { font-size: 1.35rem; color: #ff8c66; }
+    .panel-identidad-logo.con-logo { background: #fff; border: 1px solid var(--line); }
+    .panel-identidad-logo img { width: 100%; height: 100%; object-fit: contain; }
+    .panel-identidad-texto { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+    .panel-identidad-nombre {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 700;
+        font-size: .9375rem;
+    }
+    .panel-identidad-nota { font-size: .75rem; color: var(--muted); }
+}
+
+/* Menú: un renglón más bajo y el aviso del que está abierto. */
+.panel-pagina .dash-nav-link {
+    min-height: 44px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    font-size: .9rem;
+    transition: background-color .2s var(--ease-out), color .2s var(--ease-out);
+}
+.panel-pagina .dash-nav-link i { font-size: 1.2rem; }
+.panel-pagina .dash-nav-link:hover:not(.active) { background: rgba(32, 34, 31, .07); color: var(--ink); }
+.panel-pagina .dash-nav-grupo { padding: 18px 12px 6px; letter-spacing: .08em; }
+
+@media (max-width: 991.98px) {
+    /* En el teléfono el menú es una tira que se desliza: el borde derecho
+       se desvanece para que se note que hay más. */
+    .panel-pagina .dash-sidebar {
+        -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
+        mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
+    }
+    .panel-pagina .dash-nav { padding: 10px 28px 10px 12px; scrollbar-width: none; }
+    .panel-pagina .dash-nav::-webkit-scrollbar { display: none; }
+    .panel-pagina .dash-content { padding: 20px 16px 48px; }
+}
+
+/* ─── Cifras: el título arriba, el número grande y una nota ─── */
+.gym-interior .kpi-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px 18px;
+    background: #fff;
+    container-type: inline-size;
+}
+.kpi-cabeza {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+}
+.kpi-titulo { font-size: .8125rem; font-weight: 600; line-height: 1.3; color: var(--muted); }
+.kpi-cabeza .bx { font-size: 1.2rem; color: #8a8c82; flex-shrink: 0; }
+.gym-interior .kpi-tile .kpi-value {
+    /* Se ajusta al ancho de su tarjeta: "$156,313.00" cabe en un renglón aunque vayan seis en fila. */
+    font-size: clamp(1.4rem, 1.1rem + .8vw, 1.8rem);
+    font-size: clamp(1.1rem, 13.5cqi, 1.8rem);
+    white-space: nowrap;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+}
+.kpi-detalle {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: .8125rem;
+    line-height: 1.4;
+    color: var(--muted);
+}
+/* Una cifra que pide atención (membresías vencidas, reseñas malas). */
+.kpi-tile.es-alerta { border-color: rgba(183, 53, 17, .45); background: #fff8f5; }
+.kpi-tile.es-alerta .kpi-value,
+.kpi-tile.es-alerta .kpi-cabeza .bx { color: var(--brand-dark); }
+
+/* ─── Personas: círculo con iniciales junto al nombre ─── */
+.persona { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.persona-texto { min-width: 0; }
+.avatar-iniciales {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #e8e9df;
+    color: var(--ink);
+    font-family: var(--identity);
+    font-size: .75rem;
+    font-weight: 800;
+    letter-spacing: .02em;
+    flex-shrink: 0;
+}
+
+/* ─── Tablas ─── */
+.gym-interior .dash-table thead th { color: var(--muted); letter-spacing: .08em; padding-block: 12px; }
+.gym-interior .dash-table tbody td { padding-block: 12px; }
+.gym-interior .dash-table tbody tr { transition: background-color .15s ease; }
+
+/* ─── Resumen del dueño ─── */
+.resumen-cabeza {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 8px 24px;
+}
+.resumen-fecha { font-size: .875rem; font-weight: 500; color: var(--muted); }
+
+.resumen-atajos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.resumen-atajo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 64px;
+    padding: 12px 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+    color: var(--ink);
+    text-align: left;
+    transition: border-color .2s var(--ease-out), background-color .2s var(--ease-out), transform .16s var(--ease-out);
+}
+.resumen-atajo > .bx { font-size: 1.5rem; color: var(--brand-dark); flex-shrink: 0; }
+.resumen-atajo > span { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.resumen-atajo strong { font-size: .9375rem; font-weight: 700; }
+.resumen-atajo small { font-size: .8125rem; color: var(--muted); }
+.resumen-atajo:hover { border-color: var(--ink); }
+.resumen-atajo:active { transform: scale(.98); }
+.resumen-atajo:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.resumen-atajo.es-principal { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.resumen-atajo.es-principal > .bx { color: #ff8c66; }
+.resumen-atajo.es-principal small { color: #c6c7bd; }
+.resumen-atajo.es-principal:hover { background: #2c2f2a; }
+@media (max-width: 1199.98px) { .resumen-atajos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 479.98px) {
+    .resumen-atajos { gap: 8px; }
+    .resumen-atajo { padding: 10px 12px; gap: 10px; }
+    .resumen-atajo small { display: none; }
+}
+
+/* Ventas por día: una barra por día, la de hoy en tinta. */
+.resumen-barras {
+    display: flex;
+    align-items: stretch;
+    gap: clamp(3px, .8vw, 8px);
+    height: 168px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.resumen-barras li {
+    position: relative;
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    border-radius: 6px;
+    outline-offset: 2px;
+}
+.resumen-barra {
+    width: 100%;
+    max-width: 34px;
+    height: max(var(--alto), 3px);
+    max-height: calc(100% - 24px);
+    border-radius: 5px 5px 2px 2px;
+    background: var(--brand);
+    transform-origin: bottom;
+    transition: filter .15s ease;
+}
+.resumen-barras .sin-venta .resumen-barra { background: var(--line); }
+.resumen-barras .es-hoy .resumen-barra { background: var(--ink); }
+.resumen-barras .es-hoy.sin-venta .resumen-barra { background: #8a8c82; }
+.resumen-barras li:hover .resumen-barra,
+.resumen-barras li:focus-visible .resumen-barra { filter: brightness(.82); }
+.resumen-barras li:focus-visible { outline: 2px solid var(--brand); }
+.resumen-barra-dia { font-size: .75rem; line-height: 18px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.resumen-barras .es-hoy .resumen-barra-dia { font-weight: 700; color: var(--ink); }
+.resumen-barras-lectura {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+.resumen-espera { height: 120px; border-radius: 8px; background: linear-gradient(90deg, #f1efe7, #f8f7f2, #f1efe7); background-size: 200% 100%; }
+
+.resumen-vencen li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-top: 1px solid var(--line);
+}
+.resumen-vencen li:first-child { border-top: 0; padding-top: 0; }
+.resumen-vencen li:last-child { padding-bottom: 0; }
+.resumen-plazo {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #eeeee6;
+    color: #464842;
+    font-size: .8125rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.resumen-plazo.es-pronto { background: #fdf0d2; color: #6b4a00; }
+.resumen-plazo.es-vencida { background: #fde3db; color: #8f260a; }
+
+.gym-interior .dash-empty .btn-link { color: var(--brand-dark); font-weight: 600; text-decoration: none; }
+.gym-interior .dash-empty .btn-link:hover { text-decoration: underline; }
+
+/* ─── Movimiento: corto, y solo si la persona no pidió reducirlo ─── */
+@media (prefers-reduced-motion: no-preference) {
+    /* Sin "forwards": al terminar no queda ningún transform, así las ventanas
+       (position: fixed) que viven dentro de la pestaña siguen en su lugar. */
+    .panel-pagina .dash-panel.active { animation: panel-entra .26s var(--ease-out); }
+    .panel-pagina .kpi-tile { animation: cifra-entra .32s var(--ease-out) backwards; }
+    .panel-pagina .row > :nth-child(2) > .kpi-tile { animation-delay: .04s; }
+    .panel-pagina .row > :nth-child(3) > .kpi-tile { animation-delay: .08s; }
+    .panel-pagina .row > :nth-child(4) > .kpi-tile { animation-delay: .12s; }
+    .panel-pagina .row > :nth-child(n+5) > .kpi-tile { animation-delay: .16s; }
+    .resumen-barra { animation: barra-crece .5s var(--ease-out) backwards; animation-delay: calc(var(--orden, 0) * 22ms); }
+    .ventas-barra > span { animation: barra-ancha .5s var(--ease-out) backwards; transform-origin: left; }
+    .resumen-espera { animation: espera 1.2s linear infinite; }
+}
+@keyframes panel-entra { from { opacity: .35; transform: translateY(8px); } }
+@keyframes cifra-entra { from { opacity: .4; transform: translateY(6px); } }
+@keyframes barra-crece { from { transform: scaleY(.04); } }
+@keyframes barra-ancha { from { transform: scaleX(.04); } }
+@keyframes espera { to { background-position: -200% 0; } }
+
+/* Pendientes sin nada que hacer. */
+.resumen-al-dia { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 10px; background: #eef4ec; color: #1d4a2c; }
+.resumen-al-dia .bx { font-size: 1.75rem; flex-shrink: 0; }
+.resumen-al-dia strong { display: block; }

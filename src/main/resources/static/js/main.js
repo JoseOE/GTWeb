@@ -86,8 +86,11 @@ function initMap() {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     }).addTo(map);
 
-    L.marker([destLat, destLng]).addTo(map)
-        .bindPopup('<b>GymTrack</b><br>Oficinas Centrales.')
+    L.marker([destLat, destLng], {
+        icon: L.divIcon({ className: 'mapa-pin', html: '<span></span>', iconSize: [32, 42], iconAnchor: [16, 40], popupAnchor: [0, -38] }),
+        alt: 'GymTrack', keyboard: false
+    }).addTo(map)
+        .bindPopup('<b>GymTrack</b><br>Oficinas centrales.', { className: 'mapa-globo', closeButton: false })
         .openPopup();
 
     const routeButton = document.getElementById('show-route');

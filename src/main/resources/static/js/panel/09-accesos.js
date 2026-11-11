@@ -39,13 +39,10 @@ function initAccesos() {
     function tarjetaKpi(valor, texto, sub, icono, color) {
         return `
             <div class="col-6 col-xl-3">
-                <div class="kpi-tile h-100">
-                    <div class="icon-circle ${color} rounded-circle d-flex align-items-center justify-content-center mb-3" style="width:42px;height:42px">
-                        <i class='bx ${icono}' aria-hidden="true"></i>
-                    </div>
-                    <div class="ventas-dinero fw-bold">${valor}</div>
-                    <div class="small fw-semibold">${texto}</div>
-                    <small class="text-body-secondary text-truncate d-block">${sub}</small>
+                <div class="kpi-tile h-100${color === 'icon-danger' && Number(valor) ? ' es-alerta' : ''}">
+                    <div class="kpi-cabeza"><span class="kpi-titulo">${texto}</span><i class="bx ${icono}" aria-hidden="true"></i></div>
+                    <div class="kpi-value">${valor}</div>
+                    <small class="kpi-detalle">${sub}</small>
                 </div>
             </div>`;
     }

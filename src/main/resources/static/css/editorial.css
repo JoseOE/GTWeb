@@ -2198,3 +2198,196 @@ fieldset:disabled .btn-primary {
     justify-content:center;
     gap:6px
 }
+
+/* ═══════════════════════════════════════
+   Parte pública: Quiénes somos, mapa, pie de página y acceso
+═══════════════════════════════════════ */
+
+/* Quiénes somos: la nota del proyecto va bajo el título, a la izquierda. */
+.about-lead {
+    display:flex;
+    flex-direction:column;
+    gap:36px
+}
+.about-lead .about-note {
+    max-width:44ch;
+    margin:0;
+    padding-top:18px;
+    border-top:1px solid var(--line)
+}
+@media(max-width:991.98px) {
+    /* En una columna la nota va al final, después del texto. */
+    .about-lead {
+        display:contents
+    }
+    .about-lead .about-note {
+        order:3;
+        max-width:68ch
+    }
+}
+
+/* Mapa: el plano en gris para que el marcador naranja sea lo único con color. */
+.gym-editorial #map .leaflet-tile-pane {
+    filter:grayscale(1) contrast(1.05)
+}
+.mapa-pin span {
+    position:absolute;
+    left:1px;
+    top:0;
+    width:30px;
+    height:30px;
+    border-radius:50% 50% 50% 0;
+    background:var(--brand);
+    border:2px solid var(--ink);
+    transform:rotate(-45deg)
+}
+.mapa-pin span::after {
+    content:'';
+    position:absolute;
+    inset:8px;
+    border-radius:50%;
+    background:var(--ink)
+}
+.mapa-globo .leaflet-popup-content-wrapper {
+    background:var(--ink);
+    color:var(--paper);
+    border-radius:8px;
+    box-shadow:0 10px 30px -14px #20221f90;
+    font-family:var(--body)
+}
+.mapa-globo .leaflet-popup-content {
+    margin:10px 14px;
+    font-size:13px;
+    line-height:1.5
+}
+.mapa-globo .leaflet-popup-content b {
+    font-family:var(--identity);
+    font-size:14px
+}
+.mapa-globo .leaflet-popup-tip {
+    background:var(--ink)
+}
+
+/* Pie de página: la marca, tres columnas de enlaces y el contacto. */
+.editorial-footer .footer-top {
+    align-items:flex-start;
+    flex-wrap:wrap;
+    gap:36px 48px
+}
+.footer-marca {
+    display:flex;
+    flex-direction:column;
+    gap:18px
+}
+.footer-columnas {
+    display:grid;
+    grid-template-columns:repeat(3,auto);
+    gap:28px clamp(28px,5vw,72px)
+}
+.footer-columnas h2 {
+    margin:0 0 14px;
+    font-family:var(--body);
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:#adb2a3
+}
+.footer-columnas a {
+    display:block;
+    padding:5px 0;
+    color:var(--paper);
+    font-size:14px;
+    text-decoration:none
+}
+.footer-columnas a:hover,.footer-columnas a:focus-visible {
+    color:#ff8c66
+}
+@media(max-width:767.98px) {
+    .footer-columnas {
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        width:100%
+    }
+    .footer-columnas a {
+        padding:9px 0
+    }
+}
+
+/* Iniciar sesión: la foto ocupa la columna, con el saludo encima. */
+.gym-interior .auth-shell .row:has(.acceso-foto) {
+    align-items:stretch!important
+}
+.acceso-foto {
+    position:relative;
+    height:100%;
+    min-height:520px;
+    margin:0;
+    border-radius:12px;
+    overflow:hidden;
+    background:var(--ink)
+}
+.gym-interior .auth-shell .col-lg-5:first-child .acceso-foto img {
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    filter:grayscale(1) contrast(1.08);
+    border-radius:0!important
+}
+.acceso-foto::after {
+    content:'';
+    position:absolute;
+    inset:0;
+    background:linear-gradient(180deg,#20221f00 35%,#20221fe6 100%)
+}
+.acceso-foto figcaption {
+    position:absolute;
+    left:28px;
+    right:28px;
+    bottom:28px;
+    z-index:1;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    color:var(--paper)
+}
+.acceso-foto-titulo {
+    font-family:var(--display);
+    font-size:clamp(44px,4.6vw,64px);
+    font-weight:700;
+    line-height:.95;
+    text-transform:uppercase
+}
+.acceso-foto-titulo em {
+    font-style:normal;
+    color:#ff7a4d
+}
+.acceso-foto-texto {
+    max-width:34ch;
+    font-size:15px;
+    line-height:1.6;
+    color:#e3e4da
+}
+
+/* Registro: lo que incluye la cuenta, como lista con renglones. */
+.acceso-lista {
+    margin:0;
+    padding:0;
+    list-style:none;
+    border-top:1px solid var(--line)
+}
+.acceso-lista li {
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:14px 0;
+    border-bottom:1px solid var(--line);
+    font-size:16px;
+    color:var(--ink)
+}
+.acceso-lista .bx {
+    font-size:22px;
+    color:var(--brand-dark);
+    flex-shrink:0
+}

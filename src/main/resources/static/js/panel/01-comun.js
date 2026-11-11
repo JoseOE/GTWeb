@@ -66,6 +66,16 @@ function avisoSinGimnasio(texto, icono) {
         + texto + '<div class="mt-3"><button type="button" class="btn btn-primary btn-sm rounded-pill px-3" data-goto="gimnasio">Configurar mi gimnasio</button></div></div>';
 }
 
+// Iniciales para el círculo de una persona: "Ana López Ruiz" → "AL".
+function iniciales(nombre) {
+    const p = (nombre || '').trim().split(/\s+/).filter(Boolean);
+    return ((p[0] || '?')[0] + (p.length > 1 ? p[1][0] : '')).toUpperCase();
+}
+
+function avatar(nombre) {
+    return '<span class="avatar-iniciales" aria-hidden="true">' + escapeHtml(iniciales(nombre)) + '</span>';
+}
+
 function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str == null ? '' : String(str);
