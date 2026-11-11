@@ -19,7 +19,7 @@
 
     <header id="tienda-barra"></header>
 
-    <main class="container-tienda pt-2" id="contenido" style="max-width:760px">
+    <main class="container-tienda checkout-contenedor pt-2" id="contenido">
         <a href="tienda.html" class="d-inline-flex align-items-center gap-1 text-body-secondary text-decoration-none tocable fw-semibold">
             <i class='bx bx-chevron-left fs-4' aria-hidden="true"></i> Seguir comprando
         </a>
@@ -120,12 +120,10 @@
                 const gym = cuenta.gym || {};
                 raiz.innerHTML = `
                     <div id="avisos"></div>
-                    <section class="paso mb-3" aria-labelledby="paso-1">
-                        <h2 class="paso-titulo" id="paso-1"><span class="numero">1</span> Tu pedido</h2>
-                        <div id="resumen"></div>
-                    </section>
-                    <section class="paso mb-3" aria-labelledby="paso-2">
-                        <h2 class="paso-titulo" id="paso-2"><span class="numero">2</span> Entrega</h2>
+                    <div class="checkout-rejilla">
+                    <div class="checkout-pasos">
+                    <section class="paso mb-3 paso-entrega" aria-labelledby="paso-2">
+                        <h2 class="paso-titulo" id="paso-2"><span class="numero">1</span> Entrega</h2>
                         <div class="d-flex gap-3 align-items-start">
                             <i class="bx bx-store-alt fs-3 text-primary" aria-hidden="true"></i>
                             <div>
@@ -136,7 +134,7 @@
                         </div>
                     </section>
                     <section class="paso mb-3" aria-labelledby="paso-3">
-                        <h2 class="paso-titulo" id="paso-3"><span class="numero">3</span> Forma de pago</h2>
+                        <h2 class="paso-titulo" id="paso-3"><span class="numero">2</span> Forma de pago</h2>
                         <p class="small text-body-secondary mt-n2">Pagos en modo de prueba (sandbox) de Stripe, PayPal y Paynet: usa sus tarjetas y cuentas de prueba, no las reales.</p>
                         ${metodos.length
                             ? '<div role="radiogroup" aria-label="Forma de pago">' + metodos.map(m => `
@@ -150,10 +148,18 @@
                             : '<div class="estado-vacio"><i class="bx bx-wallet"></i>Todavía no hay formas de pago disponibles. Vuelve pronto.</div>'}
                         <div id="metodo-contenedor" class="metodo-contenedor mt-3"></div>
                     </section>
+                    </div>
+                    <aside class="checkout-lado" aria-label="Resumen de tu compra">
+                    <section class="paso mb-3 paso-resumen" aria-labelledby="paso-1">
+                        <h2 class="paso-titulo" id="paso-1"><i class="bx bx-shopping-bag" aria-hidden="true"></i> Tu pedido</h2>
+                        <div id="resumen"></div>
+                    </section>
                     <div class="accion-fija">
                         <div id="error-pago" class="alert alert-danger small py-2 d-none" role="alert"></div>
                         <button type="button" class="btn btn-primary btn-grande w-100" id="pagar" disabled>Pagar</button>
                         <p class="nota-legal">Al confirmar tu compra aceptas los <a href="terminos.html${conGym}" target="_blank" rel="noopener">Términos y condiciones de compra</a> y el <a href="privacidad.html${conGym}" target="_blank" rel="noopener">Aviso de privacidad</a>${vendedor ? ' de ' + Tienda.escapar(vendedor.nombre.replace(/\.$/, '')) : ''}. Pagos en modo de prueba: no se cobra dinero real.</p>
+                    </div>
+                    </aside>
                     </div>`;
 
                 raiz.querySelectorAll('input[name="metodo"]').forEach(r => r.addEventListener('change', () => elegir(r.value)));

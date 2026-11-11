@@ -59,7 +59,7 @@
                     return;
                 }
                 lista.innerHTML = pedidos.map(p => `
-                    <article class="pedido-card">
+                    <article class="pedido-card${p.estado === 'cancelado' ? ' es-cancelado' : ''}">
                         <div class="d-flex justify-content-between align-items-start gap-2">
                             <div>
                                 <h2 class="seccion-titulo mb-0">Pedido #${Tienda.escapar(p.folio)}</h2>
@@ -79,7 +79,7 @@
                                     ? '<button type="button" class="btn btn-outline-primary tocable px-3" data-recibo="' + Tienda.escapar(p.orderId) + '" data-folio="' + Tienda.escapar(p.folio) + '"><i class="bx bx-download"></i> Recibo</button>'
                                     : ''}
                                 ${p.estado === 'pagado' || p.estado === 'reembolsado' || (p.estado === 'pendiente_pago' && p.paynet) ? Tienda.menuCompartir(p) : ''}
-                                <a class="btn btn-primary tocable px-3" href="confirmacion.html?pedido=${encodeURIComponent(p.orderId)}">Ver</a>
+                                <a class="btn ${p.estado === 'cancelado' ? 'btn-outline-primary' : 'btn-primary'} tocable px-3" href="confirmacion.html?pedido=${encodeURIComponent(p.orderId)}">Ver pedido</a>
                             </div>
                         </div>
                     </article>`).join('');

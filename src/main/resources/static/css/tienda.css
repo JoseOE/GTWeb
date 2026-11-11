@@ -1173,3 +1173,59 @@ body.con-barra-carrito {
     background: #fff4d6;
     color: #7a5600;
 }
+
+/* ─── Pasada de diseño (tienda, checkout y pedidos) ─── */
+
+/* Fotos de producto en 4:3: una tarjeta ya no ocupa media pantalla. */
+.producto-card .foto {
+    aspect-ratio: 4 / 3;
+}
+
+/* Un pedido cancelado pasa a segundo plano: borde punteado y sin fondo. */
+.pedido-card.es-cancelado {
+    background: transparent;
+    border-style: dashed;
+}
+
+/* Checkout: en escritorio los pasos a la izquierda y el resumen con "Pagar"
+   a la derecha, fijo al bajar. En celular el resumen va arriba y el botón
+   de pagar queda pegado abajo, como antes. */
+.checkout-contenedor {
+    max-width: 760px;
+}
+.paso-titulo > .bx {
+    font-size: 20px;
+    color: var(--brand-dark);
+}
+@media (min-width: 992px) {
+    .checkout-contenedor {
+        max-width: 1100px;
+    }
+    .checkout-rejilla {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 380px;
+        gap: 24px;
+        align-items: start;
+    }
+    .checkout-lado {
+        position: sticky;
+        top: 84px;
+    }
+    .checkout-lado .nota-legal {
+        text-align: left;
+    }
+}
+@media (max-width: 991.98px) {
+    .checkout-rejilla {
+        display: flex;
+        flex-direction: column;
+    }
+    .checkout-pasos,
+    .checkout-lado {
+        display: contents;
+    }
+    .paso-resumen { order: 1; }
+    .paso-entrega { order: 2; }
+    .checkout-pasos > .paso:last-child { order: 3; }
+    .checkout-rejilla .accion-fija { order: 4; }
+}
