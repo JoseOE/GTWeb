@@ -854,77 +854,54 @@ El recibo se descarga de `GET /api/recibos/pedidos/{orderId}.pdf` con `fetch` y 
 
 ---
 
-## 🚪 Control de acceso RFID, voz y Alexa
+## 🚪 Control de acceso RFID
 
-La puerta del gimnasio tiene un lector RFID UHF que valida la membresía de cada socio contra la API en tiempo real, registra **entradas y salidas** y avisa en el panel cuando alguien no puede entrar. Además se puede entrar o salir con un **comando de voz**, y una Alexa saluda a cada socio y prende la lámpara del gimnasio por **Matter**. El firmware de las placas está en [`hardware/acceso-rfid/`](hardware/acceso-rfid).
+La puerta del gimnasio tiene un lector RFID UHF que valida la membresía de cada socio contra la API en tiempo real, registra **entradas y salidas** y avisa en el panel cuando alguien no puede entrar. Si la membresía venció, al socio le llega un aviso para renovar desde la app y, al pagar, la puerta se abre sola. El firmware y las conexiones están en [`hardware/acceso-rfid/`](hardware/acceso-rfid).
 
 ```plaintext
- tag UHF ──► YRM1004 ──► LILYGO T-SIM7070G ── HTTPS (WiFi, LTE-M o 2G) ──► GTWeb en Render ──► MongoDB Atlas
-                            ▲      │                                            │
-   XIAO ESP32-S3 (voz) ─────┘      │ serial 9600                                └─► panel "Accesos RFID"
-   pulso D0 → GPIO 14              ▼                                                 (alertas, dar acceso)
-                          ESP32-C6 puente ── UDP 4210 ──► ESP32-C6 Alexa
-                     sensor Matter "Gimnasio ocupado"    un sensor Matter por socio + "Voz" + "Acceso denegado"
-                                   │                                  │
-                                   └──────────── Alexa (rutinas) ─────┘
-                           prende/apaga la lámpara        "Bienvenido Chema", "Hasta luego Chema", "Acceso denegado"
+ tag UHF ──► YRM1004 ──► LILYGO T-SIM7070G ── HTTPS (WiFi o datos móviles) ──► GTWeb en Render ──► MongoDB Atlas
+                            │                                                   │
+              LEDs, buzzer y servo (puerta)                                     ├─► panel "Accesos RFID" (alertas, dar acceso)
+                                                                                └─► push al socio: "renueva desde la app"
 ```
 
 ### Cómo decide la puerta
 
-| Situación | Resultado | Qué pasa |
+| Situación | Resultado | Qué pasa en la puerta |
 |---|---|---|
-| Socio fuera con la membresía al día | `ENTRADA` | LED verde, se abre la puerta, la Alexa le da la bienvenida y, si es el primero, prende la lámpara |
-| Socio dentro | `SALIDA` | LED azul; la salida no se valida. La Alexa lo despide y, si ya no queda nadie, apaga la lámpara |
-| Membresía vencida o tag desconocido | `NEGADO` | LED rojo, alerta en el panel y la Alexa dice "Acceso denegado" |
-| El dueño da acceso desde la alerta | `ENTRADA` | La LILYGO recibe la orden (consulta larga a `/api/lectores/comandos`), abre y la Alexa le da la bienvenida. Su siguiente pase cuenta como salida aunque siga vencido |
-| Comando de voz "entrada" / "salida" | `ENTRADA` / `SALIDA` | Se registra como "Acceso por voz", por turnos (una entrada repetida se ignora) |
+| Socio fuera con la membresía al día | `ENTRADA` | LED verde, 1 pitido y el servo abre 3 s |
+| Socio dentro | `SALIDA` | LED azul, 2 pitidos y abre; la salida no se valida |
+| Membresía vencida | `NEGADO` | LED rojo y 3 pitidos; alerta en el panel y push al socio para renovar. Al pagar, la puerta se abre sola |
+| Tag desconocido | `NEGADO` | LED rojo y 3 pitidos; alerta en el panel |
+| El dueño da acceso desde la alerta | `ENTRADA` | La LILYGO recibe "abrir" (consulta larga a `/api/lectores/comandos`) y abre |
 
 - Un pase del mismo tag a menos de 10 s del anterior se ignora; quien no registra su salida en 4 h se da por fuera.
-- Sin internet, la LILYGO decide con la lista de tags que guarda en su memoria.
+- **Internet automático.** Primero WiFi (hasta 3 redes de 2.4 GHz); si no hay, datos móviles con el SIM7070G (LTE-M / NB-IoT y, si no, 2G). Si el WiFi se cae más de 45 s pasa a datos, y en datos busca el WiFi cada 2 min para regresar. Sin internet decide con la lista de tags que guarda en su memoria.
 - Por qué no MQTT: el lector es un solo cliente que siempre pregunta, así que HTTPS con una llave por lector (guardada como hash SHA-256) basta y no necesita un broker aparte.
 
-### Placas
+### Simular entrada (prueba)
 
-| Placa | Programa | Qué hace |
-|---|---|---|
-| LILYGO T-SIM7070G + YRM1004 | `lector_wifi/` | Lee los tags, pregunta a la API, LEDs y puerta. Red por WiFi (3 redes conocidas), LTE-M o 2G: comandos `w` / `l` / `g` en el monitor serie (115200); `r` muestra el estado, `n` simula un tag desconocido |
-| XIAO ESP32-S3 Sense | `xiao_voz_turnos/` | Escucha continua con un modelo de Edge Impulse ("entrada" / "salida") y le manda un pulso a la LILYGO (≈100 ms entrada, ≈300 ms salida). Guía: [`MODELO_VOZ.md`](hardware/acceso-rfid/MODELO_VOZ.md) |
-| ESP32-C6 puente | `c6_puente/` | Recibe los avisos de la LILYGO (`E\|Chema\|3`, `S`, `N`, `A`, `D`), es el sensor Matter "Gimnasio ocupado" y reenvía cada aviso por UDP |
-| ESP32-C6 Alexa | `c6_alexa/` | Un sensor de contacto Matter por socio, uno de "Voz" y uno de "Acceso denegado"; la Alexa reacciona con rutinas. Guía: [`ALEXA_MATTER.md`](hardware/acceso-rfid/ALEXA_MATTER.md) |
+Mientras se termina la puerta, en **Mis Usuarios** cada socio tiene el botón **Simular entrada**: hace como si pasara su tarjeta, con las mismas reglas que el lector.
 
-Cada carpeta lleva un `secrets.example.h`: cópialo como `secrets.h` (no se sube a GitHub) y pon el WiFi, la URL del servidor y la llave del lector que da el panel al crearlo.
+1. Con la membresía vencida se niega, queda la alerta en Accesos RFID y al socio le llega el push para renovar (si tiene la app con avisos).
+2. El socio paga desde el teléfono: la puerta se abre sola y queda su entrada.
+3. Con la membresía al día, "Simular entrada" registra la entrada (o la salida, si ya estaba dentro) y, si el lector está conectado, **abre el servo de verdad**: la LILYGO recibe "abrir" por `/api/lectores/comandos`.
 
-### Compilar y subir las ESP32-C6
-
-En Windows, el Control inteligente de aplicaciones bloquea el compilador RISC-V de la C6, así que se compilan en Ubuntu (WSL) y se suben desde Windows con el esptool del Arduino IDE. Usa el USB-C marcado **ESP32C6**, no el CH343.
-
-```bash
-bash /mnt/c/Users/<tu-usuario>/Documents/Proyectos/Gym-Track/GTWeb/hardware/acceso-rfid/compilar_c6.sh
-```
-
-```powershell
-.\subir_c6.ps1 -Puerto COM5 -Programa c6_puente -Borrar   # primera vez: borra todo y sube la imagen completa
-.\subir_c6.ps1 -Puerto COM5 -Programa c6_puente           # actualizar: solo el programa, conserva el emparejamiento
-```
-
-Al arrancar sin emparejar, el monitor muestra el código de 11 dígitos para la app Alexa (Dispositivos → + → Matter). Las dos C6 traen el mismo código de prueba: empareja una a la vez. Mantener BOOT 5 s borra el emparejamiento.
-
-> En el núcleo ESP32 3.3.11, `MatterContactSensor::setContact()` no cambia el sensor (el estado lo lleva el cluster BooleanState y escribir el atributo da `ESP_ERR_NOT_SUPPORTED`). Los programas lo cambian con `BooleanStateCluster::SetStateValue()`.
+Las entradas simuladas quedan en el historial como "Simulada desde el panel" y en la bitácora. Para quitar el botón sin tocar el código: `ACCESO_SIMULACION=false` en Render.
 
 ### API del acceso
 
 | Método | Ruta | Uso |
 |---|---|---|
 | POST | `/api/lectores/accesos` | El lector manda un EPC → `ENTRADA`, `SALIDA`, `NEGADO`, `IGNORADO` o `REGISTRO`, con cuántos quedan dentro |
-| POST | `/api/lectores/voz` | Entrada o salida por comando de voz |
-| GET | `/api/lectores/comandos?espera=0..15` | Consulta larga: órdenes del panel ("abrir" / "negar") |
-| GET | `/api/lectores/lista` · `/api/lectores/aforo` | Tags permitidos para decidir sin red · cuántos hay dentro |
+| GET | `/api/lectores/comandos?espera=0..15` | Consulta larga: "abrir" / "negar" (alertas, renovación y entradas simuladas) |
+| GET | `/api/lectores/lista` | Tags permitidos para decidir sin red |
 | GET | `/api/gyms/{gymId}/acceso` | Resumen del panel: lectores, tags, alertas, quién está dentro y bitácora |
 | POST | `/api/gyms/{gymId}/acceso/lectores` | Crear un lector (devuelve su llave una sola vez) |
 | POST · DELETE | `/api/gyms/{gymId}/acceso/tarjetas` · `/tarjetas/{id}` | Ligar un tag a un socio · quitarlo |
 | POST · DELETE | `/api/gyms/{gymId}/acceso/lectores/{lectorId}/registro` | Modo registro: el siguiente tag que pase se captura para asignarlo |
 | POST | `/api/gyms/{gymId}/acceso/solicitudes/{id}/abrir` · `/negar` | Atender una alerta de acceso negado |
+| GET · POST | `/api/gyms/{gymId}/acceso/simulacion` · `/simular` | Simular entrada (prueba): si está activa y con qué lector · `{userId}` pasa la tarjeta de ese socio |
 | GET · POST | `/api/tienda/renovacion` | App: ver y preparar la renovación tras un acceso negado por membresía vencida (ver abajo) |
 
 Las rutas `/api/lectores/*` piden el encabezado `X-Lector-Key`; las del panel, la sesión del dueño. Para probar sin placas: `node pruebas/lector-rfid.mjs preparar|probar|limpiar`.
@@ -943,7 +920,7 @@ Si el lector niega la entrada por **membresía vencida**, el socio puede renovar
    - Si ya pasaron, la membresía queda al día y basta con volver a pasar la tarjeta.
    - Lo mismo pasa si el dueño le vende el plan en el mostrador mientras el socio espera en la puerta.
 
-Prueba: `pruebas/renovar-puerta.mjs`, incluida en `correr-todas`.
+Pruebas: `pruebas/renovar-puerta.mjs` y `pruebas/simular-entrada.mjs`, incluidas en `correr-todas`.
 
 ---
 

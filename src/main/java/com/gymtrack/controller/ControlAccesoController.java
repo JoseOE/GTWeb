@@ -89,6 +89,24 @@ public class ControlAccesoController {
         return control.atender(gymId, id, false, userId);
     }
 
+    // Simular una entrada (prueba, mientras se termina la puerta): GET dice si
+    // está activa y qué lector abriría; POST {"userId": "..."} "pasa la tarjeta"
+    // de ese socio. Ver ControlAccesoService.simularEntrada.
+    @GetMapping("/simulacion")
+    public Map<String, Object> simulacion(@PathVariable String gymId,
+                                          @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
+        acceso.exigirDueno(gymId, userId);
+        return control.simulacion(gymId);
+    }
+
+    @PostMapping("/simular")
+    public Map<String, Object> simular(@PathVariable String gymId,
+                                       @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId,
+                                       @RequestBody(required = false) Map<String, String> body) {
+        acceso.exigirDueno(gymId, userId);
+        return control.simularEntrada(gymId, body == null ? null : body.get("userId"));
+    }
+
     // Las fotos no tienen URL pública: el panel las pide con su sesión.
     @GetMapping("/fotos/{id}")
     public ResponseEntity<byte[]> foto(@PathVariable String gymId, @PathVariable String id,

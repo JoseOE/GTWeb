@@ -1,3 +1,2 @@
-# Secretos de cada placa y lo que compila compilar_c6.sh.
+# Los datos de cada placa (WiFi, llave del lector): nunca a git.
 secrets.h
-build_c6/

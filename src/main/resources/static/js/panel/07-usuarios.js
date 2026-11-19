@@ -16,7 +16,16 @@ function initMembers() {
         modal.show();
     });
 
+    document.getElementById('simulacion-otra').addEventListener('click', () => {
+        if (simulacionSocio) simularEntrada(simulacionSocio.id, simulacionSocio.nombre);
+    });
+
     document.getElementById('members-tbody').addEventListener('click', (e) => {
+        const simular = e.target.closest('[data-simular-user]');
+        if (simular) {
+            simularEntrada(simular.dataset.simularUser, simular.dataset.simularName);
+            return;
+        }
         const btn = e.target.closest('[data-member-action]');
         if (!btn) return;
         const gymId = localStorage.getItem('gymId');
@@ -83,13 +92,96 @@ function initMembers() {
     });
 }
 
+/* ─── Simular entrada (prueba, mientras se termina la puerta RFID) ───
+   "Pasa la tarjeta" de un socio con las mismas reglas que el lector: con la
+   membresía vencida se niega y le llega un push para renovar desde la app (al
+   pagar, la puerta se abre sola); al día, entra y el lector abre el servo.
+   Se apaga en el servidor con ACCESO_SIMULACION=false. */
+let simulacionAcceso = null;   // {activa, lector: {nombre, enLinea}} o null mientras se pregunta
+let simulacionSocio = null;    // {id, nombre} de la última simulación, para "Simular otra vez"
+
+function cargarSimulacion(gymId) {
+    return fetch('/api/gyms/' + gymId + '/acceso/simulacion')
+        .then(res => res.ok ? res.json() : { activa: false })
+        .catch(() => ({ activa: false }))
+        .then(s => {
+            simulacionAcceso = s;
+            const aviso = document.getElementById('members-simulacion');
+            aviso.classList.toggle('d-none', !s.activa);
+            if (s.activa) {
+                document.getElementById('members-simulacion-texto').innerHTML = s.lector
+                    ? '"Simular entrada" hace como si el socio pasara su tarjeta en <strong>' + escapeHtml(s.lector.nombre) + '</strong> ('
+                        + (s.lector.enLinea ? 'conectado: la puerta se abre de verdad' : 'desconectado: solo queda registrado') + '). '
+                        + 'Con la membresía vencida se niega y le llega un aviso a su teléfono para renovar; al pagar, la puerta se abre sola.'
+                    : 'Para simular entradas, primero agrega el lector de la puerta en Accesos RFID.';
+            }
+            return s;
+        });
+}
+
+function botonSimular(m) {
+    if (!simulacionAcceso || !simulacionAcceso.activa || !simulacionAcceso.lector) return '';
+    const vencida = m.diasParaVencer != null && m.diasParaVencer < 0;
+    return `<button type="button" class="btn ${vencida ? 'btn-outline-danger' : 'btn-outline-secondary'} btn-sm rounded-pill px-3 mb-1"
+                data-simular-user="${m.id}" data-simular-name="${escapeHtml(m.nombre)}" title="Prueba: como si pasara su tarjeta">
+                <i class='bx bx-door-open'></i> Simular entrada
+            </button>`;
+}
+
+function simularEntrada(socioId, nombre) {
+    const gymId = localStorage.getItem('gymId');
+    const cuerpo = document.getElementById('simulacion-cuerpo');
+    const modalEl = document.getElementById('simulacionModal');
+    simulacionSocio = { id: socioId, nombre };
+    document.getElementById('simulacionModalLabel').textContent = 'Simular entrada de ' + nombre;
+    cuerpo.innerHTML = '<div class="py-4 text-body-secondary"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Pasando la tarjeta…</div>';
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    apiTienda('/api/gyms/' + gymId + '/acceso/simular', { method: 'POST', body: JSON.stringify({ userId: socioId }) })
+        .then(r => { cuerpo.innerHTML = vistaSimulacion(r); })
+        .catch(err => {
+            cuerpo.innerHTML = '<div class="py-3"><i class="bx bx-error-circle fs-1 text-danger d-block mb-2"></i>' + escapeHtml(err.message) + '</div>';
+        });
+}
+
+function vistaSimulacion(r) {
+    const lector = r.lector ? escapeHtml(r.lector.nombre) : 'el lector';
+    const puerta = r.puertaAbierta
+        ? '<i class="bx bx-wifi me-1"></i><strong>' + lector + '</strong> está abriendo la puerta.'
+        : '<i class="bx bx-wifi-off me-1"></i><strong>' + lector + '</strong> no está conectado: la puerta no se movió, pero quedó registrado.';
+    const tarjeta = (icono, color, titulo, texto, extra) => `
+        <div class="py-2">
+            <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-${color} bg-opacity-10 text-${color} mb-3" style="width:72px;height:72px">
+                <i class="bx ${icono}" style="font-size:2.4rem" aria-hidden="true"></i>
+            </div>
+            <h5 class="fw-bold mb-2">${titulo}</h5>
+            <p class="mb-2">${texto}</p>
+            ${extra ? '<p class="small text-body-secondary mb-0">' + extra + '</p>' : ''}
+        </div>`;
+    const nombre = escapeHtml(r.nombre || '');
+    if (r.resultado === 'ENTRADA') {
+        return tarjeta('bx-door-open', 'success', 'Bienvenido, ' + nombre, 'Su membresía está al día: entrada registrada.', puerta);
+    }
+    if (r.resultado === 'SALIDA') {
+        return tarjeta('bx-log-out', 'primary', 'Hasta luego, ' + nombre, 'Ya estaba dentro, así que este pase cuenta como su salida.', puerta);
+    }
+    if (r.resultado === 'NEGADO') {
+        const aviso = r.avisoRenovar
+            ? '<i class="bx bx-mobile-alt me-1"></i>Le llegó una notificación a su teléfono para renovar desde la app.'
+            : r.alertaRepetida
+                ? 'Ya tenía una alerta de hace menos de 2 minutos, así que no se le volvió a avisar.'
+                : 'No tiene la app con las notificaciones activas, así que no le llegó el aviso; puede renovar desde la app.';
+        return tarjeta('bx-block', 'danger', 'Acceso negado: ' + escapeHtml(r.motivo || 'sin permiso'), aviso,
+            'Cuando pague desde el teléfono (tiene 10 minutos), la puerta se abre sola y queda su entrada. También aparece en Accesos RFID como alerta.');
+    }
+    return tarjeta('bx-time-five', 'secondary', 'Espera un momento', escapeHtml(r.motivo || 'Muy pronto desde su último pase') + ': vuelve a intentar en 10 segundos.', '');
+}
+
 function loadMembers(gymId) {
     const tbody = document.getElementById('members-tbody');
     const countLabel = document.getElementById('members-count');
     if (!gymId) return;
-    fetch('/api/gyms/' + gymId + '/members')
-        .then(res => res.json())
-        .then(members => {
+    Promise.all([fetch('/api/gyms/' + gymId + '/members').then(res => res.json()), cargarSimulacion(gymId)])
+        .then(([members]) => {
             resumenConteos.miembros = members.length;
             pintarPasos();
             const pendientes = members.filter(m => m.membershipStatus === 'pending').length;
@@ -141,6 +233,7 @@ function loadMembers(gymId) {
                         ${esSolicitud ? '' : `<button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3 mb-1" data-pay-user="${m.id}" data-pay-name="${escapeHtml(m.nombre)}">
                             <i class='bx bx-dollar'></i> Pago
                         </button>`}
+                        ${esSolicitud ? '' : botonSimular(m)}
                         ${estado.acciones(m.id)}
                     </td>
                 </tr>`;

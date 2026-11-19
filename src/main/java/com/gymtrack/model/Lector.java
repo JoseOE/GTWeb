@@ -6,7 +6,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
 
-// Un lector RFID de la puerta (LILYGO + YRM1004, con la XIAO como cámara).
+// Un lector RFID de la puerta (LILYGO T-SIM7070G + YRM1004).
 // Se identifica con una llave que el panel muestra una sola vez; aquí solo
 // queda su SHA-256, como una contraseña.
 @Document(collection = "lectores")
@@ -25,8 +25,18 @@ public class Lector {
     private Instant registroHasta;
     private String epcCapturado;
     private Instant epcCapturadoEn;
+    // Una entrada simulada desde el panel pidió abrir la puerta: el lector se
+    // entera en /api/lectores/comandos (vale 1 minuto) y mueve el servo.
+    private Instant abrirPendienteEn;
+    private String abrirPendienteNombre;
 
     public Lector() {}
+
+    public Instant getAbrirPendienteEn() { return abrirPendienteEn; }
+    public void setAbrirPendienteEn(Instant abrirPendienteEn) { this.abrirPendienteEn = abrirPendienteEn; }
+
+    public String getAbrirPendienteNombre() { return abrirPendienteNombre; }
+    public void setAbrirPendienteNombre(String abrirPendienteNombre) { this.abrirPendienteNombre = abrirPendienteNombre; }
 
     public Instant getRegistroHasta() { return registroHasta; }
     public void setRegistroHasta(Instant registroHasta) { this.registroHasta = registroHasta; }

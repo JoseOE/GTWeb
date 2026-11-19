@@ -3,8 +3,8 @@
 //   node pruebas/lector-rfid.mjs preparar   crea el lector "Puerta principal" (si no
 //       hay llave guardada) y liga los tags que ya leímos: la tarjeta a Chema, el
 //       sticker 1 a Valeria y el sticker 2 a Eduardo. La llave del lector se
-//       guarda en LECTOR_LLAVE del .env y en los secrets.h de lector_wifi y
-//       xiao_camara (fuera de git), junto con la IP de esta PC; no se imprime.
+//       guarda en LECTOR_LLAVE del .env y en el secrets.h de lector_wifi (fuera
+//       de git), junto con la IP de esta PC; no se imprime.
 //   node pruebas/lector-rfid.mjs probar     se hace pasar por la LILYGO y la XIAO:
 //       entrada, pase repetido, salida, tag desconocido con foto, y el dueño
 //       abriendo desde el panel mientras el lector espera el comando.
@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 
 const RUTA_ENV = new URL('../.env', import.meta.url);
-const RUTAS_SECRETS = ['lector_wifi', 'xiao_camara'].map(d => new URL(`../hardware/acceso-rfid/${d}/secrets.h`, import.meta.url));
+const RUTAS_SECRETS = ['lector_wifi'].map(d => new URL(`../hardware/acceso-rfid/${d}/secrets.h`, import.meta.url));
 
 function leerEnv() {
   try {

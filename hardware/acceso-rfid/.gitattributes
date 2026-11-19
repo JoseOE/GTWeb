@@ -1,2 +1,0 @@
-# Los scripts de bash se corren en Ubuntu: siempre con fin de línea LF.
-*.sh text eol=lf
