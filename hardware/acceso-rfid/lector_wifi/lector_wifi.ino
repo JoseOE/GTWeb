@@ -1,43 +1,38 @@
-// Lector de acceso conectado a GymTrack: LILYGO T-SIM7070G + YRM1004.
+// Lector de acceso de GymTrack: LILYGO T-SIM7070G + lector UHF YRM1004.
 //
 // Cada tag que lee se lo pregunta a GTWeb (POST /api/lectores/accesos) y hace
 // lo que el servidor responda:
-//   ENTRADA  -> LED verde y abre        SALIDA   -> LED azul y abre
-//   NEGADO   -> LED rojo; queda la alerta en el panel para que el dueño decida
-//   REGISTRO -> LED azul: el panel estaba en "Registrar tag nuevo" y capturó este tag
+//   ENTRADA  -> LED verde, 1 pitido y abre la puerta (servo)
+//   SALIDA   -> LED azul, 2 pitidos y abre la puerta
+//   NEGADO   -> LED rojo y 3 pitidos. Si la membresía venció, al socio le llega
+//               un aviso al teléfono para renovar; al pagar, el servidor manda
+//               "abrir" y la puerta se abre sola.
+//   REGISTRO -> LED azul y un pitido largo: el panel estaba en "Registrar tag
+//               nuevo" y capturó este tag
 //   IGNORADO -> nada (pasó otra vez muy pronto)
-// En paralelo, una tarea pregunta por los comandos del servidor (GET /api/lectores/comandos):
-// si el dueño da acceso desde la alerta,
-// se prende el verde y abre.
+// En paralelo, una tarea pregunta por los comandos del servidor (GET
+// /api/lectores/comandos): "abrir" cuando el dueño da acceso desde una alerta,
+// cuando el socio renovó desde la app o con "Simular entrada" en el panel.
 //
-// Tres formas de llegar a internet (se elige con el monitor y queda guardada):
-//   WiFi  -> las redes de secrets.h (hasta 3).
-//   LTE-M -> el módem SIM7070G con la SIM (LTE Cat-M o NB-IoT).
-//   2G    -> el mismo módem en GSM/GPRS.
-// Con LTE o 2G la LILYGO crea su propia red WiFi (LECTOR_AP_SSID) para que la
-// XIAO se conecte a ella; lo que la XIAO le manda (sus comandos de voz) lo reenvía al
-// servidor por el módem.
-//
-// Sin internet decide con la lista de tags que descarga cada minuto (/lista).
-//
-// Comandos de voz: la XIAO (xiao_voz_turnos) manda un pulso por GPIO 14 (corto =
-// entrada, largo = salida) y aquí se prende el LED verde o el de salida.
-//
-// Cada entrada, salida o negado se le avisa por GPIO 13 a la ESP32-C6 puente
-// (c6_puente): ella abre o cierra su sensor Matter "Gimnasio ocupado" (la Alexa prende o
-// apaga el foco con una rutina) y le pasa el aviso a la C6 de la Alexa (c6_alexa),
-// que por Matter hace que la Alexa diga "Bienvenido Chema", "Hasta luego Chema"
-// o "Acceso denegado".
+// Internet, por WiFi o por datos móviles (se elige solo):
+//   1. WiFi: las redes de secrets.h (hasta 3; solo 2.4 GHz, el ESP32 no ve 5 GHz).
+//   2. Si no hay WiFi: datos móviles con el módem SIM7070G (LTE-M / NB-IoT y,
+//      si no hay, 2G). El SIM7070G no tiene 4G "normal" ni 5G.
+//   - Si estando en WiFi se cae más de 45 s, se pasa a datos móviles.
+//   - Estando en datos móviles, cada 2 min busca las redes WiFi conocidas y,
+//     si alguna está cerca, regresa a WiFi.
+//   Sin internet decide con la lista de tags que descarga cada minuto.
 //
 // Comandos por el monitor serie (115200):
-//   w  usar WiFi        l  usar LTE-M        g  usar 2G        r  estado de la red
-//   n  simular un tag desconocido (crea la alerta en el panel)
+//   a  red automática (WiFi y si no, datos)   w  solo WiFi
+//   l  solo LTE-M                             g  solo 2G
+//   r  estado de la red    p  probar la puerta (servo)    n  simular un tag desconocido
 //   +  subir la potencia 1 dBm      -  bajarla 1 dBm
 //
 // Placa: "ESP32 Wrover Module". Librerías: TinyGSM y ArduinoHttpClient.
-// Mismas conexiones que prueba_puerta; el módem y la antena LTE ya vienen en la placa.
-// Para LTE/2G: SIM con datos y, de preferencia, una batería 18650 puesta (el
-// módem pide picos de corriente que el USB solo a veces no da, sobre todo en 2G).
+// Conexiones en README.md (misma carpeta de arriba). Para datos móviles: SIM con
+// datos y, de preferencia, una batería 18650 puesta (el módem pide picos de
+// corriente que el USB solo a veces no da, sobre todo en 2G).
 // Antes de subirlo: copia secrets.example.h como secrets.h y llena tus datos.
 
 #define TINY_GSM_MODEM_SIM7080   // el SIM7070G usa los mismos comandos que el SIM7080
@@ -50,6 +45,7 @@
 #include <Preferences.h>
 #include <TinyGsmClient.h>
 #include <ArduinoHttpClient.h>
+#include <esp_arduino_version.h>
 #include "secrets.h"
 
 // Lo opcional de secrets.h: un secrets.h viejo, sin esto, también compila.
@@ -64,41 +60,39 @@
 #ifndef APN
 #define APN "internet.itelcel.com"   // Telcel
 #endif
-#ifndef LECTOR_AP_SSID
-#define LECTOR_AP_SSID "GymTrack-Lector"
-#define LECTOR_AP_PASS "gymtrack2026"
-#endif
 
 // ============================================================
 // SECCIÓN 1 · Pines, tiempos y variables globales
-// Aquí se dice a qué pin va cada cosa (YRM, módem, LEDs, buzzer, C6 y XIAO),
-// cuánto se espera al servidor por cada red y las variables que comparten
-// loop() y la tarea de comandos (FreeRTOS).
 // ============================================================
 #define RFID_RX         32   // llega del TXD del YRM
 #define RFID_TX         33   // va al RXD del YRM
-#define LED_VERDE       18
-#define LED_AZUL        19
-#define LED_ROJO        21
-#define BUZZER          22
+#define LED_VERDE       18   // entrada / puerta abierta
+#define LED_AZUL        19   // salida, registro y "sin internet"
+#define LED_ROJO        21   // negado
+#define BUZZER          22   // buzzer activo (suena con HIGH)
+#define SERVO           23   // señal del servo de la puerta
 #define MODEM_RX        26   // llega del TX del módem (dentro de la placa)
 #define MODEM_TX        27
 #define MODEM_PWR       4    // pulso para encender el módem
-#define AVISO_C6        13   // va al RX de la ESP32-C6 puente (serial de 9600, solo TX)
-#define BAUDIOS_C6      9600
-#define PULSO_XIAO      14   // llega de D0 de la XIAO: pulso corto = entrada por voz, largo = salida
-// Reservados para la versión final, sin conectar todavía:
-//   servo de la puerta en GPIO 23; botón "Solicitar acceso" en GPIO 34 (con 10 kΩ a 3V3).
+
+// La puerta: ángulos del servo y cuánto se queda abierta.
+const int      SERVO_CERRADO    = 0;       // grados
+const int      SERVO_ABIERTO    = 90;
+const uint32_t PUERTA_ABIERTA_MS = 3000;
 
 const uint32_t REARME_MS        = 3000;    // el tag tiene que alejarse esto para contar otra vez
 const uint32_t SENAL_MS         = 1500;
 const uint32_t LISTA_CADA_MS    = 60000;
 const uint16_t ESPERA_WIFI_MS   = 4000;    // más que esto y se decide con la lista local
-const uint16_t ESPERA_MODEM_MS  = 12000;   // por LTE/2G cada petición tarda más (TLS por el módem)
+const uint16_t ESPERA_MODEM_MS  = 12000;   // por datos móviles cada petición tarda más (TLS por el módem)
+const uint32_t WIFI_CAIDO_MS    = 45000;   // en automático: tanto sin WiFi y se pasa a datos
+const uint32_t BUSCAR_WIFI_MS   = 120000;  // en datos: cada cuánto se buscan las redes WiFi
 const char*    EPC_SIMULADO     = "E20000000000000000000001";
 
-enum Red { RED_WIFI = 0, RED_LTE = 1, RED_2G = 2 };
-const char* NOMBRE_RED[] = {"WiFi", "LTE-M", "2G"};
+enum Red { RED_WIFI = 0, RED_LTE = 1, RED_2G = 2, RED_NINGUNA = 3 };
+const char* NOMBRE_RED[] = {"WiFi", "LTE-M", "2G", "sin red"};
+enum Modo { MODO_AUTO = 0, MODO_WIFI = 1, MODO_LTE = 2, MODO_2G = 3 };
+const char* NOMBRE_MODO[] = {"automático (WiFi y si no, datos)", "solo WiFi", "solo LTE-M", "solo 2G"};
 
 HardwareSerial yrm(2);
 HardwareSerial modemSerial(1);
@@ -106,13 +100,21 @@ TinyGsm modem(modemSerial);
 TinyGsmClientSecure modemSeguro(modem, 0);
 TinyGsmClient modemSimple(modem, 1);
 SemaphoreHandle_t candado;          // el módem atiende una petición a la vez
-WiFiServer relevo(80);              // en LTE/2G: lo que manda la XIAO
 Preferences prefs;
 WiFiMulti redes;
 int potenciaDbm = 15;
 
-volatile int red = RED_WIFI;
-volatile bool redLista = false;     // false mientras se cambia de red
+int modo = MODO_AUTO;
+volatile int red = RED_NINGUNA;     // por dónde se está saliendo a internet
+volatile bool redLista = false;     // false mientras se conecta
+// Sobrevive a ESP.restart(): en automático, si el WiFi se cayó, el siguiente
+// arranque va directo a datos móviles en lugar de esperar al WiFi otra vez.
+RTC_DATA_ATTR bool saltarWifi = false;
+uint32_t wifiCaidoDesde = 0;        // cuándo se cayó el WiFi (0 = conectado)
+uint32_t ultimoIntentoRed = 0;
+uint32_t ultimaBusquedaWifi = 0;    // en datos: la última vez que se buscaron redes WiFi
+int fallosDatos = 0;
+bool modemPrendido = false;
 
 String hostServidor;
 uint16_t puertoServidor = 443;
@@ -121,8 +123,7 @@ bool servidorSeguro = true;
 // Lo que deja la tarea de comandos para que loop() lo haga (0 = nada, 1 = abrir, 2 = negar).
 volatile int comandoPendiente = 0;
 char nombreComando[48] = "";
-// Para saber si la tarea de comandos sigue hablando con el servidor: si deja de
-// poder, los "dar acceso" del panel se quedan sin entregar y no se nota nada.
+// Para saber si la tarea de comandos sigue hablando con el servidor.
 volatile uint32_t ultimoSondeoOk = 0;
 const uint32_t SIN_SONDEO_REINICIA_MS = 180000;
 
@@ -132,7 +133,6 @@ Visto vistos[8];
 
 // Respuesta del servidor (codigo < 0 = no hubo respuesta).
 struct Respuesta { int codigo; String cuerpo; };
-int dentroServidor = -1;        // cuántos quedan dentro, según la última respuesta
 
 // Lista para decidir sin internet.
 struct Permitido { char epc[65]; char nombre[32]; bool permitido; };
@@ -142,10 +142,7 @@ uint32_t ultimaLista = 0;
 
 // ============================================================
 // SECCIÓN 2 · Comunicación con el lector UHF YRM1004 (UART2, 115200)
-// En esta sección se arman y se leen las tramas del chip M100: pedir la
-// versión, fijar la potencia de lectura y validar cada respuesta con su
-// checksum. Formato de trama:
-// BB | tipo | cmd | largo (2) | datos | checksum | 7E
+// Tramas del chip M100: BB | tipo | cmd | largo (2) | datos | checksum | 7E
 // ============================================================
 void enviar(uint8_t cmd, const uint8_t* datos, uint16_t n) {
   uint8_t cs = cmd + (n >> 8) + (n & 0xFF);
@@ -218,34 +215,89 @@ bool fijarPotencia(int dbm) {
 }
 
 // ============================================================
-// SECCIÓN 3 · Señales: LEDs, buzzer y puerta
-// En esta sección se prende el LED que corresponde (verde entrada, azul
-// salida, rojo negado) con sus pitidos. La puerta todavía solo se anuncia.
+// SECCIÓN 3 · Señales: LEDs, buzzer y la puerta (servo)
+// El servo se mueve con PWM de 50 Hz (LEDC, sin librería extra): 500 µs = 0°
+// y 2500 µs = 180°. La puerta se abre y se cierra sola a los 3 s, sin
+// detener la lectura de tags (vigilarPuerta en loop).
 // ============================================================
+#define SERVO_CANAL 0      // solo para el core 2.x del ESP32
+#define SERVO_BITS  14
+
+void escribirServo(int grados) {
+  uint32_t us = 500 + (uint32_t)constrain(grados, 0, 180) * 2000 / 180;
+  uint32_t duty = us * ((1UL << SERVO_BITS) - 1) / 20000;
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+  ledcWrite(SERVO, duty);
+#else
+  ledcWrite(SERVO_CANAL, duty);
+#endif
+}
+
+void iniciarServo() {
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+  ledcAttach(SERVO, 50, SERVO_BITS);
+#else
+  ledcSetup(SERVO_CANAL, 50, SERVO_BITS);
+  ledcAttachPin(SERVO, SERVO_CANAL);
+#endif
+  escribirServo(SERVO_CERRADO);
+}
+
+uint32_t cerrarPuertaEn = 0;    // 0 = cerrada
+
+void abrirPuerta() {
+  if (!cerrarPuertaEn) Serial.println("         [puerta] abierta");
+  escribirServo(SERVO_ABIERTO);
+  cerrarPuertaEn = millis() + PUERTA_ABIERTA_MS;
+}
+
+void vigilarPuerta() {
+  if (cerrarPuertaEn && (int32_t)(millis() - cerrarPuertaEn) >= 0) {
+    escribirServo(SERVO_CERRADO);
+    cerrarPuertaEn = 0;
+    Serial.println("         [puerta] cerrada");
+  }
+}
+
 void pitido(int ms) {
   digitalWrite(BUZZER, HIGH); delay(ms); digitalWrite(BUZZER, LOW);
 }
 
-void senal(int led, int pitidos) {
+// Prende el LED con sus pitidos (cada uno de msPitido) y lo deja encendido SENAL_MS.
+void senalCon(int led, int pitidos, int msPitido) {
   digitalWrite(led, HIGH);
   uint32_t inicio = millis();
-  for (int i = 0; i < pitidos; i++) { pitido(80); delay(80); }
-  while (millis() - inicio < SENAL_MS) delay(10);
+  for (int i = 0; i < pitidos; i++) { pitido(msPitido); delay(80); }
+  while (millis() - inicio < SENAL_MS) { vigilarPuerta(); delay(10); }
   digitalWrite(led, LOW);
 }
 
-// El servo llega después; por ahora solo se avisa.
-void abrirPuerta() {
-  Serial.println("         [puerta] abrir 3 s");
+void senal(int led, int pitidos) {
+  senalCon(led, pitidos, 80);
+}
+
+// Al arrancar: cada LED, un pitido y la puerta, para revisar las conexiones.
+void probarSalidas() {
+  int leds[] = {LED_VERDE, LED_AZUL, LED_ROJO};
+  for (int led : leds) { digitalWrite(led, HIGH); delay(250); digitalWrite(led, LOW); }
+  pitido(60);
+}
+
+// Sin internet: un destello azul cada 3 s (decide con la lista local).
+uint32_t ultimoDestello = 0;
+
+void avisarSinInternet() {
+  bool conInternet = redLista && (red == RED_WIFI ? WiFi.status() == WL_CONNECTED : red != RED_NINGUNA);
+  if (conInternet || millis() - ultimoDestello < 3000) return;
+  ultimoDestello = millis();
+  digitalWrite(LED_AZUL, HIGH); delay(40); digitalWrite(LED_AZUL, LOW);
 }
 
 // ============================================================
 // SECCIÓN 4 · Peticiones HTTPS al servidor GTWeb
-// En esta sección se hace cada petición a la API (con el encabezado
-// X-Lector-Key). Por WiFi usa HTTPClient con TLS; por LTE-M o 2G usa el
-// cliente TLS del módem, y como el módem es uno solo, la petición toma
-// primero el semáforo "candado" (mutex de FreeRTOS) para no chocar con la
-// otra tarea.
+// Por WiFi usa HTTPClient con TLS; por datos móviles, el cliente TLS del
+// módem. Como el módem es uno solo, la petición toma primero el semáforo
+// "candado" (mutex de FreeRTOS) para no chocar con la tarea de comandos.
 // ============================================================
 // Saca el valor de "campo":"valor" de una respuesta JSON sencilla.
 String campo(const String& json, const char* nombre) {
@@ -279,7 +331,7 @@ void leerServidor() {
 Respuesta pedir(const char* metodo, const String& ruta, const uint8_t* cuerpo, size_t largo,
                 const char* tipo, uint32_t esperaMs) {
   Respuesta r = {-1, ""};
-  if (!redLista) return r;
+  if (!redLista || red == RED_NINGUNA) return r;
 
   if (red == RED_WIFI) {
     if (WiFi.status() != WL_CONNECTED) return r;
@@ -297,7 +349,7 @@ Respuesta pedir(const char* metodo, const String& ruta, const uint8_t* cuerpo, s
     return r;
   }
 
-  // LTE / 2G: el módem es uno solo, así que se toma por turnos.
+  // Datos móviles: el módem es uno solo, así que se toma por turnos.
   if (xSemaphoreTake(candado, pdMS_TO_TICKS(esperaMs + 5000)) != pdTRUE) return r;
   if (modem.isGprsConnected()) {
     Client& cliente = servidorSeguro ? (Client&)modemSeguro : (Client&)modemSimple;
@@ -328,15 +380,10 @@ uint32_t esperaServidor() {
 }
 
 // ============================================================
-// SECCIÓN 5 · Conexión por WiFi (las 3 redes guardadas en secrets.h)
-// En esta sección se intenta la conexión WiFi: se registran las hasta 3 redes
-// de secrets.h (WIFI_SSID, WIFI_SSID_2, WIFI_SSID_3) en WiFiMulti, que se
-// conecta a la conocida con mejor señal. Se hacen 3 intentos de 8 s al
-// arrancar y, si no hay red, un reintento cada 10 s (vigilarWifi); mientras,
-// la puerta decide con la lista local.
+// SECCIÓN 5 · WiFi (las 3 redes de secrets.h)
+// Primero la red principal (WIFI_SSID) aunque otra conocida tenga mejor
+// señal; si no está, WiFiMulti se conecta a la conocida con mejor señal.
 // ============================================================
-// Las redes que se sabe la placa (hasta 3, en secrets.h). Se conecta sola a la
-// conocida que tenga mejor señal: en casa, en la escuela o con el hotspot.
 void agregarRedes() {
   static bool agregadas = false;
   if (agregadas) return;
@@ -361,59 +408,58 @@ const char* motivoWifi(wl_status_t s) {
   }
 }
 
-bool wifiAvisado = false;      // ya se imprimió que conectó
-uint32_t ultimoIntentoRed = 0;
-
-void avisarConexion() {
-  wifiAvisado = true;
+void avisarConexionWifi() {
   Serial.printf("WiFi: conectado a \"%s\", IP %s, señal %d dBm\n",
                 WiFi.SSID().c_str(), WiFi.localIP().toString().c_str(), WiFi.RSSI());
 }
 
-void conectarWifi() {
+// true si conectó. Tarda hasta ~35 s si no hay ninguna red.
+bool conectarWifi() {
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
   agregarRedes();
-  Serial.println("Buscando una red conocida...");
-  for (int i = 0; i < 3 && redes.run(8000) != WL_CONNECTED; i++) Serial.println("  ...otra vez");
-  ultimoIntentoRed = millis();
-  if (WiFi.status() == WL_CONNECTED) {
-    avisarConexion();
-  } else {
-    wifiAvisado = false;
-    Serial.printf("Sin WiFi: %s. Se reintenta cada 10 s; mientras, decide con la lista local.\n",
-                  motivoWifi(WiFi.status()));
+  Serial.printf("Probando primero la red principal \"%s\"...\n", WIFI_SSID);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  for (uint32_t t = millis(); WiFi.status() != WL_CONNECTED && millis() - t < 10000;) delay(200);
+  if (WiFi.status() != WL_CONNECTED) {
+    WiFi.disconnect();
+    Serial.println("No está cerca: buscando las otras redes conocidas...");
+    for (int i = 0; i < 3 && redes.run(8000) != WL_CONNECTED; i++) Serial.println("  ...otra vez");
   }
+  if (WiFi.status() == WL_CONNECTED) {
+    avisarConexionWifi();
+    return true;
+  }
+  Serial.printf("Sin WiFi: %s.\n", motivoWifi(WiFi.status()));
+  return false;
 }
 
-// Si no hay WiFi, otro intento cada 10 s (busca las redes unos segundos).
-void vigilarWifi() {
-  if (WiFi.status() == WL_CONNECTED) {
-    if (!wifiAvisado) {
-      avisarConexion();
-      descargarLista();
+// ¿Hay alguna red conocida cerca? (para regresar de datos móviles a WiFi)
+bool hayWifiConocida() {
+  const char* nombres[] = {WIFI_SSID, WIFI_SSID_2, WIFI_SSID_3};
+  int n = WiFi.scanNetworks();
+  bool hay = false;
+  for (int i = 0; i < n && !hay; i++) {
+    for (const char* nombre : nombres) {
+      if (strlen(nombre) && WiFi.SSID(i) == nombre && WiFi.RSSI(i) > -80) {
+        Serial.printf("Red WiFi \"%s\" cerca (%d dBm)\n", nombre, WiFi.RSSI(i));
+        hay = true;
+        break;
+      }
     }
-    return;
   }
-  if (wifiAvisado) {
-    wifiAvisado = false;
-    Serial.println("Se perdió el WiFi: decide con la lista local mientras vuelve.");
-  }
-  if (millis() - ultimoIntentoRed < 10000) return;
-  ultimoIntentoRed = millis();
-  Serial.printf("Reintentando WiFi (%s)\n", motivoWifi(WiFi.status()));
-  redes.run(5000);
+  WiFi.scanDelete();
+  return hay;
 }
 
 // ============================================================
-// SECCIÓN 6 · Conexión celular: LTE-M y 2G con el módem SIM7070G
-// En esta sección se intenta la conexión celular. encenderModem() prende el
-// módem (con reintentos del pulso PWRKEY), revisa la SIM y elige el modo:
+// SECCIÓN 6 · Datos móviles: LTE-M y 2G con el módem SIM7070G
+// prenderModem() prende el módem (con reintentos del pulso PWRKEY) y revisa
+// la SIM; conectarDatos() elige el modo:
 //   - LTE-M: setNetworkMode(38) = solo LTE y setPreferredMode(3) = Cat-M o NB-IoT.
 //   - 2G:    setNetworkMode(13) = solo GSM/GPRS.
-// Luego espera la red hasta 90 s y abre los datos con el APN de Telcel.
-// vigilarModem() reintenta los datos cada 30 s y, a los 3 fallos seguidos,
-// reinicia el módem. Quien llame debe tener el candado.
+// Espera la red hasta 90 s y abre los datos con el APN. Quien llame debe
+// tener el candado.
 // ============================================================
 // El pulso en PWRKEY prende el módem si está apagado, pero lo APAGA si ya estaba
 // prendido (p. ej. si el ESP32 se reinició y el módem no).
@@ -424,12 +470,11 @@ void pulsoModem() {
   digitalWrite(MODEM_PWR, LOW);
 }
 
-bool encenderModem(int cual) {
-  Serial.printf("Encendiendo el módem para %s...\n", NOMBRE_RED[cual]);
+bool prenderModem() {
+  if (modemPrendido) return true;
   modemSerial.begin(115200, SERIAL_8N1, MODEM_RX, MODEM_TX);
   // Primero se le pregunta un buen rato: si ya está prendido, no se le da el pulso.
   bool responde = modem.testAT(4000);
-  // Si no, pulso para prenderlo; si tampoco, quizá el pulso lo apagó: otro pulso.
   for (int intento = 0; intento < 2 && !responde; intento++) {
     Serial.println(intento == 0 ? "  prendiendo el módem..." : "  no respondió: otro pulso...");
     pulsoModem();
@@ -442,9 +487,16 @@ bool encenderModem(int cual) {
   }
   modem.init();
   if (modem.getSimStatus() != 1) {
-    Serial.println("La SIM no está lista: revisa que esté bien puesta y sin PIN.");
+    Serial.println("La SIM no está lista: revisa que esté bien puesta, con datos y sin PIN.");
     return false;
   }
+  modemPrendido = true;
+  return true;
+}
+
+bool conectarDatos(int cual) {
+  Serial.printf("Datos móviles por %s...\n", NOMBRE_RED[cual]);
+  if (!prenderModem()) return false;
   modem.setNetworkMode(cual == RED_2G ? 13 : 38);    // 13 = solo GSM, 38 = solo LTE
   if (cual == RED_LTE) modem.setPreferredMode(3);    // LTE Cat-M o NB-IoT, la que haya
   Serial.print("Buscando red celular (hasta 90 s)...");
@@ -464,17 +516,108 @@ bool encenderModem(int cual) {
 }
 
 void apagarModem() {
+  if (!modemPrendido) return;
   modem.gprsDisconnect();
   modem.poweroff();
+  modemPrendido = false;
 }
 
-// Si se cayeron los datos celulares, otro intento cada 30 s; a los 3 fallos
-// seguidos se reinicia el módem completo (a veces se queda trabado sin red).
-int fallosDatos = 0;
+// ============================================================
+// SECCIÓN 7 · Elegir por dónde salir a internet
+// En automático: WiFi primero; si no hay, LTE-M; si tampoco, 2G. Cambiar de
+// red reinicia la placa (al volver de datos a WiFi, el WiFi quedaba conectado
+// pero sin llegar al servidor), así que cada cambio arranca limpio.
+// ============================================================
+void conectarInternet() {
+  redLista = false;
+  bool ok = false;
+  bool probarWifi = modo == MODO_WIFI || (modo == MODO_AUTO && !saltarWifi);
+  if (saltarWifi && modo == MODO_AUTO) Serial.println("El WiFi se había caído: voy directo a datos móviles.");
+  saltarWifi = false;
 
-void vigilarModem() {
-  if (millis() - ultimoIntentoRed < 30000) return;
+  if (probarWifi && conectarWifi()) {
+    red = RED_WIFI;
+    ok = true;
+  }
+  if (!ok && modo != MODO_WIFI) {
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_STA);           // se queda prendido solo para buscar redes después
+    xSemaphoreTake(candado, portMAX_DELAY);
+    if (modo == MODO_AUTO || modo == MODO_LTE) {
+      ok = conectarDatos(RED_LTE);
+      if (ok) red = RED_LTE;
+    }
+    if (!ok && (modo == MODO_AUTO || modo == MODO_2G)) {
+      ok = conectarDatos(RED_2G);
+      if (ok) red = RED_2G;
+    }
+    xSemaphoreGive(candado);
+  }
+  if (!ok) {
+    red = modo == MODO_WIFI ? RED_WIFI : RED_NINGUNA;   // en solo WiFi se sigue reintentando
+    Serial.println("Sin internet por ahora: decide con la lista local y lo vuelve a intentar.");
+  }
   ultimoIntentoRed = millis();
+  ultimaBusquedaWifi = millis();
+  redLista = true;
+  if (ok) descargarLista();
+}
+
+void cambiarModo(int nuevo) {
+  Serial.printf("\nModo de red: %s. Se guarda y se reinicia la placa...\n", NOMBRE_MODO[nuevo]);
+  prefs.putInt("modo", nuevo);
+  redLista = false;
+  xSemaphoreTake(candado, portMAX_DELAY);
+  apagarModem();
+  delay(300);
+  ESP.restart();
+}
+
+// Cambio automático de red, desde loop().
+void vigilarRed() {
+  uint32_t ahora = millis();
+  if (red == RED_WIFI) {
+    if (WiFi.status() == WL_CONNECTED) {
+      if (wifiCaidoDesde) { wifiCaidoDesde = 0; avisarConexionWifi(); descargarLista(); }
+      return;
+    }
+    if (!wifiCaidoDesde) {
+      wifiCaidoDesde = ahora;
+      Serial.println("Se perdió el WiFi: decide con la lista local mientras vuelve.");
+    }
+    if (modo == MODO_AUTO && ahora - wifiCaidoDesde > WIFI_CAIDO_MS) {
+      Serial.println("El WiFi no regresa: paso a datos móviles (se reinicia la placa).");
+      saltarWifi = true;
+      delay(200);
+      ESP.restart();
+    }
+    if (ahora - ultimoIntentoRed > 10000) {
+      ultimoIntentoRed = ahora;
+      redes.run(5000);
+    }
+    return;
+  }
+
+  // En datos móviles (o sin red): ¿ya hay WiFi conocida cerca? Entonces regresa a WiFi.
+  if (modo == MODO_AUTO && ahora - ultimaBusquedaWifi > BUSCAR_WIFI_MS) {
+    ultimaBusquedaWifi = ahora;
+    if (hayWifiConocida()) {
+      Serial.println("Regreso a WiFi (se reinicia la placa).");
+      redLista = false;
+      xSemaphoreTake(candado, portMAX_DELAY);
+      apagarModem();
+      delay(200);
+      ESP.restart();
+    }
+  }
+  if (red == RED_NINGUNA) {
+    // Nada funcionó al arrancar: se vuelve a intentar todo cada 2 min.
+    if (ahora - ultimoIntentoRed > 120000) { ultimoIntentoRed = ahora; ESP.restart(); }
+    return;
+  }
+  // Datos móviles caídos: otro intento cada 30 s; a los 3 fallos se reinicia el módem.
+  if (ahora - ultimoIntentoRed < 30000) return;
+  ultimoIntentoRed = ahora;
   if (xSemaphoreTake(candado, 0) != pdTRUE) return;   // ocupado en una petición: después
   if (!modem.isGprsConnected()) {
     fallosDatos++;
@@ -488,78 +631,21 @@ void vigilarModem() {
       Serial.println("No regresa: reiniciando el módem. Si pasa seguido, revisa la batería y la alimentación del YRM.");
       apagarModem();
       delay(3000);
-      if (encenderModem(red)) fallosDatos = 0;
+      if (conectarDatos(red)) fallosDatos = 0;
     }
   }
   xSemaphoreGive(candado);
 }
 
-// Cambiar de red reinicia la placa: así la red nueva arranca limpia (al volver
-// de LTE a WiFi, el WiFi quedaba conectado pero sin poder llegar al servidor).
-void cambiarRed(int nueva) {
-  if (nueva == red) return;
-  Serial.printf("\nCambiando a %s: se guarda y se reinicia la placa...\n", NOMBRE_RED[nueva]);
-  prefs.putInt("red", nueva);
-  if (red != RED_WIFI) {
-    redLista = false;
-    xSemaphoreTake(candado, portMAX_DELAY);
-    apagarModem();
-  }
-  delay(300);
-  ESP.restart();
-}
-
-// ============================================================
-// SECCIÓN 7 · Elegir la red (WiFi, LTE-M o 2G)
-// En esta sección se arranca la red guardada en la memoria (Preferences):
-// con WiFi llama a la sección 5; con LTE-M o 2G crea la red propia para la
-// XIAO y llama a la sección 6. Cambiar de red (comandos w / l / g) guarda la
-// elección y reinicia la placa.
-// ============================================================
-void usarRed(int nueva) {
-  redLista = false;
-  delay(300);   // que la tarea de comandos suelte lo que estaba haciendo
-  Serial.printf("\n--- Cambiando a %s ---\n", NOMBRE_RED[nueva]);
-
-  // Se apaga lo de la red anterior.
-  xSemaphoreTake(candado, portMAX_DELAY);
-  if (red != RED_WIFI) {
-    apagarModem();
-    relevo.end();
-    WiFi.softAPdisconnect(true);
-  }
-  xSemaphoreGive(candado);
-
-  red = nueva;
-  prefs.putInt("red", nueva);
-  if (nueva == RED_WIFI) {
-    conectarWifi();
-  } else {
-    // Red propia para la XIAO: ella se conecta aquí y la LILYGO reenvía.
-    WiFi.disconnect(true);
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP(LECTOR_AP_SSID, LECTOR_AP_PASS);
-    relevo.begin();
-    Serial.printf("Red para la XIAO: \"%s\" (IP %s)\n", LECTOR_AP_SSID, WiFi.softAPIP().toString().c_str());
-    xSemaphoreTake(candado, portMAX_DELAY);
-    bool ok = encenderModem(nueva);
-    xSemaphoreGive(candado);
-    if (!ok) Serial.println("Sin datos celulares por ahora: se reintenta cada 30 s; mientras, decide con la lista local.");
-    ultimoIntentoRed = millis();
-  }
-  redLista = true;
-  descargarLista();
-}
-
 void mostrarEstado() {
-  Serial.printf("\nRed elegida: %s\n", NOMBRE_RED[red]);
+  Serial.printf("\nModo: %s · saliendo por: %s\n", NOMBRE_MODO[modo], NOMBRE_RED[red]);
   if (red == RED_WIFI) {
     if (WiFi.status() == WL_CONNECTED) {
       Serial.printf("  WiFi \"%s\", IP %s, señal %d dBm\n", WiFi.SSID().c_str(), WiFi.localIP().toString().c_str(), WiFi.RSSI());
     } else {
       Serial.printf("  Sin WiFi: %s\n", motivoWifi(WiFi.status()));
     }
-  } else if (xSemaphoreTake(candado, pdMS_TO_TICKS(15000)) == pdTRUE) {
+  } else if (red != RED_NINGUNA && xSemaphoreTake(candado, pdMS_TO_TICKS(15000)) == pdTRUE) {
     String info;
     modem.sendAT(GF("+CPSI?"));          // tipo de red real: GSM, LTE CAT-M1, LTE NB-IOT
     modem.waitResponse(2000L, info);
@@ -567,7 +653,6 @@ void mostrarEstado() {
     Serial.printf("  Operador: %s, señal %d/31, datos: %s, IP %s\n", modem.getOperator().c_str(),
                   modem.getSignalQuality(), modem.isGprsConnected() ? "sí" : "no", modem.getLocalIP().c_str());
     Serial.printf("  %s\n", info.c_str());
-    Serial.printf("  Red para la XIAO: \"%s\", %d conectada(s)\n", LECTOR_AP_SSID, WiFi.softAPgetStationNum());
     xSemaphoreGive(candado);
   }
   Serial.printf("  Servidor: %s · lista local: %d tags\n", SERVIDOR, tamLista);
@@ -576,74 +661,9 @@ void mostrarEstado() {
 }
 
 // ============================================================
-// SECCIÓN 8 · Relevo para la XIAO (solo en LTE-M / 2G)
-// En esta sección la LILYGO hace de pasarela: recibe la petición HTTP que la
-// XIAO manda por la red propia (GymTrack-Lector) y la reenvía al servidor por
-// el módem, con la llave del lector. Solo deja pasar rutas /api/lectores/.
-// ============================================================
-String leerLinea(WiFiClient& c, uint32_t limite) {
-  String linea;
-  while (millis() < limite) {
-    if (!c.available()) { delay(1); continue; }
-    char ch = c.read();
-    if (ch == '\n') break;
-    if (ch != '\r') linea += ch;
-  }
-  return linea;
-}
-
-void responderRelevo(WiFiClient& c, int codigo, const String& cuerpo) {
-  c.printf("HTTP/1.1 %d %s\r\nContent-Type: application/json\r\nContent-Length: %u\r\nConnection: close\r\n\r\n",
-           codigo, codigo == 200 ? "OK" : "Error", (unsigned)cuerpo.length());
-  c.print(cuerpo);
-  c.stop();
-}
-
-void atenderRelevo() {
-  WiFiClient c = relevo.available();
-  if (!c) return;
-  uint32_t limite = millis() + 10000;
-  String primera = leerLinea(c, limite);               // "POST /api/lectores/fotos HTTP/1.1"
-  int esp1 = primera.indexOf(' '), esp2 = primera.indexOf(' ', esp1 + 1);
-  String metodo = primera.substring(0, esp1);
-  String ruta = esp2 > esp1 ? primera.substring(esp1 + 1, esp2) : "";
-  size_t largo = 0;
-  String tipo = "application/octet-stream";
-  while (millis() < limite) {
-    String h = leerLinea(c, limite);
-    if (h.length() == 0) break;
-    String minus = h; minus.toLowerCase();
-    if (minus.startsWith("content-length:")) largo = h.substring(15).toInt();
-    if (minus.startsWith("content-type:")) { tipo = h.substring(13); tipo.trim(); }
-  }
-  // Solo se reenvía a la API del lector, nada más.
-  if (!ruta.startsWith("/api/lectores/") || largo > 400000) {
-    responderRelevo(c, 400, "{\"error\":\"El relevo solo reenvía a /api/lectores.\"}");
-    return;
-  }
-  uint8_t* cuerpo = nullptr;
-  if (largo) {
-    cuerpo = (uint8_t*)(psramFound() ? ps_malloc(largo) : malloc(largo));
-    if (!cuerpo) { responderRelevo(c, 500, "{\"error\":\"Sin memoria.\"}"); return; }
-    size_t leidos = 0;
-    while (leidos < largo && millis() < limite + 20000) {
-      int n = c.read(cuerpo + leidos, largo - leidos);
-      if (n > 0) leidos += n; else delay(2);
-    }
-    if (leidos < largo) { free(cuerpo); responderRelevo(c, 400, "{\"error\":\"Llegó incompleto.\"}"); return; }
-  }
-  Respuesta r = pedir(metodo.c_str(), ruta, cuerpo, largo, tipo.c_str(), 30000);
-  free(cuerpo);
-  Serial.printf("[relevo] XIAO %s %s (%u bytes) -> servidor: HTTP %d\n", metodo.c_str(), ruta.c_str(), (unsigned)largo, r.codigo);
-  responderRelevo(c, r.codigo > 0 ? r.codigo : 502,
-                  r.cuerpo.length() ? r.cuerpo : String("{\"error\":\"El servidor no respondió por ") + NOMBRE_RED[red] + ".\"}");
-}
-
-// ============================================================
-// SECCIÓN 9 · Lista local y consulta de cada tag
-// En esta sección se descarga cada minuto la lista de tags permitidos (y se
-// guarda en la memoria para decidir sin internet) y se arma el payload JSON
-// {"epc": "..."} que se le manda al servidor por cada tag leído.
+// SECCIÓN 8 · Lista local y consulta de cada tag
+// Cada minuto se descarga la lista de tags permitidos (y se guarda en la
+// memoria para decidir sin internet). Por cada tag leído se manda {"epc"}.
 // ============================================================
 int leerLista(const String& json) {
   int n = 0, i = 0;
@@ -684,8 +704,8 @@ void descargarLista() {
 }
 
 // Pregunta al servidor qué hacer con el tag. false = no hubo respuesta.
-// fotos = el servidor abrió una alerta nueva (si no, su alerta seguía pendiente).
-bool preguntarAlServidor(const char* epc, String& resultado, String& nombre, String& motivo, bool& fotos) {
+// alertaNueva = el servidor abrió una alerta nueva (si no, la anterior seguía pendiente).
+bool preguntarAlServidor(const char* epc, String& resultado, String& nombre, String& motivo, bool& alertaNueva) {
   String json = String("{\"epc\":\"") + epc + "\"}";
   Respuesta r = pedir("POST", "/api/lectores/accesos", (const uint8_t*)json.c_str(), json.length(),
                       "application/json", esperaServidor());
@@ -696,59 +716,22 @@ bool preguntarAlServidor(const char* epc, String& resultado, String& nombre, Str
   resultado = campo(r.cuerpo, "resultado");
   nombre = campo(r.cuerpo, "nombre");
   motivo = campo(r.cuerpo, "motivo");
-  fotos = r.cuerpo.indexOf("\"fotos\":true") >= 0;
-  int i = r.cuerpo.indexOf("\"dentro\":");
-  dentroServidor = i >= 0 ? r.cuerpo.substring(i + 9).toInt() : -1;
+  alertaNueva = r.cuerpo.indexOf("\"fotos\":true") >= 0;
   return resultado.length() > 0;
 }
 
 // ============================================================
-// SECCIÓN 10 · Aviso a la ESP32-C6 puente (y de ahí a la Alexa por Matter)
-// En esta sección se manda cada evento a la C6 por el GPIO 13 como una línea
-// de texto "TIPO|nombre|dentro" a 9600 baudios. Cada byte se envía dentro de
-// una sección crítica (taskENTER_CRITICAL) para que ninguna interrupción ni
-// otra tarea deforme los bits.
+// SECCIÓN 9 · Tarea de FreeRTOS: comandos del servidor
+// Corre aparte de loop() y pregunta si hay que abrir: el dueño dio acceso
+// desde una alerta, el socio renovó desde la app o se simuló una entrada en
+// el panel. No mueve LEDs ni la puerta: deja el comando en comandoPendiente
+// y loop() lo ejecuta (atenderComando), así nunca se pisan los pines.
+// Por WiFi el servidor tiene la consulta abierta hasta 15 s; por datos se
+// pregunta cada 4 s sin esperar, para no tener el módem ocupado.
 // ============================================================
-// Los tres UART del ESP32 ya están ocupados (USB, módem y YRM): este serial
-// de solo transmisión se hace a mano, bit por bit, a 9600 baudios.
-portMUX_TYPE candadoBits = portMUX_INITIALIZER_UNLOCKED;
-
-void enviarByteC6(uint8_t b) {
-  const uint32_t bit = 1000000 / BAUDIOS_C6;   // 104 µs
-  taskENTER_CRITICAL(&candadoBits);
-  digitalWrite(AVISO_C6, LOW);                  // bit de inicio
-  esp_rom_delay_us(bit);
-  for (int i = 0; i < 8; i++) {
-    digitalWrite(AVISO_C6, (b >> i) & 1);
-    esp_rom_delay_us(bit);
-  }
-  digitalWrite(AVISO_C6, HIGH);                 // bit de parada
-  esp_rom_delay_us(bit);
-  taskEXIT_CRITICAL(&candadoBits);
-}
-
-// Una línea "TIPO|nombre|dentro": E entrada, S salida, N negado, A abierta
-// desde el panel, D solo el aforo (tras un comando de voz).
-// dentro = cuántos quedan en el gimnasio (-1 = no se sabe).
-void avisarC6(char tipo, const String& nombre, int dentro) {
-  String linea = String(tipo) + "|" + nombre + "|" + dentro + "\n";
-  for (size_t i = 0; i < linea.length(); i++) enviarByteC6(linea[i]);
-  Serial.printf("         [C6] %s", linea.c_str());
-}
-
-// ============================================================
-// SECCIÓN 11 · Tarea de FreeRTOS: comandos del panel
-// En esta sección corre una tarea aparte de loop() que pregunta al servidor
-// si el dueño dio o negó un acceso desde el panel. No mueve LEDs ni la
-// puerta: deja el comando en comandoPendiente y loop() lo ejecuta
-// (atenderComando), así las dos tareas nunca usan los mismos pines a la vez.
-// ============================================================
-// Corre aparte (en el núcleo 1, ver setup). Por WiFi el servidor tiene la consulta abierta hasta
-// 15 s (responde en cuanto haya algo); por LTE/2G se pregunta cada 4 s sin
-// esperar, para no tener el módem ocupado y que los tags pasen rápido.
 void tareaComandos(void*) {
   for (;;) {
-    if (!redLista) { vTaskDelay(pdMS_TO_TICKS(1000)); continue; }
+    if (!redLista || red == RED_NINGUNA) { vTaskDelay(pdMS_TO_TICKS(1000)); continue; }
     bool porModem = red != RED_WIFI;
     Respuesta r = pedir("GET", porModem ? "/api/lectores/comandos?espera=0" : "/api/lectores/comandos?espera=15",
                         nullptr, 0, nullptr, porModem ? ESPERA_MODEM_MS : 20000);
@@ -770,12 +753,25 @@ void tareaComandos(void*) {
   }
 }
 
+void atenderComando() {
+  int c = comandoPendiente;
+  if (!c) return;
+  comandoPendiente = 0;
+  if (c == 1) {
+    Serial.printf("ABRIR    %s (desde el servidor)\n", nombreComando);
+    abrirPuerta();
+    senal(LED_VERDE, 1);
+  } else {
+    Serial.printf("NEGAR    %s (el dueño negó el acceso)\n", nombreComando);
+    senal(LED_ROJO, 1);
+  }
+}
+
 // ============================================================
-// SECCIÓN 12 · Lógica de la puerta
-// En esta sección se decide qué hacer con cada tag: se descarta si sigue
-// frente al lector (rearme de 3 s), se pregunta al servidor y se actúa según
-// la respuesta (ENTRADA, SALIDA, NEGADO, REGISTRO). Sin respuesta del
-// servidor, decide con la lista local (decidirSinRed).
+// SECCIÓN 10 · Lógica de la puerta
+// Un tag se descarta si sigue frente al lector (rearme de 3 s). Si no, se
+// pregunta al servidor y se actúa según la respuesta. Sin respuesta, decide
+// con la lista local (decidirSinRed).
 // ============================================================
 bool seguiaCerca(const char* epc) {
   uint32_t ahora = millis();
@@ -798,19 +794,16 @@ void decidirSinRed(const char* epc) {
     if (strcmp(lista[i].epc, epc) == 0) {
       if (lista[i].permitido) {
         Serial.printf("ENTRADA  %s  [sin red: lista local]\n", lista[i].nombre);
-        avisarC6('E', lista[i].nombre, -1);
         abrirPuerta();
         senal(LED_VERDE, 1);
       } else {
-        Serial.printf("NEGADO   %s: membresia vencida  [sin red]\n", lista[i].nombre);
-        avisarC6('N', lista[i].nombre, -1);
+        Serial.printf("NEGADO   %s: membresía vencida  [sin red]\n", lista[i].nombre);
         senal(LED_ROJO, 3);
       }
       return;
     }
   }
   Serial.printf("NEGADO   tag desconocido %s  [sin red]\n", epc);
-  avisarC6('N', "", -1);
   senal(LED_ROJO, 3);
 }
 
@@ -818,40 +811,36 @@ void decidirSinRed(const char* epc) {
 void alLeerTag(const char* epc, int8_t rssi, bool forzar) {
   if (seguiaCerca(epc) && !forzar) return;
   String resultado, nombre, motivo;
-  bool fotos = false;
-  if (!preguntarAlServidor(epc, resultado, nombre, motivo, fotos)) {
+  bool alertaNueva = false;
+  if (!preguntarAlServidor(epc, resultado, nombre, motivo, alertaNueva)) {
     decidirSinRed(epc);
     return;
   }
   if (resultado == "ENTRADA") {
     Serial.printf("ENTRADA  %s  RSSI=%d\n", nombre.c_str(), rssi);
-    avisarC6('E', nombre, dentroServidor);
     abrirPuerta();
     senal(LED_VERDE, 1);
   } else if (resultado == "SALIDA") {
     Serial.printf("SALIDA   %s  RSSI=%d\n", nombre.c_str(), rssi);
-    avisarC6('S', nombre, dentroServidor);
     abrirPuerta();
     senal(LED_AZUL, 2);
   } else if (resultado == "NEGADO") {
     Serial.printf("NEGADO   %s %s (%s)\n", nombre.length() ? nombre.c_str() : epc, motivo.c_str(),
-                  fotos ? "alerta nueva en el panel" : "su alerta sigue pendiente");
-    if (fotos) avisarC6('N', nombre, -1);   // la misma alerta otra vez: la Alexa no lo repite
+                  alertaNueva ? "alerta nueva en el panel" : "su alerta sigue pendiente");
     senal(LED_ROJO, 3);
   } else if (resultado == "REGISTRO") {
-    Serial.printf("REGISTRO tag %s capturado%s%s: asignalo en el panel\n", epc,
+    Serial.printf("REGISTRO tag %s capturado%s%s: asígnalo en el panel\n", epc,
                   nombre.length() ? ", ahora es de " : "", nombre.c_str());
-    senal(LED_AZUL, 1);
+    senalCon(LED_AZUL, 1, 400);
   } else {
     Serial.printf("ignorado %s: %s\n", nombre.c_str(), motivo.c_str());
   }
 }
 
 // ============================================================
-// SECCIÓN 13 · Lectura continua de tags (inventario del YRM)
-// En esta sección se pide un inventario al YRM (comando 0x22) en cada vuelta
-// de loop() y se leen todas las tramas de tags que respondan: RSSI, PC y el
-// EPC, que se convierte a texto hexadecimal y pasa a la sección 12.
+// SECCIÓN 11 · Lectura continua de tags (inventario del YRM)
+// En cada vuelta de loop() se pide un inventario (comando 0x22) y se leen
+// las tramas de los tags: RSSI, PC y el EPC, que se pasa a texto hexadecimal.
 // ============================================================
 void inventario() {
   vaciarEntrada();
@@ -860,7 +849,7 @@ void inventario() {
   while (true) {
     int n = leerTrama(tipo, cmd, datos, sizeof(datos), 150);
     if (n == -1) break;
-    if (n == -2) { Serial.println("Trama con error (revisa GND o alimentacion)"); continue; }
+    if (n == -2) { Serial.println("Trama con error (revisa GND o alimentación)"); continue; }
     if (tipo == 0x01 && cmd == 0xFF) break;   // "ningún tag"
     if (tipo != 0x02 || cmd != 0x22 || n < 5) continue;
 
@@ -877,74 +866,7 @@ void inventario() {
 }
 
 // ============================================================
-// SECCIÓN 14 · Comandos de voz de la XIAO y órdenes del panel
-// En esta sección se mide el pulso que manda la XIAO por el GPIO 14 con una
-// interrupción (corto = entrada, largo = salida), se pregunta el aforo
-// después de un comando de voz y se ejecuta el comando que dejó la tarea de
-// la sección 11 (dar o negar acceso desde el panel).
-// ============================================================
-// La XIAO ya decidió y avisó al panel; aquí solo se prende el LED y se abre.
-// El pulso se mide con una interrupción para no perderlo mientras se leen
-// tags o hay un LED encendido: ~100 ms = entrada, ~300 ms = salida.
-volatile uint32_t pulsoDesde = 0;
-volatile uint32_t pulsoDuro = 0;
-uint32_t aforoPendienteEn = 0;   // cuándo preguntar el aforo tras un comando de voz
-
-void IRAM_ATTR cambioPulsoXiao() {
-  uint32_t ahora = millis();
-  if (digitalRead(PULSO_XIAO) == HIGH) pulsoDesde = ahora;
-  else if (pulsoDesde) { pulsoDuro = ahora - pulsoDesde; pulsoDesde = 0; }
-}
-
-void atenderVoz() {
-  uint32_t ms = pulsoDuro;
-  if (!ms) return;
-  pulsoDuro = 0;
-  if (ms < 40) return;                     // ruido en el cable
-  bool entrada = ms < 200;
-  Serial.printf("VOZ      %s (pulso de %lu ms de la XIAO)\n", entrada ? "ENTRADA" : "SALIDA", (unsigned long)ms);
-  avisarC6(entrada ? 'E' : 'S', "Voz", -1);
-  abrirPuerta();
-  senal(entrada ? LED_VERDE : LED_AZUL, entrada ? 1 : 2);
-  aforoPendienteEn = millis() + 3000;   // para entonces la XIAO ya avisó al servidor
-}
-
-// Después de un comando de voz: cuántos quedan dentro, para que la C6 puente
-// sepa si apagarlo ("D||0") o dejarlo prendido.
-void atenderAforo() {
-  if (!aforoPendienteEn || (int32_t)(millis() - aforoPendienteEn) < 0) return;
-  aforoPendienteEn = 0;
-  Respuesta r = pedir("GET", "/api/lectores/aforo", nullptr, 0, nullptr, esperaServidor());
-  int i = r.cuerpo.indexOf("\"dentro\":");
-  if (r.codigo != 200 || i < 0) {
-    Serial.printf("No se pudo saber cuántos quedan dentro (HTTP %d)\n", r.codigo);
-    return;
-  }
-  avisarC6('D', "", r.cuerpo.substring(i + 9).toInt());
-}
-
-void atenderComando() {
-  int c = comandoPendiente;
-  if (!c) return;
-  comandoPendiente = 0;
-  if (c == 1) {
-    Serial.printf("PANEL    el dueño abrio la puerta a %s\n", nombreComando);
-    avisarC6('A', nombreComando, -1);
-    abrirPuerta();
-    senal(LED_VERDE, 1);
-  } else {
-    Serial.printf("PANEL    el dueño nego el acceso a %s\n", nombreComando);
-    senal(LED_ROJO, 1);
-  }
-}
-
-// ============================================================
-// SECCIÓN 15 · Arranque (setup) y ciclo principal (loop)
-// setup(): configura pines e interrupción, despierta al YRM, crea el
-// semáforo del módem, carga la lista guardada, conecta la red elegida
-// (sección 7) y crea la tarea de comandos (sección 11).
-// loop(): atiende el monitor serie, los comandos del panel, la voz y el
-// aforo, vigila la red, refresca la lista y lee tags (sección 13).
+// SECCIÓN 12 · Arranque (setup) y ciclo principal (loop)
 // ============================================================
 void setup() {
   Serial.begin(115200);
@@ -953,17 +875,15 @@ void setup() {
 
   pinMode(LED_VERDE, OUTPUT); pinMode(LED_AZUL, OUTPUT);
   pinMode(LED_ROJO, OUTPUT);  pinMode(BUZZER, OUTPUT);
-  pinMode(AVISO_C6, OUTPUT);
-  digitalWrite(AVISO_C6, HIGH);   // un serial en reposo está en alto
-  pinMode(PULSO_XIAO, INPUT_PULLDOWN);   // sin la XIAO conectada se queda en bajo
-  attachInterrupt(digitalPinToInterrupt(PULSO_XIAO), cambioPulsoXiao, CHANGE);
+  iniciarServo();
+  probarSalidas();
 
   // El YRM puede tardar en encender más que la LILYGO: se reintenta unos segundos.
   yrm.begin(115200, SERIAL_8N1, RFID_RX, RFID_TX);
   bool yrmListo = false;
   for (int i = 0; i < 8 && !yrmListo; i++) { delay(500); yrmListo = pedirVersion(); }
   if (!yrmListo) {
-    Serial.println("El YRM NO responde: revisa GND comun, TX/RX cruzados, EN y los 5 V.");
+    Serial.println("El YRM NO responde: revisa GND común, TX/RX cruzados, EN y los 5 V.");
     digitalWrite(LED_ROJO, HIGH);
   } else {
     fijarPotencia(potenciaDbm);
@@ -973,46 +893,45 @@ void setup() {
   leerServidor();
   prefs.begin("lector", false);
   cargarListaGuardada();
-  Serial.printf("Servidor: %s\n", SERVIDOR);
-  int guardada = prefs.getInt("red", RED_WIFI);
-  red = RED_WIFI;   // al arrancar no hay nada de otra red que apagar
-  usarRed(guardada >= RED_WIFI && guardada <= RED_2G ? guardada : RED_WIFI);
+  modo = prefs.getInt("modo", MODO_AUTO);
+  if (modo < MODO_AUTO || modo > MODO_2G) modo = MODO_AUTO;
+  Serial.printf("Servidor: %s · modo de red: %s\n", SERVIDOR, NOMBRE_MODO[modo]);
+  digitalWrite(LED_AZUL, HIGH);          // azul fijo mientras conecta
+  conectarInternet();
+  digitalWrite(LED_AZUL, LOW);
   // En el núcleo 1, junto a loop(): por el módem, la librería HTTP espera la
   // respuesta sin soltar el procesador, y en el núcleo 0 eso dispara el
   // watchdog del sistema (task_wdt) y reinicia la placa.
   xTaskCreatePinnedToCore(tareaComandos, "comandos", 10240, nullptr, 1, nullptr, 1);
-  Serial.println("Listo. Comandos: w / l / g (WiFi, LTE-M, 2G), r (estado), n (simular tag desconocido), + / - (potencia)");
+  Serial.println("Listo. Comandos: a / w / l / g (red), r (estado), p (probar puerta), n (tag desconocido), + / - (potencia)");
 }
 
 void loop() {
   if (Serial.available()) {
     char c = Serial.read();
-    if (c == 'w') cambiarRed(RED_WIFI);
-    if (c == 'l') cambiarRed(RED_LTE);
-    if (c == 'g') cambiarRed(RED_2G);
+    if (c == 'a') cambiarModo(MODO_AUTO);
+    if (c == 'w') cambiarModo(MODO_WIFI);
+    if (c == 'l') cambiarModo(MODO_LTE);
+    if (c == 'g') cambiarModo(MODO_2G);
     if (c == 'r') mostrarEstado();
+    if (c == 'p') { Serial.println("PRUEBA   puerta"); abrirPuerta(); senal(LED_VERDE, 1); }
     if (c == 'n') alLeerTag(EPC_SIMULADO, 0, true);
     if (c == '+' && potenciaDbm < 26) fijarPotencia(++potenciaDbm);
     if (c == '-' && potenciaDbm > 5)  fijarPotencia(--potenciaDbm);
   }
   atenderComando();
-  atenderVoz();
-  atenderAforo();
-  // Con WiFi pero sin poder preguntar por los comandos del panel tanto tiempo:
-  // se reinicia la placa (así se recupera si se quedó sin memoria para el https).
+  vigilarPuerta();
+  // Con WiFi pero sin poder preguntar por los comandos tanto tiempo: se
+  // reinicia la placa (así se recupera si se quedó sin memoria para el https).
   if (redLista && red == RED_WIFI && WiFi.status() == WL_CONNECTED &&
       millis() > SIN_SONDEO_REINICIA_MS && millis() - ultimoSondeoOk > SIN_SONDEO_REINICIA_MS) {
     Serial.println("[comandos] 3 min sin poder preguntar al servidor: reinicio la placa");
     delay(200);
     ESP.restart();
   }
-  if (red == RED_WIFI) {
-    vigilarWifi();
-  } else {
-    atenderRelevo();
-    vigilarModem();
-  }
-  if (millis() - ultimaLista > LISTA_CADA_MS) descargarLista();
+  vigilarRed();
+  avisarSinInternet();
+  if (red != RED_NINGUNA && millis() - ultimaLista > LISTA_CADA_MS) descargarLista();
   inventario();
   delay(150);
 }
