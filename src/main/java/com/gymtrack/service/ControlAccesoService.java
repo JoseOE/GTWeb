@@ -13,6 +13,7 @@ import com.gymtrack.repository.SolicitudAccesoRepository;
 import com.gymtrack.repository.TarjetaRepository;
 import com.gymtrack.repository.UserRepository;
 import com.gymtrack.util.Fechas;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -28,6 +29,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -73,6 +75,9 @@ public class ControlAccesoService {
     static final Duration MODO_REGISTRO = Duration.ofSeconds(60);
     static final Duration TAG_CAPTURADO = Duration.ofMinutes(10);
     static final Duration EN_LINEA = Duration.ofSeconds(60);
+    // Una apertura pedida por una simulación espera al lector este tiempo.
+    static final Duration APERTURA_PENDIENTE = Duration.ofMinutes(1);
+    public static final String ORIGEN_SIMULADO = "Simulada desde el panel";
     static final int MAX_FOTO = 1_500_000;
 
     private static final Pattern EPC = Pattern.compile("^[0-9A-F]{8,64}$");
@@ -86,10 +91,13 @@ public class ControlAccesoService {
     private final UserRepository users;
     private final RenovacionAccesoService renovacion;
     private final MongoTemplate mongo;
+    private final boolean simulacion;
 
     public ControlAccesoService(LectorRepository lectores, TarjetaRepository tarjetas, AccesoRepository accesos,
                                 SolicitudAccesoRepository solicitudes, FotoAccesoRepository fotos, UserRepository users,
-                                MongoTemplate mongo, RenovacionAccesoService renovacion) {
+                                MongoTemplate mongo, RenovacionAccesoService renovacion,
+                                @Value("${acceso.simulacion:true}") boolean simulacion) {
+        this.simulacion = simulacion;
         this.lectores = lectores;
         this.tarjetas = tarjetas;
         this.accesos = accesos;
@@ -186,20 +194,111 @@ public class ControlAccesoService {
         if (socio == null) {
             return negar(lector, epc, null, "El tag es de alguien que ya no es socio");
         }
+        return decidirSocio(lector, epc, socio, null);
+    }
 
+    // Las reglas para un socio identificado, del tag o de una simulación del
+    // panel (origen = lo que queda en el historial; null para el tag).
+    private Map<String, Object> decidirSocio(Lector lector, String epc, User socio, String origen) {
+        Instant ahora = Instant.now();
         Optional<Acceso> ultimo = accesos.findFirstByUserIdAndTipoInOrderByFechaDesc(socio.getId(), List.of(Acceso.ENTRADA, Acceso.SALIDA));
         if (ultimo.isPresent() && Duration.between(ultimo.get().getFecha(), ahora).compareTo(MINIMO_ENTRE_PASES) < 0) {
             return respuesta("IGNORADO", socio.getNombre(), "Muy pronto desde su último pase", null);
         }
         if (estaDentro(ultimo, ahora)) {
-            guardarAcceso(lector, epc, socio.getId(), socio.getNombre(), Acceso.SALIDA, null, null);
+            guardarAcceso(lector, epc, socio.getId(), socio.getNombre(), Acceso.SALIDA, origen, null);
             return conAforo(respuesta(Acceso.SALIDA, socio.getNombre(), null, null), lector.getGymId());
         }
         if (!membresiaVigente(socio)) {
             return negar(lector, epc, socio, MOTIVO_VENCIDA);
         }
-        guardarAcceso(lector, epc, socio.getId(), socio.getNombre(), Acceso.ENTRADA, null, null);
+        guardarAcceso(lector, epc, socio.getId(), socio.getNombre(), Acceso.ENTRADA, origen, null);
         return conAforo(respuesta(Acceso.ENTRADA, socio.getNombre(), null, null), lector.getGymId());
+    }
+
+    // ─────────────────────────── Simular una entrada (prueba) ───────────────────────────
+
+    // Mientras se termina la puerta: el dueño "pasa la tarjeta" de un socio
+    // desde Mis Usuarios. Usa las mismas reglas que el lector de verdad:
+    //   - membresía vencida → NEGADO, alerta y push para renovar desde la app;
+    //     al pagar, la puerta se abre sola (abrirTrasRenovar).
+    //   - al día → ENTRADA (o SALIDA si ya estaba dentro) y el lector de la
+    //     puerta, si está conectado, abre el servo.
+    // Se apaga con ACCESO_SIMULACION=false.
+    public Map<String, Object> simulacion(String gymId) {
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("activa", simulacion);
+        r.put("lector", lectorParaSimular(gymId).map(l -> vistaLector(l, Instant.now())).orElse(null));
+        return r;
+    }
+
+    public Map<String, Object> simularEntrada(String gymId, String socioId) {
+        if (!simulacion) throw new TiendaException(HttpStatus.NOT_FOUND, "La simulación de entradas está apagada.");
+        User socio = users.findById(socioId == null ? "" : socioId)
+                .filter(u -> gymId.equals(u.getGymId()) && "member".equals(u.getRole()))
+                .orElseThrow(() -> new TiendaException(HttpStatus.NOT_FOUND, "Ese socio no es de tu gimnasio."));
+        if (User.STATUS_PENDING.equals(socio.getMembershipStatus())) {
+            throw new TiendaException(HttpStatus.CONFLICT, "Primero aprueba su solicitud.");
+        }
+        Lector lector = lectorParaSimular(gymId)
+                .orElseThrow(() -> new TiendaException(HttpStatus.CONFLICT, "Primero agrega el lector de la puerta en Accesos RFID."));
+        // Su tag, si tiene; si no, uno de mentira para que el historial lo distinga.
+        String epc = tarjetas.findByGymId(gymId).stream().filter(t -> socio.getId().equals(t.getUserId()))
+                .map(Tarjeta::getEpc).findFirst().orElse("SIMULADO");
+
+        Map<String, Object> r = decidirSocio(lector, epc, socio, ORIGEN_SIMULADO);
+        Instant ahora = Instant.now();
+        boolean enLinea = enLinea(lector, ahora);
+        String resultado = String.valueOf(r.get("resultado"));
+        boolean abre = Acceso.ENTRADA.equals(resultado) || Acceso.SALIDA.equals(resultado);
+        if (abre) pedirApertura(lector, socio.getNombre());
+        boolean alertaNueva = Boolean.TRUE.equals(r.get("fotos"));
+        r.remove("fotos");
+        r.put("simulado", true);
+        r.put("lector", vistaLector(lector, ahora));
+        r.put("puertaAbierta", abre && enLinea);
+        // El push para renovar solo sale con una alerta nueva y si tiene la app con avisos.
+        r.put("avisoRenovar", Acceso.NEGADO.equals(resultado) && MOTIVO_VENCIDA.equals(r.get("motivo")) && alertaNueva
+                && socio.getPushToken() != null && !socio.getPushToken().isBlank());
+        r.put("alertaRepetida", Acceso.NEGADO.equals(resultado) && !alertaNueva);
+        return r;
+    }
+
+    // El lector del gimnasio que más recientemente se conectó.
+    private Optional<Lector> lectorParaSimular(String gymId) {
+        return lectores.findByGymId(gymId).stream()
+                .max(Comparator.comparing(l -> l.getUltimaConexion() == null ? Instant.EPOCH : l.getUltimaConexion()));
+    }
+
+    private void pedirApertura(Lector lector, String nombre) {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(lector.getId())),
+                new Update().set("abrirPendienteEn", Instant.now()).set("abrirPendienteNombre", nombre), Lector.class);
+    }
+
+    // Si hay una apertura pedida por una simulación (de hace menos de 1 min), se
+    // entrega una sola vez: el findAndModify la borra al leerla.
+    private Optional<Map<String, Object>> aperturaPendiente(Lector lector) {
+        Lector l = mongo.findAndModify(
+                Query.query(Criteria.where("_id").is(lector.getId()).and("abrirPendienteEn").gt(Instant.now().minus(APERTURA_PENDIENTE))),
+                new Update().unset("abrirPendienteEn").unset("abrirPendienteNombre"), Lector.class);
+        if (l == null) return Optional.empty();
+        Map<String, Object> comando = new LinkedHashMap<>();
+        comando.put("comando", "abrir");
+        comando.put("solicitudId", null);
+        comando.put("nombre", l.getAbrirPendienteNombre() == null ? "Socio" : l.getAbrirPendienteNombre());
+        return Optional.of(comando);
+    }
+
+    private static boolean enLinea(Lector l, Instant ahora) {
+        return l.getUltimaConexion() != null && Duration.between(l.getUltimaConexion(), ahora).compareTo(EN_LINEA) < 0;
+    }
+
+    private static Map<String, Object> vistaLector(Lector l, Instant ahora) {
+        Map<String, Object> v = new LinkedHashMap<>();
+        v.put("id", l.getId());
+        v.put("nombre", l.getNombre());
+        v.put("enLinea", enLinea(l, ahora));
+        return v;
     }
 
     // Para el lector después de un comando de voz (la LILYGO no sabe cuántos quedan).
@@ -251,6 +350,8 @@ public class ControlAccesoService {
     public Optional<Map<String, Object>> esperarComando(Lector lector, Duration espera) {
         Instant limite = Instant.now().plus(espera);
         while (true) {
+            Optional<Map<String, Object>> simulada = aperturaPendiente(lector);
+            if (simulada.isPresent()) return simulada;
             Optional<SolicitudAcceso> decidida = solicitudes.findFirstByLectorIdAndEstadoInAndComandoEntregadoFalseAndAtendidaEnAfter(
                     lector.getId(), List.of(SolicitudAcceso.APROBADA, SolicitudAcceso.RECHAZADA), Instant.now().minus(VIGENCIA_SOLICITUD));
             if (decidida.isPresent()) {
@@ -392,6 +493,7 @@ public class ControlAccesoService {
         r.put("solicitudes", listaSolicitudes);
         r.put("accesos", listaAccesos);
         r.put("dentro", dentro);
+        r.put("simulacion", simulacion);
         // El último acceso por voz: si quien entró por voz sigue dentro (LED de la XIAO prendido).
         r.put("voz", ultimoPorVoz(gymId).map(a -> {
             Map<String, Object> v = new LinkedHashMap<>();
