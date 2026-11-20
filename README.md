@@ -1,5 +1,7 @@
 # GymTrack — Página web
 
+> **Tu gimnasio. Tu visión. Otro nivel.**
+
 **GymTrack** es un ecosistema tecnológico **B2B2C** diseñado para modernizar la administración y la experiencia de usuario en gimnasios locales y medianos.
 
 El sistema integra una **plataforma web administrativa**, una **aplicación móvil**, servicios backend y un **módulo físico IoT basado en tecnología RFID** para automatizar el control de acceso al gimnasio.
