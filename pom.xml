@@ -15,7 +15,7 @@
 	<description>GymTrack Web Platform</description>
 	<properties>
 		<java.version>17</java.version>
-		<itext.version>9.8.0</itext.version>
+		<itext.version>9.8.1</itext.version>
 	</properties>
 	<dependencies>
 		<!-- Web (REST y Servidor Integrado) -->
