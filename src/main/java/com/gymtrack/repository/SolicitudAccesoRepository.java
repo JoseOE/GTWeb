@@ -13,7 +13,6 @@ public interface SolicitudAccesoRepository extends MongoRepository<SolicitudAcce
     // La alerta más reciente de un socio (renovar desde la puerta).
     Optional<SolicitudAcceso> findFirstByUserIdAndCreadaEnAfterOrderByCreadaEnDesc(String userId, Instant desde);
     Optional<SolicitudAcceso> findFirstByLectorIdAndEpcAndEstadoAndCreadaEnAfter(String lectorId, String epc, String estado, Instant desde);
-    Optional<SolicitudAcceso> findFirstByLectorIdAndCreadaEnAfterOrderByCreadaEnDesc(String lectorId, Instant desde);
     Optional<SolicitudAcceso> findFirstByLectorIdAndEstadoInAndComandoEntregadoFalseAndAtendidaEnAfter(
             String lectorId, Collection<String> estados, Instant desde);
 }

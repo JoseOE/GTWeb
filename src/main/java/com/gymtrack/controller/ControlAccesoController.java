@@ -1,6 +1,5 @@
 package com.gymtrack.controller;
 
-import com.gymtrack.model.FotoAcceso;
 import com.gymtrack.service.AccesoService;
 import com.gymtrack.service.ControlAccesoService;
 import org.springframework.http.CacheControl;
@@ -11,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 // Pestaña "Accesos RFID" del panel: lectores, tags de los socios, alertas de
-// accesos negados (con las fotos de la XIAO) y la bitácora de la puerta.
+// accesos negados y la bitácora de la puerta.
 // Solo el dueño del gimnasio.
 @RestController
 @RequestMapping("/api/gyms/{gymId}/acceso")
@@ -107,15 +106,4 @@ public class ControlAccesoController {
         return control.simularEntrada(gymId, body == null ? null : body.get("userId"));
     }
 
-    // Las fotos no tienen URL pública: el panel las pide con su sesión.
-    @GetMapping("/fotos/{id}")
-    public ResponseEntity<byte[]> foto(@PathVariable String gymId, @PathVariable String id,
-                                       @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
-        acceso.exigirDueno(gymId, userId);
-        FotoAcceso f = control.foto(gymId, id);
-        return ResponseEntity.ok()
-                .contentType(MediaType.IMAGE_JPEG)
-                .cacheControl(CacheControl.noStore())
-                .body(f.getDatos());
-    }
 }
