@@ -32,7 +32,7 @@ GitHub Pages solo sirve archivos estáticos, así que ahí funcionan la página 
 - [Seguridad y sesiones](#-seguridad-y-sesiones)
 - [Correos de la cuenta](#-correos-de-la-cuenta)
 - [Tienda](#-tienda)
-- [Control de acceso RFID, voz y Alexa](#-control-de-acceso-rfid-voz-y-alexa)
+- [Control de acceso RFID](#-control-de-acceso-rfid)
 - [Contexto del proyecto](#problemática)
 - [Equipo y sprints](#-equipo-y-flujo-de-trabajo)
 - [Negocios Electrónicos · Tema 3 (análisis, evidencias y decisiones)](docs/negocios-electronicos-tema3.md)
@@ -225,7 +225,7 @@ GTWeb/
 ├── Dockerfile                    # Imagen para desplegar en Render
 ├── .github/workflows/            # Revisión de cada PR y publicación de la parte estática en GitHub Pages
 ├── pruebas/                      # Pruebas de punta a punta (Node)
-├── hardware/acceso-rfid/         # Firmware del lector RFID (LILYGO), la XIAO de voz y las dos ESP32-C6 con Matter
+├── hardware/acceso-rfid/         # Firmware del lector RFID (LILYGO T-SIM7070G + YRM1004)
 └── src/main/
     ├── java/com/gymtrack/
     │   ├── GymTrackApplication.java   # Arranque y datos iniciales del catálogo
@@ -1035,7 +1035,7 @@ La credencial podrá tomar diferentes formas:
 El usuario únicamente deberá acercar su credencial al lector instalado en la entrada.
 
 🚪 4. Control de acceso IoT
-El módulo IoT está en la entrada del gimnasio (ver [Control de acceso RFID, voz y Alexa](#-control-de-acceso-rfid-voz-y-alexa)).
+El módulo IoT está en la entrada del gimnasio (ver [Control de acceso RFID](#-control-de-acceso-rfid)).
 
 Su función:
 
@@ -1045,7 +1045,7 @@ Su función:
 * Consultar la base de datos (MongoDB) para verificar el estado de pago.
 * Autorizar o rechazar el acceso, y registrar la entrada o la salida.
 * Avisar al dueño en el panel cuando se niega un acceso, para que decida si abre.
-* Saludar al socio con una Alexa y prender la lámpara del gimnasio por Matter.
+* Responder con LEDs, buzzer y el servo de la puerta.
 
 🗄️ 5. Backend y Base de Datos
 GymTrack utiliza **Java Spring Boot** como API backend principal y **MongoDB Atlas** como base de datos NoSQL.
@@ -1075,7 +1075,7 @@ Gimnasio
 Dado que la plataforma web permitirá a múltiples gimnasios contratar el servicio, la información se aísla a nivel lógico y de base de datos para asegurar que cada administrador solo pueda ver y modificar los datos de su propio gimnasio. Las contraseñas se guardan cifradas con BCrypt y las cuentas de la página confirman su correo antes de entrar.
 
 🌐 Comunicación IoT
-El lector habla con el backend por HTTPS (TLS) sobre WiFi, o por LTE-M / 2G con su módem cuando no hay WiFi. Las órdenes del panel le llegan con una consulta larga, sin broker MQTT. Las placas de la puerta se comunican entre sí por serial, UDP en la red local y Matter hacia la Alexa.
+El lector habla con el backend por HTTPS (TLS) sobre WiFi, o por LTE-M / 2G con su módem cuando no hay WiFi. Las órdenes del panel le llegan con una consulta larga, sin broker MQTT.
 
 ---
 
@@ -1119,9 +1119,7 @@ El lector habla con el backend por HTTPS (TLS) sobre WiFi, o por LTE-M / 2G con 
 | LILYGO T-SIM7070G (ESP32 + módem SIM7070) | Lector de la puerta, con WiFi, LTE-M y 2G (TinyGSM) |
 | YRM1004 (RFID UHF) | Lectura de tarjetas, llaveros y stickers UHF |
 | HTTPS + llave por lector (hash SHA-256) | Comunicación segura con la API |
-| XIAO ESP32-S3 Sense + Edge Impulse | Comandos de voz "entrada" / "salida" |
-| ESP32-C6 + Matter (Arduino ESP32 3.3.11) | Sensores de contacto que la Alexa usa en sus rutinas |
-| Amazon Alexa | Anuncios de bienvenida/despedida y la lámpara inteligente |
+| LEDs, buzzer y servo SG90 | Respuesta en la puerta: entrada, salida, negado y apertura |
 
 ---
 
@@ -1166,9 +1164,8 @@ Fase 4 — IoT (Control de Acceso)
 - [x] Conectar el lector a Spring Boot por HTTPS (en lugar de un broker MQTT), con lista local para cuando no hay red.
 - [x] Registrar entradas y salidas, y alertas de acceso negado en el panel con "dar acceso".
 - [x] Respaldo por LTE-M y 2G.
-- [x] Comandos de voz con la XIAO ESP32-S3 (Edge Impulse).
-- [x] Alexa por Matter con dos ESP32-C6: saludos por socio, "acceso denegado" y la lámpara del gimnasio.
-- [ ] Mecanismo de apertura real (servo o chapa) en la puerta.
+- [x] Servo que simula la puerta, con LEDs y buzzer.
+- [ ] Chapa eléctrica real en la puerta.
 
 Fase 5 — Integración e Investigación
 - [ ] Pruebas E2E del ecosistema (Web -> Backend -> MongoDB -> IoT -> App).
@@ -1202,7 +1199,7 @@ La página web está publicada completa en Render (https://gtweb.onrender.com):
 - panel del gimnasio;
 - correos de la cuenta (Brevo);
 - tienda de cada gimnasio, con pagos simulados, mostrador y ventas, en el mismo servicio de Spring y MongoDB;
-- control de acceso RFID con voz y Alexa (pestaña "Accesos RFID" del panel).
+- control de acceso RFID (pestaña "Accesos RFID" del panel).
 
 La sesión de la página usa token. La aplicación móvil consume por defecto la misma API publicada en Render. Faltan dos cosas:
 - que la app mande el token de sesión, para activar `EXIGIR_TOKEN=true` en Render;

@@ -5,10 +5,10 @@
 //       sticker 1 a Valeria y el sticker 2 a Eduardo. La llave del lector se
 //       guarda en LECTOR_LLAVE del .env y en el secrets.h de lector_wifi (fuera
 //       de git), junto con la IP de esta PC; no se imprime.
-//   node pruebas/lector-rfid.mjs probar     se hace pasar por la LILYGO y la XIAO:
-//       entrada, pase repetido, salida, tag desconocido con foto, y el dueño
+//   node pruebas/lector-rfid.mjs probar     se hace pasar por la LILYGO:
+//       entrada, pase repetido, salida, tag desconocido, y el dueño
 //       abriendo desde el panel mientras el lector espera el comando.
-//   node pruebas/lector-rfid.mjs limpiar    borra los accesos, alertas y fotos de
+//   node pruebas/lector-rfid.mjs limpiar    borra los accesos y alertas de
 //       Gym Maximus (antes de una demo); los tags y el lector se quedan.
 //
 // DEMO_API (por defecto http://localhost:8080) y DEMO_PASSWORD salen del .env.
@@ -41,8 +41,6 @@ const TAGS = [
   { epc: 'E28069150000502D9DF80D65', socio: 'valeria.maximus@gymtrack.demo', que: 'Sticker 1' },
   { epc: 'E2827802000000000DFFC5F9', socio: 'eduardo.maximus@gymtrack.demo', que: 'Sticker 2' },
 ];
-// Un JPEG mínimo (1x1) para probar la subida de fotos.
-const JPEG = Buffer.from('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=', 'base64');
 
 async function pedir(metodo, ruta, { cuerpo, token, llave, binario } = {}) {
   const headers = {};
@@ -71,7 +69,7 @@ function guardarLlave(llave) {
     : texto.replace(/\s*$/, '\n') + '\n# Llave del lector RFID de Gym Maximus (pruebas/lector-rfid.mjs)\nLECTOR_LLAVE=' + llave + '\n';
   fs.writeFileSync(RUTA_ENV, texto);
 
-  // La LILYGO y la XIAO usan la misma llave; el servidor local es la IP de esta PC.
+  // El servidor local es la IP de esta PC.
   // Primero la del WiFi: un puerto Ethernet desconectado puede seguir mostrando una IP vieja.
   const interfaces = Object.entries(os.networkInterfaces())
     .sort(([a], [b]) => /wi-?fi|wlan/i.test(b) - /wi-?fi|wlan/i.test(a))
@@ -88,7 +86,7 @@ function guardarLlave(llave) {
   return escritos > 0;
 }
 
-// Borra la bitácora, las alertas y las fotos del gimnasio (no los tags ni el lector).
+// Borra la bitácora y las alertas del gimnasio (no los tags ni el lector).
 async function limpiar() {
   const { MongoClient } = await import('mongodb');
   if (!env.DEMO_MONGODB_URI) throw new Error('Falta DEMO_MONGODB_URI en el .env.');
@@ -97,7 +95,7 @@ async function limpiar() {
   try {
     await cliente.connect();
     const db = cliente.db();
-    for (const c of ['accesos', 'solicitudes_acceso', 'fotos_acceso']) {
+    for (const c of ['accesos', 'solicitudes_acceso']) {
       const r = await db.collection(c).deleteMany({ gymId });
       console.log(`  ${c}: ${r.deletedCount} borrados`);
     }
@@ -114,7 +112,7 @@ async function preparar() {
   } else {
     const lector = exigir(await pedir('POST', `/api/gyms/${gymId}/acceso/lectores`, { cuerpo: { nombre: 'Puerta principal' }, token }), 'crear lector');
     const enSecrets = guardarLlave(lector.llave);
-    console.log(`Lector "${lector.nombre}" creado; su llave quedó en .env (LECTOR_LLAVE)${enSecrets ? ' y en los secrets.h de la LILYGO y la XIAO' : ''}.`);
+    console.log(`Lector "${lector.nombre}" creado; su llave quedó en .env (LECTOR_LLAVE)${enSecrets ? ' y en el secrets.h de la LILYGO' : ''}.`);
   }
   const { socios } = exigir(await pedir('GET', `/api/gyms/${gymId}/acceso`, { token }), 'resumen');
   const miembros = exigir(await pedir('GET', `/api/gyms/${gymId}/members`, { token }), 'miembros');
@@ -146,8 +144,7 @@ async function probar() {
   if (negado.resultado !== 'NEGADO' || !negado.solicitudId) throw new Error('El tag desconocido debía negarse con solicitud.');
   await pase(desconocido, 'Mismo tag (no repite alerta)');
 
-  const foto = exigir(await pedir('POST', '/api/lectores/fotos', { cuerpo: JPEG, llave, binario: true }), 'subir foto');
-  console.log(`Foto de la XIAO guardada en la solicitud: ${foto.solicitudId === negado.solicitudId ? 'sí' : 'NO'}`);
+  if (negado.alertaNueva !== true) throw new Error('La primera vez el tag desconocido debía abrir una alerta nueva.');
 
   // El lector espera el comando mientras el dueño abre desde el panel.
   const esperando = pedir('GET', '/api/lectores/comandos', { llave });

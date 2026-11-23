@@ -5,11 +5,9 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 
-// Un acceso negado que el dueño puede revisar desde el panel: ve las fotos
-// de la XIAO y decide si abre la puerta. Cuando decide, el lector se entera
+// Un acceso negado que el dueño puede revisar desde el panel y decidir si
+// abre la puerta. Cuando decide, el lector se entera
 // en su siguiente consulta de comandos (comandoEntregado pasa a true).
 @Document(collection = "solicitudes_acceso")
 public class SolicitudAcceso {
@@ -33,7 +31,6 @@ public class SolicitudAcceso {
     private Instant atendidaEn;
     private String atendidaPor;
     private boolean comandoEntregado;
-    private List<String> fotos = new ArrayList<>();
 
     public SolicitudAcceso() {}
 
@@ -73,6 +70,4 @@ public class SolicitudAcceso {
     public boolean isComandoEntregado() { return comandoEntregado; }
     public void setComandoEntregado(boolean comandoEntregado) { this.comandoEntregado = comandoEntregado; }
 
-    public List<String> getFotos() { return fotos; }
-    public void setFotos(List<String> fotos) { this.fotos = fotos; }
 }

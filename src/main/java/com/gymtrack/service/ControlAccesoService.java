@@ -1,13 +1,11 @@
 package com.gymtrack.service;
 
 import com.gymtrack.model.Acceso;
-import com.gymtrack.model.FotoAcceso;
 import com.gymtrack.model.Lector;
 import com.gymtrack.model.SolicitudAcceso;
 import com.gymtrack.model.Tarjeta;
 import com.gymtrack.model.User;
 import com.gymtrack.repository.AccesoRepository;
-import com.gymtrack.repository.FotoAccesoRepository;
 import com.gymtrack.repository.LectorRepository;
 import com.gymtrack.repository.SolicitudAccesoRepository;
 import com.gymtrack.repository.TarjetaRepository;
@@ -46,7 +44,7 @@ import java.util.stream.Collectors;
 //   - socio fuera con la membresía al día  -> ENTRADA
 //   - socio dentro                         -> SALIDA (salir no se valida)
 //   - membresía vencida o tag desconocido  -> NEGADO, y queda una solicitud
-//     para que el dueño vea las fotos de la XIAO y decida si abre.
+//     para que el dueño decida desde el panel si abre.
 //   - membresía vencida: además le llega al socio un push para renovar desde
 //     la app; si paga mientras la alerta sigue vigente, se abre sola
 //     (RenovacionAccesoService y abrirTrasRenovar).
@@ -68,9 +66,6 @@ public class ControlAccesoService {
     static final Duration SOLICITUD_REPETIDA = Duration.ofMinutes(2);
     // El dueño puede abrir hasta este tiempo después del intento.
     static final Duration VIGENCIA_SOLICITUD = Duration.ofMinutes(10);
-    // Las fotos que llegan en este lapso son de la última solicitud del lector.
-    static final Duration FOTOS_DE_LA_SOLICITUD = Duration.ofSeconds(60);
-    static final int FOTOS_POR_ALERTA = 3;
     // El modo registro espera el tag este tiempo; el tag capturado se puede asignar durante 10 min.
     static final Duration MODO_REGISTRO = Duration.ofSeconds(60);
     static final Duration TAG_CAPTURADO = Duration.ofMinutes(10);
@@ -78,7 +73,6 @@ public class ControlAccesoService {
     // Una apertura pedida por una simulación espera al lector este tiempo.
     static final Duration APERTURA_PENDIENTE = Duration.ofMinutes(1);
     public static final String ORIGEN_SIMULADO = "Simulada desde el panel";
-    static final int MAX_FOTO = 1_500_000;
 
     private static final Pattern EPC = Pattern.compile("^[0-9A-F]{8,64}$");
     private static final SecureRandom AZAR = new SecureRandom();
@@ -87,14 +81,13 @@ public class ControlAccesoService {
     private final TarjetaRepository tarjetas;
     private final AccesoRepository accesos;
     private final SolicitudAccesoRepository solicitudes;
-    private final FotoAccesoRepository fotos;
     private final UserRepository users;
     private final RenovacionAccesoService renovacion;
     private final MongoTemplate mongo;
     private final boolean simulacion;
 
     public ControlAccesoService(LectorRepository lectores, TarjetaRepository tarjetas, AccesoRepository accesos,
-                                SolicitudAccesoRepository solicitudes, FotoAccesoRepository fotos, UserRepository users,
+                                SolicitudAccesoRepository solicitudes, UserRepository users,
                                 MongoTemplate mongo, RenovacionAccesoService renovacion,
                                 @Value("${acceso.simulacion:true}") boolean simulacion) {
         this.simulacion = simulacion;
@@ -102,7 +95,6 @@ public class ControlAccesoService {
         this.tarjetas = tarjetas;
         this.accesos = accesos;
         this.solicitudes = solicitudes;
-        this.fotos = fotos;
         this.users = users;
         this.renovacion = renovacion;
         this.mongo = mongo;
@@ -122,55 +114,6 @@ public class ControlAccesoService {
         mongo.updateFirst(Query.query(Criteria.where("_id").is(lector.getId())),
                 Update.update("ultimaConexion", lector.getUltimaConexion()), Lector.class);
         return lector;
-    }
-
-    // La XIAO reconoció un comando de voz con su modelo (Edge Impulse) mientras
-    // se presionaba su botón: "entrada" prende su LED y "salida" lo apaga.
-    // Cada comando válido cuenta como una entrada o una salida de verdad ("Acceso
-    // por voz"), por turnos: no hay dos entradas seguidas ni dos salidas
-    // seguidas. Un comando repetido responde IGNORADO y no se registra.
-    public Map<String, Object> registrarVoz(Lector lector, String comandoCrudo, Double confianza) {
-        String comando = normalizar(comandoCrudo);
-        if (!comando.equals("entrada") && !comando.equals("salida")) {
-            throw new TiendaException(HttpStatus.BAD_REQUEST, "El comando de voz debe ser \"entrada\" o \"salida\".");
-        }
-        boolean entrada = comando.equals("entrada");
-        boolean dentro = vozDentro(lector.getGymId());
-        Map<String, Object> r = new LinkedHashMap<>();
-        r.put("comando", comando);
-        if (entrada == dentro) {
-            r.put("resultado", "IGNORADO");
-            r.put("motivo", entrada ? "Ya entró por voz: falta su salida" : "Nadie ha entrado por voz");
-            r.put("led", dentro ? "encendido" : "apagado");
-            return r;
-        }
-        String porcentaje = confianza == null ? "" : " (" + Math.round(confianza * 100) + " %)";
-        guardarAcceso(lector, null, null, NOMBRE_VOZ, entrada ? Acceso.ENTRADA : Acceso.SALIDA,
-                PREFIJO_VOZ + " \"" + comando + "\"" + porcentaje, null);
-        r.put("resultado", entrada ? Acceso.ENTRADA : Acceso.SALIDA);
-        r.put("motivo", "");
-        r.put("led", entrada ? "encendido" : "apagado");
-        return r;
-    }
-
-    static final String NOMBRE_VOZ = "Acceso por voz";
-    static final String PREFIJO_VOZ = "Comando de voz";
-
-    private Optional<Acceso> ultimoPorVoz(String gymId) {
-        return accesos.findFirstByGymIdAndMotivoStartingWithOrderByFechaDesc(gymId, PREFIJO_VOZ);
-    }
-
-    // Quien entró por voz y no ha salido sigue dentro (con la misma salida
-    // automática que los tags).
-    private boolean vozDentro(String gymId) {
-        return estaDentro(ultimoPorVoz(gymId), Instant.now());
-    }
-
-    // "Entrada " → "entrada": para comparar lo que manda el modelo.
-    static String normalizar(String texto) {
-        if (texto == null) return "";
-        return java.text.Normalizer.normalize(texto.trim(), java.text.Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "").toLowerCase();
     }
 
     public Map<String, Object> registrarLectura(Lector lector, String epcCrudo) {
@@ -207,13 +150,13 @@ public class ControlAccesoService {
         }
         if (estaDentro(ultimo, ahora)) {
             guardarAcceso(lector, epc, socio.getId(), socio.getNombre(), Acceso.SALIDA, origen, null);
-            return conAforo(respuesta(Acceso.SALIDA, socio.getNombre(), null, null), lector.getGymId());
+            return respuesta(Acceso.SALIDA, socio.getNombre(), null, null);
         }
         if (!membresiaVigente(socio)) {
             return negar(lector, epc, socio, MOTIVO_VENCIDA);
         }
         guardarAcceso(lector, epc, socio.getId(), socio.getNombre(), Acceso.ENTRADA, origen, null);
-        return conAforo(respuesta(Acceso.ENTRADA, socio.getNombre(), null, null), lector.getGymId());
+        return respuesta(Acceso.ENTRADA, socio.getNombre(), null, null);
     }
 
     // ─────────────────────────── Simular una entrada (prueba) ───────────────────────────
@@ -252,8 +195,7 @@ public class ControlAccesoService {
         String resultado = String.valueOf(r.get("resultado"));
         boolean abre = Acceso.ENTRADA.equals(resultado) || Acceso.SALIDA.equals(resultado);
         if (abre) pedirApertura(lector, socio.getNombre());
-        boolean alertaNueva = Boolean.TRUE.equals(r.get("fotos"));
-        r.remove("fotos");
+        boolean alertaNueva = Boolean.TRUE.equals(r.get("alertaNueva"));
         r.put("simulado", true);
         r.put("lector", vistaLector(lector, ahora));
         r.put("puertaAbierta", abre && enLinea);
@@ -301,25 +243,8 @@ public class ControlAccesoService {
         return v;
     }
 
-    // Para el lector después de un comando de voz (la LILYGO no sabe cuántos quedan).
-    public Map<String, Object> aforo(Lector lector) {
-        return conAforo(new LinkedHashMap<>(), lector.getGymId());
-    }
-
-    // "dentro": cuántos socios con tag quedan en el gimnasio. El lector se lo
-    // pasa a la ESP32-C6 del foco, que lo deja prendido mientras haya alguien.
-    private Map<String, Object> conAforo(Map<String, Object> r, String gymId) {
-        Instant ahora = Instant.now();
-        long dentro = tarjetas.findByGymId(gymId).stream().map(Tarjeta::getUserId).distinct()
-                .filter(id -> estaDentro(accesos.findFirstByUserIdAndTipoInOrderByFechaDesc(id, List.of(Acceso.ENTRADA, Acceso.SALIDA)), ahora))
-                .count();
-        if (vozDentro(gymId)) dentro++;   // quien entró por voz también cuenta
-        r.put("dentro", dentro);
-        return r;
-    }
-
-    // Solo una alerta nueva pide fotos ("fotos": true): si el mismo tag vuelve a
-    // pasar mientras su alerta sigue pendiente, la XIAO no toma otras 3.
+    // "alertaNueva": true solo cuando se abre una alerta. Si el mismo tag vuelve
+    // a pasar mientras su alerta sigue pendiente, no se repiten alerta ni aviso.
     private Map<String, Object> negar(Lector lector, String epc, User socio, String motivo) {
         String nombre = socio == null ? null : socio.getNombre();
         Instant ahora = Instant.now();
@@ -342,7 +267,7 @@ public class ControlAccesoService {
         // Solo con una alerta nueva: si vuelve a pasar la tarjeta, no le llegan más avisos.
         if (socio != null && MOTIVO_VENCIDA.equals(motivo)) renovacion.avisarVencida(socio, s);
         Map<String, Object> r = respuesta(Acceso.NEGADO, nombre, motivo, s.getId());
-        r.put("fotos", true);
+        r.put("alertaNueva", true);
         return r;
     }
 
@@ -372,37 +297,6 @@ public class ControlAccesoService {
                 return Optional.empty();
             }
         }
-    }
-
-    public Map<String, Object> guardarFoto(Lector lector, byte[] datos) {
-        if (datos == null || datos.length < 4 || (datos[0] & 0xFF) != 0xFF || (datos[1] & 0xFF) != 0xD8) {
-            throw new TiendaException(HttpStatus.BAD_REQUEST, "La foto debe ser un JPEG.");
-        }
-        if (datos.length > MAX_FOTO) {
-            throw new TiendaException(HttpStatus.BAD_REQUEST, "La foto es demasiado pesada (máximo 1.5 MB).");
-        }
-        Optional<SolicitudAcceso> solicitud = solicitudes.findFirstByLectorIdAndCreadaEnAfterOrderByCreadaEnDesc(
-                lector.getId(), Instant.now().minus(FOTOS_DE_LA_SOLICITUD));
-        if (solicitud.isPresent() && solicitud.get().getFotos().size() >= FOTOS_POR_ALERTA) {
-            throw new TiendaException(HttpStatus.CONFLICT, "Esa alerta ya tiene sus " + FOTOS_POR_ALERTA + " fotos.");
-        }
-
-        FotoAcceso foto = new FotoAcceso();
-        foto.setGymId(lector.getGymId());
-        foto.setLectorId(lector.getId());
-        foto.setSolicitudId(solicitud.map(SolicitudAcceso::getId).orElse(null));
-        foto.setDatos(datos);
-        foto.setCreadaEn(Instant.now());
-        String fotoId = fotos.save(foto).getId();
-
-        solicitud.ifPresent(s -> {
-            s.getFotos().add(fotoId);
-            solicitudes.save(s);
-        });
-        Map<String, Object> r = new LinkedHashMap<>();
-        r.put("id", fotoId);
-        r.put("solicitudId", foto.getSolicitudId());
-        return r;
     }
 
     // Para decidir sin internet: cada tag del gimnasio y si hoy puede entrar.
@@ -472,11 +366,11 @@ public class ControlAccesoService {
             m.put("estado", estadoDe(s, ahora));
             m.put("creadaEn", s.getCreadaEn());
             m.put("atendidaEn", s.getAtendidaEn());
-            m.put("fotos", s.getFotos());
             return m;
         }).toList();
 
-        List<Map<String, Object>> listaAccesos = accesos.findTop40ByGymIdOrderByFechaDesc(gymId).stream().map(a -> {
+        List<Map<String, Object>> listaAccesos = accesos.findTop40ByGymIdOrderByFechaDesc(gymId).stream()
+                .filter(a -> !esDeVoz(a)).map(a -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("fecha", a.getFecha());
             m.put("nombre", a.getNombre());
@@ -494,15 +388,6 @@ public class ControlAccesoService {
         r.put("accesos", listaAccesos);
         r.put("dentro", dentro);
         r.put("simulacion", simulacion);
-        // El último acceso por voz: si quien entró por voz sigue dentro (LED de la XIAO prendido).
-        r.put("voz", ultimoPorVoz(gymId).map(a -> {
-            Map<String, Object> v = new LinkedHashMap<>();
-            v.put("encendido", estaDentro(Optional.of(a), ahora));
-            v.put("detalle", a.getMotivo());
-            v.put("fecha", a.getFecha());
-            return v;
-        }).orElse(null));
-        if (vozDentro(gymId)) dentro.add(NOMBRE_VOZ);
         return r;
     }
 
@@ -672,11 +557,6 @@ public class ControlAccesoService {
         return true;
     }
 
-    public FotoAcceso foto(String gymId, String id) {
-        return fotos.findById(id).filter(f -> gymId.equals(f.getGymId()))
-                .orElseThrow(() -> new TiendaException(HttpStatus.NOT_FOUND, "Esa foto no existe."));
-    }
-
     // ─────────────────────────── Reglas ───────────────────────────
 
     public static boolean membresiaVigente(User u) {
@@ -723,8 +603,13 @@ public class ControlAccesoService {
         r.put("nombre", nombre == null ? "" : nombre);
         r.put("motivo", motivo == null ? "" : motivo);
         r.put("solicitudId", solicitudId);
-        r.put("fotos", false);
+        r.put("alertaNueva", false);
         return r;
+    }
+
+    // Registros que dejó la XIAO cuando había acceso por voz (ya no existe).
+    private static boolean esDeVoz(Acceso a) {
+        return a.getMotivo() != null && a.getMotivo().startsWith("Comando de voz");
     }
 
     private static String nombreDe(User u) {
