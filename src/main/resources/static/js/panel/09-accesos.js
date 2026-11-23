@@ -68,16 +68,7 @@ function initAccesos() {
                     <span class="fw-semibold d-block">${escapeHtml(l.nombre)}: <span class="${l.enLinea ? 'text-success' : 'text-danger'}">${l.enLinea ? 'en línea' : 'sin conexión'}</span></span>
                     <small class="text-body-secondary">${l.ultimaConexion ? 'Última conexión ' + hace(l.ultimaConexion) : 'Todavía no se ha conectado'}</small>
                 </div>
-            </div>`).join('') + (datos.voz ? `
-            <div class="d-flex align-items-center gap-3 p-3 rounded-4 bg-body-tertiary border mb-3">
-                <div class="icon-circle ${datos.voz.encendido ? 'icon-warning' : 'icon-brand'} rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width:44px;height:44px">
-                    <i class='bx ${datos.voz.encendido ? 'bxs-bulb' : 'bx-bulb'} fs-4'></i>
-                </div>
-                <div>
-                    <span class="fw-semibold d-block">Acceso por voz (XIAO): <span class="${datos.voz.encendido ? 'text-warning-emphasis' : 'text-body-secondary'}">${datos.voz.encendido ? 'alguien dentro · LED encendido' : 'nadie dentro · LED apagado'}</span></span>
-                    <small class="text-body-secondary"><i class="bx bx-microphone" aria-hidden="true"></i> ${escapeHtml(datos.voz.detalle || '')} · ${hace(datos.voz.fecha)}</small>
-                </div>
-            </div>` : '') + (llaveNueva ? `
+            </div>`).join('') + (llaveNueva ? `
             <div class="alert alert-warning rounded-4 mb-4" role="alert">
                 <div class="fw-semibold mb-1"><i class='bx bx-key'></i> Llave del lector (cópiala ahora: no se vuelve a mostrar)</div>
                 <code class="user-select-all d-block text-break">${escapeHtml(llaveNueva)}</code>
