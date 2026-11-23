@@ -716,7 +716,7 @@ bool preguntarAlServidor(const char* epc, String& resultado, String& nombre, Str
   resultado = campo(r.cuerpo, "resultado");
   nombre = campo(r.cuerpo, "nombre");
   motivo = campo(r.cuerpo, "motivo");
-  alertaNueva = r.cuerpo.indexOf("\"fotos\":true") >= 0;
+  alertaNueva = r.cuerpo.indexOf("\"alertaNueva\":true") >= 0;
   return resultado.length() > 0;
 }
 
