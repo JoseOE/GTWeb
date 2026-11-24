@@ -1,8 +1,14 @@
 package com.gymtrack.util;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymtrack.model.Machine;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -10,9 +16,71 @@ import java.util.UUID;
 // Catálogo base que un gimnasio puede importar de un clic para no empezar de cero.
 // Es solo un punto de partida: al importarlo se crean copias propias del gimnasio,
 // que luego puede editar, borrar o completar con sus ejercicios reales.
+//
+// Además está el catálogo grande (catalogo-maquinas.json): máquinas comunes de
+// gimnasio clasificadas (Pecho, Espalda, Hombro, Bíceps, Tríceps, Pierna, Glúteo,
+// Core, Cardio, Multifuncional, Peso libre), cada una con los ejercicios que se
+// hacen en ella. En el panel, el dueño elige la máquina y qué ejercicios agregar.
 public final class MachineCatalog {
 
     private MachineCatalog() {}
+
+    // Orden en que el panel muestra las categorías.
+    public static final List<String> CATEGORIAS = List.of(
+            "Pecho", "Espalda", "Hombro", "Bíceps", "Tríceps", "Pierna", "Glúteo",
+            "Core", "Cardio", "Multifuncional", "Peso libre");
+
+    // Una máquina del catálogo grande (no es del gimnasio hasta que la agrega).
+    public static class MaquinaCatalogo {
+        public String nombre;
+        public String categoria;
+        public String zona;
+        public String descripcion;
+        public List<Machine.Exercise> ejercicios = new ArrayList<>();
+    }
+
+    private static final List<MaquinaCatalogo> CATALOGO = leerCatalogo();
+    // Cómo se hace cada ejercicio del catálogo grande, por nombre en minúsculas.
+    private static final Map<String, String> INSTRUCCIONES_CATALOGO = indexarInstrucciones();
+
+    private static List<MaquinaCatalogo> leerCatalogo() {
+        ObjectMapper json = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        try (InputStream in = MachineCatalog.class.getResourceAsStream("/catalogo-maquinas.json")) {
+            if (in == null) throw new IllegalStateException("Falta catalogo-maquinas.json");
+            return List.of(json.readValue(in, MaquinaCatalogo[].class));
+        } catch (IOException e) {
+            throw new UncheckedIOException("No se pudo leer catalogo-maquinas.json", e);
+        }
+    }
+
+    private static Map<String, String> indexarInstrucciones() {
+        Map<String, String> m = new HashMap<>();
+        for (MaquinaCatalogo maq : CATALOGO) {
+            for (Machine.Exercise e : maq.ejercicios) {
+                if (e.getInstrucciones() != null) m.putIfAbsent(e.getNombre().trim().toLowerCase(), e.getInstrucciones());
+            }
+        }
+        return m;
+    }
+
+    public static List<MaquinaCatalogo> catalogo() {
+        return CATALOGO;
+    }
+
+    // Cómo se hace un ejercicio, si está en alguno de los catálogos.
+    public static String instrucciones(String nombre) {
+        if (nombre == null) return null;
+        String i = INSTRUCCIONES.get(nombre.trim());
+        return i != null ? i : INSTRUCCIONES_CATALOGO.get(nombre.trim().toLowerCase());
+    }
+
+    // Copia de un ejercicio del catálogo, con id propio, para guardarlo en una máquina.
+    public static Machine.Exercise copia(Machine.Exercise e) {
+        Machine.Exercise c = new Machine.Exercise(UUID.randomUUID().toString(), e.getNombre(), e.getMusculo(),
+                e.getSeries(), e.getRepeticiones());
+        c.setInstrucciones(e.getInstrucciones());
+        return c;
+    }
 
     public static List<Machine> plantillaPara(String gymId) {
         List<Machine> maquinas = new ArrayList<>();
