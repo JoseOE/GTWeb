@@ -863,7 +863,7 @@ La puerta del gimnasio tiene un lector RFID UHF que valida la membresía de cada
 ```plaintext
  tag UHF ──► YRM1004 ──► LILYGO T-SIM7070G ── HTTPS (WiFi o datos móviles) ──► GTWeb en Render ──► MongoDB Atlas
                             │                                                   │
-              LEDs, buzzer y servo (puerta)                                     ├─► panel "Accesos RFID" (alertas, dar acceso)
+              LEDs y buzzer                                                     ├─► panel "Accesos RFID" (alertas, dar acceso)
                                                                                 └─► push al socio: "renueva desde la app"
 ```
 
@@ -871,11 +871,11 @@ La puerta del gimnasio tiene un lector RFID UHF que valida la membresía de cada
 
 | Situación | Resultado | Qué pasa en la puerta |
 |---|---|---|
-| Socio fuera con la membresía al día | `ENTRADA` | LED verde, 1 pitido y el servo abre 3 s |
-| Socio dentro | `SALIDA` | LED azul, 2 pitidos y abre; la salida no se valida |
-| Membresía vencida | `NEGADO` | LED rojo y 3 pitidos; alerta en el panel y push al socio para renovar. Al pagar, la puerta se abre sola |
+| Socio fuera con la membresía al día | `ENTRADA` | LED verde y 1 pitido (acceso permitido) |
+| Socio dentro | `SALIDA` | LED azul y 2 pitidos; la salida no se valida |
+| Membresía vencida | `NEGADO` | LED rojo y 3 pitidos; alerta en el panel y push al socio para renovar. Al pagar, se le da el acceso solo |
 | Tag desconocido | `NEGADO` | LED rojo y 3 pitidos; alerta en el panel |
-| El dueño da acceso desde la alerta | `ENTRADA` | La LILYGO recibe "abrir" (consulta larga a `/api/lectores/comandos`) y abre |
+| El dueño da acceso desde la alerta | `ENTRADA` | La LILYGO recibe "abrir" (consulta larga a `/api/lectores/comandos`): LED verde y pitido |
 
 - Un pase del mismo tag a menos de 10 s del anterior se ignora; quien no registra su salida en 4 h se da por fuera.
 - **Internet automático.** Primero WiFi (hasta 3 redes de 2.4 GHz); si no hay, datos móviles con el SIM7070G (LTE-M / NB-IoT y, si no, 2G). Si el WiFi se cae más de 45 s pasa a datos, y en datos busca el WiFi cada 2 min para regresar. Sin internet decide con la lista de tags que guarda en su memoria.
@@ -887,7 +887,7 @@ Mientras se termina la puerta, en **Mis Usuarios** cada socio tiene el botón **
 
 1. Con la membresía vencida se niega, queda la alerta en Accesos RFID y al socio le llega el push para renovar (si tiene la app con avisos).
 2. El socio paga desde el teléfono: la puerta se abre sola y queda su entrada.
-3. Con la membresía al día, "Simular entrada" registra la entrada (o la salida, si ya estaba dentro) y, si el lector está conectado, **abre el servo de verdad**: la LILYGO recibe "abrir" por `/api/lectores/comandos`.
+3. Con la membresía al día, "Simular entrada" registra la entrada (o la salida, si ya estaba dentro) y, si el lector está conectado, **prende el LED verde y suena el pitido de verdad**: la LILYGO recibe "abrir" por `/api/lectores/comandos`.
 
 Las entradas simuladas quedan en el historial como "Simulada desde el panel" y en la bitácora. Para quitar el botón sin tocar el código: `ACCESO_SIMULACION=false` en Render.
 
@@ -1045,7 +1045,7 @@ Su función:
 * Consultar la base de datos (MongoDB) para verificar el estado de pago.
 * Autorizar o rechazar el acceso, y registrar la entrada o la salida.
 * Avisar al dueño en el panel cuando se niega un acceso, para que decida si abre.
-* Responder con LEDs, buzzer y el servo de la puerta.
+* Responder con LEDs y buzzer (entrada, salida y negado).
 
 🗄️ 5. Backend y Base de Datos
 GymTrack utiliza **Java Spring Boot** como API backend principal y **MongoDB Atlas** como base de datos NoSQL.
@@ -1119,7 +1119,7 @@ El lector habla con el backend por HTTPS (TLS) sobre WiFi, o por LTE-M / 2G con 
 | LILYGO T-SIM7070G (ESP32 + módem SIM7070) | Lector de la puerta, con WiFi, LTE-M y 2G (TinyGSM) |
 | YRM1004 (RFID UHF) | Lectura de tarjetas, llaveros y stickers UHF |
 | HTTPS + llave por lector (hash SHA-256) | Comunicación segura con la API |
-| LEDs, buzzer y servo SG90 | Respuesta en la puerta: entrada, salida, negado y apertura |
+| LEDs y buzzer pasivo | Respuesta en la puerta: entrada, salida y negado |
 
 ---
 
@@ -1164,8 +1164,8 @@ Fase 4 — IoT (Control de Acceso)
 - [x] Conectar el lector a Spring Boot por HTTPS (en lugar de un broker MQTT), con lista local para cuando no hay red.
 - [x] Registrar entradas y salidas, y alertas de acceso negado en el panel con "dar acceso".
 - [x] Respaldo por LTE-M y 2G.
-- [x] Servo que simula la puerta, con LEDs y buzzer.
-- [ ] Chapa eléctrica real en la puerta.
+- [x] Señales en la puerta con LEDs y buzzer.
+- [ ] Mecanismo de apertura (servo o chapa eléctrica) en la puerta.
 
 Fase 5 — Integración e Investigación
 - [ ] Pruebas E2E del ecosistema (Web -> Backend -> MongoDB -> IoT -> App).
