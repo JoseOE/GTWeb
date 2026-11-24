@@ -3,6 +3,7 @@ package com.gymtrack.model;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Document(collection = "routines")
@@ -17,7 +18,12 @@ public class Routine {
     private String categoria;
     private String descripcion;
     private String duracion;
+    // Texto de cada ejercicio ("Press banca plano — 4 x 10"). Con items, el
+    // servidor lo arma solo, para las versiones de la app que no conocen items.
     private List<String> ejercicios;
+    // Ejercicios elegidos de las máquinas del gimnasio, en orden. Con ellos la
+    // app sabe el músculo de cada uno y puede ofrecer reemplazos.
+    private List<RoutineItem> items = new ArrayList<>();
     // Día de la semana que el coach asigna a esta rutina ("Lunes"..."Domingo").
     // Vacío = rutina disponible siempre, no atada a un día concreto.
     private String dia;
@@ -49,6 +55,9 @@ public class Routine {
     public List<String> getEjercicios() { return ejercicios; }
     public void setEjercicios(List<String> ejercicios) { this.ejercicios = ejercicios; }
 
+    public List<RoutineItem> getItems() { return items; }
+    public void setItems(List<RoutineItem> items) { this.items = items == null ? new ArrayList<>() : items; }
+
     public String getDia() { return dia; }
     public void setDia(String dia) { this.dia = dia; }
 
@@ -57,4 +66,44 @@ public class Routine {
 
     public String getNivel() { return nivel; }
     public void setNivel(String nivel) { this.nivel = nivel; }
+
+    // Un ejercicio de la rutina. machineId + exerciseId apuntan al ejercicio de la
+    // máquina; sin ellos es un ejercicio libre (peso corporal, mancuernas).
+    public static class RoutineItem {
+        private String machineId;
+        private String exerciseId;
+        private String machineNombre;
+        private String nombre;
+        private String musculo;
+        private Integer series;
+        private String repeticiones;
+        // Descanso entre series, en segundos.
+        private Integer descansoSegundos;
+
+        public RoutineItem() {}
+
+        public String getMachineId() { return machineId; }
+        public void setMachineId(String machineId) { this.machineId = machineId; }
+
+        public String getExerciseId() { return exerciseId; }
+        public void setExerciseId(String exerciseId) { this.exerciseId = exerciseId; }
+
+        public String getMachineNombre() { return machineNombre; }
+        public void setMachineNombre(String machineNombre) { this.machineNombre = machineNombre; }
+
+        public String getNombre() { return nombre; }
+        public void setNombre(String nombre) { this.nombre = nombre; }
+
+        public String getMusculo() { return musculo; }
+        public void setMusculo(String musculo) { this.musculo = musculo; }
+
+        public Integer getSeries() { return series; }
+        public void setSeries(Integer series) { this.series = series; }
+
+        public String getRepeticiones() { return repeticiones; }
+        public void setRepeticiones(String repeticiones) { this.repeticiones = repeticiones; }
+
+        public Integer getDescansoSegundos() { return descansoSegundos; }
+        public void setDescansoSegundos(Integer descansoSegundos) { this.descansoSegundos = descansoSegundos; }
+    }
 }

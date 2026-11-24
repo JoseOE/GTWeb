@@ -21,6 +21,8 @@ public class WorkoutSession {
     private Instant fecha;
     private Integer duracionMinutos;
     private String notas;
+    // Rutina del gimnasio de la que salió, si salió de una.
+    private String rutinaId;
     private List<LoggedExercise> ejercicios = new ArrayList<>();
 
     public WorkoutSession() {}
@@ -42,6 +44,9 @@ public class WorkoutSession {
 
     public Integer getDuracionMinutos() { return duracionMinutos; }
     public void setDuracionMinutos(Integer duracionMinutos) { this.duracionMinutos = duracionMinutos; }
+
+    public String getRutinaId() { return rutinaId; }
+    public void setRutinaId(String rutinaId) { this.rutinaId = rutinaId; }
 
     public String getNotas() { return notas; }
     public void setNotas(String notas) { this.notas = notas; }
