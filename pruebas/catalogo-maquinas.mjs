@@ -24,6 +24,8 @@ ok(['Pecho', 'Hombro', 'Bíceps', 'Tríceps', 'Multifuncional'].every(c => r.bod
 ok(r.body.categorias.every(c => r.body.maquinas.some(m => m.categoria === c)), 'cada categoría tiene máquinas');
 ok(r.body.maquinas.every(m => m.ejercicios.length && m.ejercicios.every(e => e.musculo && e.instrucciones)),
   'cada máquina trae ejercicios con músculo y cómo se hacen');
+const conFoto = r.body.maquinas.flatMap(m => m.ejercicios).filter(e => e.imagenes?.length).length;
+ok(conFoto >= 120, 'casi todos los ejercicios traen fotos', conFoto);
 const mancuernas = r.body.maquinas.find(m => m.nombre === 'Rack de mancuernas');
 ok(mancuernas && new Set(mancuernas.ejercicios.map(e => e.musculo)).size >= 5, 'una máquina sirve para varios músculos', mancuernas?.ejercicios.map(e => e.musculo));
 
@@ -34,6 +36,8 @@ const id = r.body?.maquina?.id;
 let m = (await api('GET', `/api/gyms/${gymId}/machines`, null, owner)).body.find(x => x.id === id);
 ok(m && m.ejercicios.length === 2 && m.ejercicios.every(e => e.id && e.instrucciones), 'la máquina del gimnasio los tiene, con id y cómo se hacen', m?.ejercicios);
 ok(m.ejercicios.find(e => e.nombre === 'Curl martillo')?.musculo === 'Bíceps', 'el curl martillo queda como Bíceps');
+ok(m.ejercicios.every(e => e.imagenes?.length === 2 && e.imagenes.every(u => u.startsWith('https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@'))),
+  'cada ejercicio trae sus fotos de inicio y final', m.ejercicios.map(e => e.imagenes?.length));
 
 r = await api('POST', ruta, { nombre: 'rack de mancuernas', ejercicios: ['Curl martillo', 'Patada de tríceps'] }, owner);
 ok(r.status === 200 && r.body.agregados === 1 && r.body.maquina.id === id, 'la misma máquina: solo suma el que faltaba', r.body?.agregados);

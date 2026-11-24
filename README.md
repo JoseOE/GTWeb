@@ -276,7 +276,7 @@ GTWeb/
 | PATCH · DELETE | `/api/gyms/{gymId}/members/{userId}` | Aprobar, dar de baja o reactivar · desvincular |
 | GET · POST | `/api/gyms/{gymId}/members/{userId}/payments` | Pagos de cada miembro |
 | GET · POST | `/api/gyms/{gymId}/machines` · PUT · DELETE `/api/machines/{id}` | Máquinas del gimnasio |
-| GET · POST | `/api/gyms/{gymId}/machines/catalogo` | Catálogo de 42 máquinas por categoría (Pecho, Espalda, Hombro, Bíceps, Tríceps, Pierna, Glúteo, Core, Cardio, Multifuncional, Peso libre), cada una con sus ejercicios. `POST {nombre, ejercicios: [nombres]}` la agrega con los ejercicios elegidos, o completa la que ya tenía. Los datos están en `src/main/resources/catalogo-maquinas.json` |
+| GET · POST | `/api/gyms/{gymId}/machines/catalogo` | Catálogo de 42 máquinas por categoría (Pecho, Espalda, Hombro, Bíceps, Tríceps, Pierna, Glúteo, Core, Cardio, Multifuncional, Peso libre), cada una con sus ejercicios. `POST {nombre, ejercicios: [nombres]}` la agrega con los ejercicios elegidos, o completa la que ya tenía. Los datos están en `src/main/resources/catalogo-maquinas.json`. Cada ejercicio trae dos fotos (inicio y final) de [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (dominio público, The Unlicense), servidas por jsDelivr y fijadas a un commit; `GET …/machines` se las pone también a los ejercicios del gimnasio con el mismo nombre |
 | GET · POST | `/api/gyms/{gymId}/routines` · PUT · DELETE `/api/routines/{id}` | Rutinas del gimnasio |
 
 ### App móvil
