@@ -111,7 +111,7 @@ public class MachineController {
         for (Machine m : actuales) {
             boolean cambio = false;
             for (Machine.Exercise e : m.getEjercicios() == null ? List.<Machine.Exercise>of() : m.getEjercicios()) {
-                String instrucciones = e.getNombre() == null ? null : MachineCatalog.INSTRUCCIONES.get(e.getNombre().trim());
+                String instrucciones = MachineCatalog.instrucciones(e.getNombre());
                 if (instrucciones != null && (e.getInstrucciones() == null || e.getInstrucciones().isBlank())) {
                     e.setInstrucciones(instrucciones);
                     cambio = true;
@@ -134,6 +134,74 @@ public class MachineController {
                 "message", nuevas.size() + " máquinas agregadas desde el catálogo.",
                 "agregadas", nuevas.size()
         ));
+    }
+
+    // GET /api/gyms/{gymId}/machines/catalogo → el catálogo grande para elegir
+    // máquinas por categoría. Cada máquina dice si el gimnasio ya la tiene y
+    // cuáles de sus ejercicios ya tiene capturados.
+    @GetMapping("/api/gyms/{gymId}/machines/catalogo")
+    public Map<String, Object> catalogo(@PathVariable String gymId) {
+        Map<String, Machine> delGimnasio = new java.util.HashMap<>();
+        for (Machine m : machineRepository.findByGymId(gymId)) {
+            if (m.getNombre() != null) delGimnasio.putIfAbsent(clave(m.getNombre()), m);
+        }
+        List<Map<String, Object>> maquinas = new ArrayList<>();
+        for (MachineCatalog.MaquinaCatalogo c : MachineCatalog.catalogo()) {
+            Machine propia = delGimnasio.get(clave(c.nombre));
+            List<String> tiene = propia == null || propia.getEjercicios() == null ? List.of()
+                    : propia.getEjercicios().stream().map(e -> e.getNombre()).toList();
+            Map<String, Object> v = new java.util.LinkedHashMap<>();
+            v.put("nombre", c.nombre);
+            v.put("categoria", c.categoria);
+            v.put("zona", c.zona);
+            v.put("descripcion", c.descripcion);
+            v.put("ejercicios", c.ejercicios);
+            v.put("machineId", propia == null ? null : propia.getId());
+            v.put("ejerciciosQueTienes", tiene);
+            maquinas.add(v);
+        }
+        return Map.of("categorias", MachineCatalog.CATEGORIAS, "maquinas", maquinas);
+    }
+
+    // POST /api/gyms/{gymId}/machines/catalogo {nombre, ejercicios: [nombres]}
+    // → agrega esa máquina del catálogo con los ejercicios elegidos. Si el
+    // gimnasio ya la tiene (mismo nombre), solo le suma los que le falten.
+    @PostMapping("/api/gyms/{gymId}/machines/catalogo")
+    public ResponseEntity<?> agregarDelCatalogo(@PathVariable String gymId, @RequestBody Map<String, Object> cuerpo) {
+        String nombre = cuerpo.get("nombre") instanceof String s ? s : null;
+        MachineCatalog.MaquinaCatalogo c = MachineCatalog.catalogo().stream()
+                .filter(x -> nombre != null && clave(x.nombre).equals(clave(nombre))).findFirst().orElse(null);
+        if (c == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Esa máquina no está en el catálogo."));
+        }
+        List<String> elegidos = cuerpo.get("ejercicios") instanceof List<?> l
+                ? l.stream().filter(String.class::isInstance).map(x -> clave((String) x)).toList() : List.of();
+        List<Machine.Exercise> nuevos = c.ejercicios.stream()
+                .filter(e -> elegidos.contains(clave(e.getNombre()))).map(MachineCatalog::copia).toList();
+        if (nuevos.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Elige al menos un ejercicio."));
+        }
+        Machine m = machineRepository.findByGymId(gymId).stream()
+                .filter(x -> x.getNombre() != null && clave(x.getNombre()).equals(clave(c.nombre))).findFirst()
+                .orElseGet(() -> {
+                    Machine n = new Machine(gymId, c.nombre, c.zona);
+                    n.setDescripcion(c.descripcion);
+                    return n;
+                });
+        if (m.getEjercicios() == null) m.setEjercicios(new ArrayList<>());
+        List<String> yaTiene = m.getEjercicios().stream().map(e -> clave(e.getNombre())).toList();
+        int agregados = 0;
+        for (Machine.Exercise e : nuevos) {
+            if (yaTiene.contains(clave(e.getNombre()))) continue;
+            m.getEjercicios().add(e);
+            agregados++;
+        }
+        Machine guardada = machineRepository.save(m);
+        return ResponseEntity.ok(Map.of("maquina", guardada, "agregados", agregados));
+    }
+
+    private static String clave(String texto) {
+        return texto == null ? "" : texto.trim().toLowerCase();
     }
 
     // Los ejercicios viven dentro del documento de la máquina, así que Mongo no
