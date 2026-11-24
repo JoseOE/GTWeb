@@ -1245,7 +1245,10 @@
             <div class="modal fade" id="routineModal" tabindex="-1" aria-labelledby="routineModalLabel" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
                     <div class="modal-content border-0 rounded-4">
-                        <form id="routine-form">
+                        <!-- El form ocupa todo el alto disponible para que el cuerpo
+                             haga scroll (modal-dialog-scrollable no lo hace solo si
+                             hay un form entre modal-content y modal-body). -->
+                        <form id="routine-form" class="d-flex flex-column flex-grow-1" style="min-height:0">
                             <div class="modal-header border-0 pb-0">
                                 <h5 class="modal-title fw-bold" id="routineModalLabel">Nueva rutina</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
