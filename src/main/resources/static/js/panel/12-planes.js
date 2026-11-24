@@ -122,9 +122,12 @@ function loadPlanes(gymId) {
                         <ul class="list-unstyled small text-body-secondary my-3">
                             ${(p.beneficios || []).map(b => '<li class="d-flex gap-1"><i class="bx bx-check text-success"></i>' + escapeHtml(b) + '</li>').join('')}
                         </ul>
-                        <div class="mt-auto d-flex gap-2">
-                            <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-editar-plan="${escapeHtml(p.id)}">Editar</button>
-                            <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" data-borrar-plan="${escapeHtml(p.id)}">Eliminar</button>
+                        <div class="mt-auto d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3 flex-grow-1" data-editar-plan="${escapeHtml(p.id)}"><i class="bx bx-edit-alt" aria-hidden="true"></i> Editar</button>
+                            ${menuMas(p.nombre, `
+                                <li><a class="dropdown-item" href="tienda.html" target="_blank" rel="noopener"><i class="bx bx-show me-2" aria-hidden="true"></i>Ver en la tienda</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><button type="button" class="dropdown-item text-danger" data-borrar-plan="${escapeHtml(p.id)}"><i class="bx bx-trash me-2" aria-hidden="true"></i>Eliminar plan</button></li>`)}
                         </div>
                     </div>
                 </div>`).join('') + '</div>';

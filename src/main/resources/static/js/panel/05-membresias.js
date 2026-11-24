@@ -190,7 +190,7 @@ function loadBilling(gymId) {
                     <td class="text-body-secondary">${m.fechaProximoPago ? escapeHtml(fechaCorta(m.fechaProximoPago)) : '—'}</td>
                     <td><span class="badge rounded-pill ${est.clase} px-3 py-2"><i class="bx ${est.icono}"></i> ${est.texto}</span></td>
                     <td class="pe-4 text-end">
-                        <button type="button" class="btn btn-primary btn-sm rounded-pill px-3" data-pay-user="${m.id}" data-pay-name="${escapeHtml(m.nombre)}">
+                        <button type="button" class="btn ${est.orden <= 1 ? 'btn-primary' : 'btn-outline-primary'} btn-sm rounded-pill px-3" data-pay-user="${m.id}" data-pay-name="${escapeHtml(m.nombre)}">
                             <i class='bx bx-dollar'></i> Registrar pago
                         </button>
                     </td>
@@ -215,7 +215,7 @@ function cargarPagosRecientes(gymId) {
                         <td class="text-body-secondary">${escapeHtml(p.metodo || '—')}${p.plan ? '<div class="small">' + escapeHtml(p.plan) + '</div>' : ''}</td>
                         <td class="text-body-secondary">${p.cubreHasta ? escapeHtml(fechaCorta(p.cubreHasta)) : '—'}${p.reembolsadoEn ? '<div><span class="badge rounded-pill bg-danger-subtle text-danger-emphasis">Reembolsado</span></div>' : ''}</td>
                         <td class="pe-4 text-end">
-                            <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-recibo-pago="${escapeHtml(p.id)}" title="Descargar el recibo en PDF">
+                            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-recibo-pago="${escapeHtml(p.id)}" title="Descargar el recibo en PDF">
                                 <i class='bx bx-receipt'></i> Recibo
                             </button>
                         </td>
