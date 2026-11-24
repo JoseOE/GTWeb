@@ -22,8 +22,9 @@ import java.util.Map;
 //             alerta de la puerta (si sigue esperando, si ya se abrió).
 //   2. POST → deja el carrito de la app con ese plan solo, listo para pagar
 //             con el checkout de siempre (tarjeta, PayPal o efectivo).
-//   3. Al confirmarse el pago, la membresía se extiende y, si la alerta sigue
-//      vigente, la puerta se abre sola (ControlAccesoService.abrirTrasRenovar).
+//   3. Al confirmarse el pago, la membresía se extiende y la alerta se cierra
+//      (ControlAccesoService.cerrarTrasRenovar); el socio vuelve a pasar su
+//      tarjeta para entrar.
 @RestController
 @RequestMapping("/api/tienda/renovacion")
 public class RenovacionController {

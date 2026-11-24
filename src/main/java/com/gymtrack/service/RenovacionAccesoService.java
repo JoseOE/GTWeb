@@ -22,9 +22,9 @@ import java.util.Optional;
 // Cuando el lector niega la entrada porque la membresía venció, al socio le
 // llega un push con el plan para renovar. La app abre la pantalla de
 // renovación (GET /api/tienda/renovacion), paga como cualquier compra y, al
-// confirmarse el pago, ControlAccesoService.abrirTrasRenovar() aprueba la
-// misma alerta de la puerta: el lector recibe "abrir" y el socio entra sin
-// volver a pasar la tarjeta (mientras la alerta siga vigente, 10 minutos).
+// confirmarse el pago, ControlAccesoService.cerrarTrasRenovar() cierra la
+// alerta de la puerta. Para entrar, vuelve a pasar su tarjeta: ya al día,
+// entra normal.
 @Service
 public class RenovacionAccesoService {
 
@@ -95,9 +95,9 @@ public class RenovacionAccesoService {
                 data.put("planId", p.getId());
                 data.put("varianteId", p.getVariantes().get(0).getId());
                 cuerpo = "Renueva tu " + p.getNombre() + " por " + CarritoService.dinero(precio(p))
-                        + " desde la app y la puerta se abre en cuanto se confirme el pago.";
+                        + " desde la app y vuelve a pasar tu tarjeta en la puerta.";
             } else {
-                cuerpo = "Renuévala desde la app para volver a entrar a " + gym + ".";
+                cuerpo = "Renuévala desde la app y vuelve a pasar tu tarjeta para entrar a " + gym + ".";
             }
             boolean conToken = socio.getPushToken() != null && !socio.getPushToken().isBlank();
             log.info("Membresía vencida en la puerta de {}: aviso de renovación a {} ({}).", gym, socio.getEmail(),
