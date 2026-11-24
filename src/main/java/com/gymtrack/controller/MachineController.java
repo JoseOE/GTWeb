@@ -104,7 +104,24 @@ public class MachineController {
     // Solo agrega las que faltan, así se puede repetir sin duplicar nada.
     @PostMapping("/api/gyms/{gymId}/machines/import")
     public ResponseEntity<?> importarCatalogo(@PathVariable String gymId) {
-        List<String> yaExisten = machineRepository.findByGymId(gymId).stream()
+        List<Machine> actuales = machineRepository.findByGymId(gymId);
+        // A los ejercicios que ya tiene el gimnasio y vienen del catálogo se les
+        // ponen las instrucciones, solo si no tienen.
+        List<Machine> completadas = new ArrayList<>();
+        for (Machine m : actuales) {
+            boolean cambio = false;
+            for (Machine.Exercise e : m.getEjercicios() == null ? List.<Machine.Exercise>of() : m.getEjercicios()) {
+                String instrucciones = e.getNombre() == null ? null : MachineCatalog.INSTRUCCIONES.get(e.getNombre().trim());
+                if (instrucciones != null && (e.getInstrucciones() == null || e.getInstrucciones().isBlank())) {
+                    e.setInstrucciones(instrucciones);
+                    cambio = true;
+                }
+            }
+            if (cambio) completadas.add(m);
+        }
+        machineRepository.saveAll(completadas);
+
+        List<String> yaExisten = actuales.stream()
                 .map(m -> m.getNombre() == null ? "" : m.getNombre().trim().toLowerCase())
                 .toList();
 

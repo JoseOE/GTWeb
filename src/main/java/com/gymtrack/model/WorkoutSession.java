@@ -95,6 +95,8 @@ public class WorkoutSession {
     public static class LoggedSet {
         private Integer repeticiones;
         private Double peso;
+        // Para los ejercicios por tiempo (plancha, cardio): cuánto duró la serie.
+        private Integer segundos;
         private Boolean completada = true;
 
         public Integer getRepeticiones() { return repeticiones; }
@@ -102,6 +104,9 @@ public class WorkoutSession {
 
         public Double getPeso() { return peso; }
         public void setPeso(Double peso) { this.peso = peso; }
+
+        public Integer getSegundos() { return segundos; }
+        public void setSegundos(Integer segundos) { this.segundos = segundos; }
 
         public Boolean getCompletada() { return completada; }
         public void setCompletada(Boolean completada) { this.completada = completada; }
