@@ -220,17 +220,33 @@ bool fijarPotencia(int dbm) {
 // y 2500 µs = 180°. La puerta se abre y se cierra sola a los 3 s, sin
 // detener la lectura de tags (vigilarPuerta en loop).
 // ============================================================
-#define SERVO_CANAL 0      // solo para el core 2.x del ESP32
+#define SERVO_CANAL 2      // solo para el core 2.x del ESP32 (el 0 lo usa tone())
 #define SERVO_BITS  14
+#define SERVO_MOVER_MS 700 // tiempo para llegar; después se dejan de mandar pulsos
 
-void escribirServo(int grados) {
-  uint32_t us = 500 + (uint32_t)constrain(grados, 0, 180) * 2000 / 180;
-  uint32_t duty = us * ((1UL << SERVO_BITS) - 1) / 20000;
+uint32_t servoReposoEn = 0;     // cuándo quitarle la señal al servo (0 = ya sin señal)
+
+void pwmServo(uint32_t duty) {
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
   ledcWrite(SERVO, duty);
 #else
   ledcWrite(SERVO_CANAL, duty);
 #endif
+}
+
+// Mueve el servo y, al llegar, deja de mandarle pulsos: así no se queda
+// zumbando ni "crujiendo" por corregir su posición todo el tiempo.
+void escribirServo(int grados) {
+  uint32_t us = 500 + (uint32_t)constrain(grados, 0, 180) * 2000 / 180;
+  pwmServo(us * ((1UL << SERVO_BITS) - 1) / 20000);
+  servoReposoEn = millis() + SERVO_MOVER_MS;
+}
+
+void reposarServo() {
+  if (servoReposoEn && (int32_t)(millis() - servoReposoEn) >= 0) {
+    pwmServo(0);
+    servoReposoEn = 0;
+  }
 }
 
 void iniciarServo() {
@@ -252,6 +268,7 @@ void abrirPuerta() {
 }
 
 void vigilarPuerta() {
+  reposarServo();
   if (cerrarPuertaEn && (int32_t)(millis() - cerrarPuertaEn) >= 0) {
     escribirServo(SERVO_CERRADO);
     cerrarPuertaEn = 0;
@@ -259,8 +276,16 @@ void vigilarPuerta() {
   }
 }
 
+// Con un tono de 2.7 kHz suena tanto un buzzer activo como uno pasivo (el
+// pasivo no hace nada si solo se le da voltaje fijo).
+#define BUZZER_HZ 2700
+
 void pitido(int ms) {
-  digitalWrite(BUZZER, HIGH); delay(ms); digitalWrite(BUZZER, LOW);
+  tone(BUZZER, BUZZER_HZ);
+  delay(ms);
+  noTone(BUZZER);
+  pinMode(BUZZER, OUTPUT);       // noTone suelta el pin: se deja en bajo
+  digitalWrite(BUZZER, LOW);
 }
 
 // Prende el LED con sus pitidos (cada uno de msPitido) y lo deja encendido SENAL_MS.
@@ -877,6 +902,7 @@ void setup() {
   pinMode(LED_ROJO, OUTPUT);  pinMode(BUZZER, OUTPUT);
   iniciarServo();
   probarSalidas();
+  reposarServo();                 // ya llegó a 0°: sin señal mientras arranca la red
 
   // El YRM puede tardar en encender más que la LILYGO: se reintenta unos segundos.
   yrm.begin(115200, SERIAL_8N1, RFID_RX, RFID_TX);
