@@ -5,8 +5,8 @@
 //   ENTRADA  -> LED verde y 1 pitido (acceso permitido)
 //   SALIDA   -> LED azul y 2 pitidos
 //   NEGADO   -> LED rojo y 3 pitidos. Si la membresía venció, al socio le llega
-//               un aviso al teléfono para renovar; al pagar, el servidor manda
-//               "abrir" y se da el acceso (LED verde).
+//               un aviso al teléfono para renovar; al pagar, vuelve a pasar
+//               su tarjeta y ya entra.
 //   REGISTRO -> LED azul y un pitido largo: el panel estaba en "Registrar tag
 //               nuevo" y capturó este tag
 //   IGNORADO -> nada (pasó otra vez muy pronto)

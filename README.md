@@ -858,7 +858,7 @@ El recibo se descarga de `GET /api/recibos/pedidos/{orderId}.pdf` con `fetch` y 
 
 ## 🚪 Control de acceso RFID
 
-La puerta del gimnasio tiene un lector RFID UHF que valida la membresía de cada socio contra la API en tiempo real, registra **entradas y salidas** y avisa en el panel cuando alguien no puede entrar. Si la membresía venció, al socio le llega un aviso para renovar desde la app y, al pagar, la puerta se abre sola. El firmware y las conexiones están en [`hardware/acceso-rfid/`](hardware/acceso-rfid).
+La puerta del gimnasio tiene un lector RFID UHF que valida la membresía de cada socio contra la API en tiempo real, registra **entradas y salidas** y avisa en el panel cuando alguien no puede entrar. Si la membresía venció, al socio le llega un aviso para renovar desde la app y, al pagar, vuelve a pasar su tarjeta para entrar. El firmware y las conexiones están en [`hardware/acceso-rfid/`](hardware/acceso-rfid).
 
 ```plaintext
  tag UHF ──► YRM1004 ──► LILYGO T-SIM7070G ── HTTPS (WiFi o datos móviles) ──► GTWeb en Render ──► MongoDB Atlas
@@ -886,7 +886,7 @@ La puerta del gimnasio tiene un lector RFID UHF que valida la membresía de cada
 Mientras se termina la puerta, en **Mis Usuarios** cada socio tiene el botón **Simular entrada**: hace como si pasara su tarjeta, con las mismas reglas que el lector.
 
 1. Con la membresía vencida se niega, queda la alerta en Accesos RFID y al socio le llega el push para renovar (si tiene la app con avisos).
-2. El socio paga desde el teléfono: la puerta se abre sola y queda su entrada.
+2. El socio paga desde el teléfono y la alerta se cierra como "Renovó desde la app". Para entrar, vuelve a pasar su tarjeta (o "Simular entrada").
 3. Con la membresía al día, "Simular entrada" registra la entrada (o la salida, si ya estaba dentro) y, si el lector está conectado, **prende el LED verde y suena el pitido de verdad**: la LILYGO recibe "abrir" por `/api/lectores/comandos`.
 
 Las entradas simuladas quedan en el historial como "Simulada desde el panel" y en la bitácora. Para quitar el botón sin tocar el código: `ACCESO_SIMULACION=false` en Render.
@@ -910,17 +910,17 @@ Las rutas `/api/lectores/*` piden el encabezado `X-Lector-Key`; las del panel, l
 
 ### Renovar desde la puerta
 
-Si el lector niega la entrada por **membresía vencida**, el socio puede renovar en ese momento desde la app y la puerta se abre sola:
+Si el lector niega la entrada por **membresía vencida**, el socio puede renovar en ese momento desde la app y volver a pasar su tarjeta:
 
-1. **El aviso.** Al negarse la entrada se crea la alerta de siempre para el dueño y, además, al socio le llega un **push**: "Tu membresía venció · Renueva tu Mensual por $480.00 desde la app y la puerta se abre en cuanto se confirme el pago". Solo sale con una alerta nueva: si vuelve a pasar la tarjeta, no le llegan más avisos.
+1. **El aviso.** Al negarse la entrada se crea la alerta de siempre para el dueño y, además, al socio le llega un **push**: "Tu membresía venció · Renueva tu Mensual por $480.00 desde la app y vuelve a pasar tu tarjeta en la puerta". Solo sale con una alerta nueva: si vuelve a pasar la tarjeta, no le llegan más avisos.
    - El `data` del push es `{tipo: "renovar_membresia", gymId, solicitudId, planId, varianteId, venceEn}`.
    - El plan sugerido es el que tenía, si sigue a la venta; si no, el destacado, el de un mes o el más barato.
-2. **La pantalla de renovación.** Al tocar el aviso, la app pide `GET /api/tienda/renovacion` → `{vencida, fechaProximoPago, planActual, plan, planes, puerta}`. En `puerta` viene la alerta (`PENDIENTE`, `APROBADA` o `EXPIRADA`) con `venceEn`, para mostrar cuánto tiempo queda.
+2. **La pantalla de renovación.** Al tocar el aviso, la app pide `GET /api/tienda/renovacion` → `{vencida, fechaProximoPago, planActual, plan, planes, puerta}`. En `puerta` viene la alerta de la puerta: `PENDIENTE`, `APROBADA` (recepción le abrió), `RENOVADA` (ya pagó) o `EXPIRADA`.
 3. **Preparar el pago.** `POST /api/tienda/renovacion?canal=app {planId?}` deja el carrito de la app con ese plan solo y lo devuelve en `carrito`. De ahí se paga con el checkout de siempre: tarjeta, PayPal o efectivo en tienda.
-4. **La puerta se abre.** Al confirmarse el pago, la membresía se extiende y, si la alerta sigue pendiente (10 minutos), se aprueba sola. El lector recibe `abrir` por `/api/lectores/comandos` y queda la ENTRADA "Abierta al renovar desde la app" en el historial.
-   - Con efectivo en tienda la puerta solo se abre si la ficha se paga dentro de esos 10 minutos.
-   - Si ya pasaron, la membresía queda al día y basta con volver a pasar la tarjeta.
-   - Lo mismo pasa si el dueño le vende el plan en el mostrador mientras el socio espera en la puerta.
+4. **Vuelve a pasar la tarjeta.** Al confirmarse el pago, la membresía se extiende y la alerta se cierra como `RENOVADA` ("Renovó desde la app" en el panel). La puerta no se abre sola: el socio vuelve a pasar su tarjeta y, ya al día, entra normal.
+   - Así la puerta solo responde con la persona enfrente y no depende de que una orden llegue a tiempo al lector. Mientras alguien paga, los demás pasan su tarjeta como siempre.
+   - Si mientras paga el encargado le da acceso desde el panel, la alerta queda aprobada (el lector responde una vez) y el pago solo renueva la membresía.
+   - Con efectivo en tienda o en el mostrador es igual: al quedar pagada, basta con volver a pasar la tarjeta.
 
 Pruebas: `pruebas/renovar-puerta.mjs` y `pruebas/simular-entrada.mjs`, incluidas en `correr-todas`.
 
