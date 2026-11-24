@@ -60,6 +60,9 @@ public class Machine {
         private Integer series;
         private String repeticiones;
         private String instrucciones;
+        // Fotos de cómo se hace (posición inicial y final). Las del catálogo
+        // son de free-exercise-db (dominio público).
+        private List<String> imagenes;
 
         public Exercise() {}
 
@@ -88,5 +91,8 @@ public class Machine {
 
         public String getInstrucciones() { return instrucciones; }
         public void setInstrucciones(String instrucciones) { this.instrucciones = instrucciones; }
+
+        public List<String> getImagenes() { return imagenes; }
+        public void setImagenes(List<String> imagenes) { this.imagenes = imagenes; }
     }
 }

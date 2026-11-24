@@ -38,6 +38,7 @@ public class MachineController {
     @GetMapping("/api/gyms/{gymId}/machines")
     public List<Machine> listar(@PathVariable String gymId) {
         List<Machine> existentes = machineRepository.findByGymId(gymId);
+        existentes.forEach(MachineCatalog::completarImagenes);
         if (!existentes.isEmpty()) return existentes;
 
         Gym gym = gymRepository.findById(gymId).orElse(null);
