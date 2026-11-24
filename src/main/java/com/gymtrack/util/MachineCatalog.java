@@ -4,6 +4,7 @@ import com.gymtrack.model.Machine;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 // Catálogo base que un gimnasio puede importar de un clic para no empezar de cero.
@@ -78,6 +79,76 @@ public final class MachineCatalog {
     }
 
     private static Machine.Exercise ej(String nombre, String musculo, int series, String reps) {
-        return new Machine.Exercise(UUID.randomUUID().toString(), nombre, musculo, series, reps);
+        Machine.Exercise e = new Machine.Exercise(UUID.randomUUID().toString(), nombre, musculo, series, reps);
+        e.setInstrucciones(INSTRUCCIONES.get(nombre));
+        return e;
     }
+
+    // Cómo se hace cada ejercicio del catálogo: la app lo muestra al entrenar.
+    public static final Map<String, String> INSTRUCCIONES = Map.ofEntries(
+        Map.entry("Prensa 45°",
+                "Pies al ancho de cadera en la plataforma. Baja hasta que las rodillas formen 90° sin despegar la espalda baja y empuja con los talones."),
+        Map.entry("Prensa pies juntos",
+                "Pies juntos al centro de la plataforma. Baja controlado y empuja sin bloquear las rodillas arriba."),
+        Map.entry("Prensa a una pierna",
+                "Un pie al centro de la plataforma. Baja hasta 90° con la rodilla alineada al pie y empuja con el talón."),
+        Map.entry("Elevación de talones en prensa",
+                "Apoya solo la punta de los pies en el borde. Baja los talones lo más posible y sube hasta quedar de puntas."),
+        Map.entry("Jalón agarre ancho",
+                "Manos más abiertas que los hombros. Pecho arriba, jala la barra hasta la parte alta del pecho llevando los codos hacia abajo."),
+        Map.entry("Jalón agarre cerrado",
+                "Agarre en V o manos juntas. Jala hacia el pecho con los codos pegados al cuerpo y sube controlado."),
+        Map.entry("Jalón supino",
+                "Palmas hacia ti, al ancho de hombros. Jala hasta la barbilla apretando la espalda y estira completo arriba."),
+        Map.entry("Jalón a una mano",
+                "Toma el maneral con una mano. Jala hacia el costado del pecho girando ligeramente el torso y regresa estirando."),
+        Map.entry("Press banca plano",
+                "Escápulas juntas y pies firmes. Baja la barra a la mitad del pecho con los codos a 45° y empuja hasta estirar los brazos."),
+        Map.entry("Press banca inclinado",
+                "Banco a 30-45°. Baja la barra a la parte alta del pecho y empuja en línea recta sin despegar los glúteos."),
+        Map.entry("Press cerrado",
+                "Manos al ancho de hombros. Baja la barra al pecho con los codos pegados al cuerpo y empuja con los tríceps."),
+        Map.entry("Remo agarre neutro",
+                "Pecho apoyado o espalda recta. Jala los manerales hacia el abdomen juntando las escápulas y regresa sin encorvarte."),
+        Map.entry("Remo agarre ancho",
+                "Manos abiertas. Jala hacia la parte baja del pecho con los codos hacia afuera y aprieta la espalda alta."),
+        Map.entry("Remo a una mano",
+                "Un maneral a la vez. Jala hacia la cadera sin girar el torso y estira completo al regresar."),
+        Map.entry("Sentadilla trasera",
+                "Barra sobre los trapecios, pies al ancho de hombros. Baja con el pecho arriba hasta que la cadera quede a la altura de las rodillas y sube empujando el piso."),
+        Map.entry("Sentadilla frontal",
+                "Barra al frente sobre los hombros con los codos altos. Baja con el torso vertical y sube sin dejar caer los codos."),
+        Map.entry("Zancadas con barra",
+                "Barra en la espalda. Da un paso largo, baja hasta que la rodilla de atrás casi toque el piso y regresa empujando con la pierna de adelante."),
+        Map.entry("Press militar de pie",
+                "Barra a la altura de la clavícula, abdomen firme. Empuja por encima de la cabeza sin arquear la espalda baja."),
+        Map.entry("Cruce de poleas alto",
+                "Poleas arriba, un paso al frente. Junta las manos frente a la cadera con los codos un poco doblados y abre controlado."),
+        Map.entry("Cruce de poleas bajo",
+                "Poleas abajo. Sube las manos hacia el pecho en un arco, juntándolas al frente, y baja controlado."),
+        Map.entry("Extensión de tríceps en polea",
+                "Codos pegados al cuerpo. Estira los brazos hacia abajo hasta bloquear y sube solo hasta 90°."),
+        Map.entry("Curl de bíceps en polea",
+                "Codos fijos a los costados. Sube la barra hacia los hombros apretando el bíceps y baja hasta estirar."),
+        Map.entry("Face pull",
+                "Cuerda a la altura de la cara. Jala hacia los ojos separando las manos y abriendo los codos hacia atrás."),
+        Map.entry("Caminata en pendiente",
+                "Inclinación de 8-12 % y paso firme. No te sostengas de los barandales."),
+        Map.entry("Trote continuo",
+                "Ritmo en el que puedas hablar con frases cortas. Pisa debajo de la cadera, sin dar zancadas largas."),
+        Map.entry("Intervalos HIIT",
+                "40 s a ritmo fuerte y 20 s caminando. Repite las rondas indicadas."),
+        Map.entry("Pedaleo continuo",
+                "Asiento a la altura de la cadera. Ritmo constante con resistencia media."),
+        Map.entry("Sprints en bici",
+                "Resistencia alta, pedalea a tope en los intervalos y recupera suave entre cada uno."),
+        Map.entry("Extensión a dos piernas",
+                "Rodillas alineadas con el eje de la máquina. Estira las piernas hasta arriba, aprieta y baja lento."),
+        Map.entry("Extensión a una pierna",
+                "Una pierna a la vez. Sube hasta estirar, aprieta el cuádriceps y baja en dos o tres segundos."),
+        Map.entry("Curl femoral acostado",
+                "Cadera pegada al banco. Lleva los talones hacia los glúteos y baja controlado sin despegar la cadera."),
+        Map.entry("Curl femoral sentado",
+                "Rodillas alineadas con el eje. Lleva los talones hacia abajo y atrás y regresa lento.")
+    );
 }
