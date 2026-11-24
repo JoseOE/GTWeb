@@ -1,0 +1,139 @@
+/* ═══════════════════════════════════════
+   Tema oscuro de los paneles (bienvenido, admin y Mi cuenta)
+   ───────────────────────────────────────
+   Lo activa js/tema.js con data-bs-theme="dark" en <html>. Bootstrap 5.3
+   cambia sus componentes solo (modales, formularios, tablas, insignias);
+   aquí van los colores propios del panel, que en claro están escritos en
+   styles.css, editorial.css y panel.css.
+   Gris grafito neutro (no negro puro, para no cansar la vista) y el mismo
+   naranja de la marca. El naranja oscuro de los textos (--brand-dark) se
+   aclara para que se lea sobre fondo oscuro.
+   Va al final de los estilos de cada página.
+═══════════════════════════════════════ */
+
+/* Al cambiar de tema, los colores se funden en un instante (tema.js). */
+html.tema-cambiando,
+html.tema-cambiando *,
+html.tema-cambiando *::before,
+html.tema-cambiando *::after {
+    transition: background-color .24s ease, border-color .24s ease, color .24s ease, fill .24s ease !important;
+}
+
+/* El botón del tema, en la barra superior. */
+.panel-tema { border: 0; background: transparent; }
+.panel-tema .bx { font-size: 1.25rem; }
+
+:root[data-bs-theme="dark"] {
+    --paper: #121315;
+    --ink: #ecebe6;
+    --muted: #a4a69d;
+    --line: #2e3035;
+    --brand-dark: #ff8c66;
+    --surface: #1b1c1f;
+    --surface-2: #24262a;
+    --chrome: #0b0c0d;
+    --shadow-soft: 0 10px 30px rgba(0, 0, 0, .35);
+    --shadow-hover: 0 22px 45px rgba(0, 0, 0, .45);
+
+    --bs-body-bg: #121315;
+    --bs-body-color: #ecebe6;
+    --bs-secondary-color: #a4a69d;
+    --bs-tertiary-color: #8d8f86;
+    --bs-secondary-bg: #24262a;
+    --bs-tertiary-bg: #121315;
+    --bs-border-color: #2e3035;
+    --bs-emphasis-color: #ffffff;
+    --bs-link-color: #ff8c66;
+    --bs-link-color-rgb: 255, 140, 102;
+    --bs-link-hover-color: #ffb199;
+    --bs-link-hover-color-rgb: 255, 177, 153;
+}
+
+/* ─── Armazón ─── */
+[data-bs-theme="dark"] .gym-interior { --bs-body-tertiary-bg: #121315; }
+[data-bs-theme="dark"] .gym-interior .bg-dark,
+[data-bs-theme="dark"] .gym-interior .panel-barra { background: var(--chrome) !important; }
+[data-bs-theme="dark"] .panel-barra { border-bottom-color: rgba(255, 255, 255, .06); }
+/* La barra superior ya era oscura en claro: conserva sus colores de siempre. */
+[data-bs-theme="dark"] .panel-barra,
+[data-bs-theme="dark"] .gym-interior .navbar.bg-dark { --paper: #f4f2eb; --ink: #20221f; }
+[data-bs-theme="dark"] .panel-avatar { color: #191b18; }
+
+[data-bs-theme="dark"] .gym-interior .dash-sidebar,
+[data-bs-theme="dark"] .dash-sidebar {
+    background: #17181b;
+    border-color: var(--line);
+}
+[data-bs-theme="dark"] .dash-nav-grupo { color: var(--muted); }
+[data-bs-theme="dark"] .dash-nav-link { color: #c9cbc2; }
+[data-bs-theme="dark"] .panel-pagina .dash-nav-link:hover:not(.active),
+[data-bs-theme="dark"] .dash-nav-link:hover { background: rgba(255, 255, 255, .06); color: var(--ink); }
+[data-bs-theme="dark"] .gym-interior .dash-nav-link.active { background: var(--surface-2); color: #ff8c66; }
+[data-bs-theme="dark"] .panel-identidad { background: var(--surface); }
+[data-bs-theme="dark"] .panel-identidad-logo { background: var(--surface-2); color: var(--ink); }
+[data-bs-theme="dark"] .panel-identidad-logo.con-logo { background: #fff; border-color: var(--line); }
+
+/* ─── Tarjetas y superficies ─── */
+[data-bs-theme="dark"] .kpi-tile,
+[data-bs-theme="dark"] .gym-interior .kpi-tile,
+[data-bs-theme="dark"] .dash-empty,
+[data-bs-theme="dark"] .resumen-atajo,
+[data-bs-theme="dark"] .gym-interior .auth-card,
+[data-bs-theme="dark"] .mostrador-tile {
+    background: var(--surface);
+    border-color: var(--line);
+    color: var(--ink);
+}
+[data-bs-theme="dark"] .kpi-tile.es-alerta { background: rgba(244, 81, 36, .08); border-color: rgba(255, 140, 102, .45); }
+[data-bs-theme="dark"] .resumen-atajo:hover { border-color: #5c5f66; }
+[data-bs-theme="dark"] .resumen-atajo.es-principal { background: var(--brand); border-color: var(--brand); color: #191b18; }
+[data-bs-theme="dark"] .resumen-atajo.es-principal > .bx { color: #191b18; }
+[data-bs-theme="dark"] .resumen-atajo.es-principal small { color: rgba(25, 27, 24, .72); }
+[data-bs-theme="dark"] .resumen-atajo.es-principal:hover { background: #f76a41; }
+
+[data-bs-theme="dark"] .avatar-iniciales { background: var(--surface-2); color: var(--ink); }
+[data-bs-theme="dark"] .resumen-plazo { background: var(--surface-2); color: #c9cbc2; }
+[data-bs-theme="dark"] .resumen-plazo.es-pronto { background: rgba(242, 165, 65, .14); color: #f3c97a; }
+[data-bs-theme="dark"] .resumen-plazo.es-vencida { background: rgba(244, 81, 36, .16); color: #ff9a7a; }
+[data-bs-theme="dark"] .resumen-al-dia { background: rgba(46, 139, 87, .16); color: #8fd6a8; }
+[data-bs-theme="dark"] .resumen-espera { background: linear-gradient(90deg, #1d1f22, #26282c, #1d1f22); background-size: 200% 100%; }
+[data-bs-theme="dark"] .resumen-barras .sin-venta .resumen-barra { background: #34363b; }
+[data-bs-theme="dark"] .resumen-barras .es-hoy .resumen-barra { background: #ecebe6; }
+[data-bs-theme="dark"] .resumen-paso-marca { border-color: #6d7068; color: #c9cbc2; }
+[data-bs-theme="dark"] .resumen-paso.hecho .resumen-paso-marca { background: var(--ink); border-color: var(--ink); color: #121315; }
+[data-bs-theme="dark"] .resumen-paso.hecho .resumen-paso-texto { color: var(--muted); }
+[data-bs-theme="dark"] .resumen-paso,
+[data-bs-theme="dark"] .resumen-pendientes li { border-color: var(--line); }
+
+[data-bs-theme="dark"] .dash-table thead th,
+[data-bs-theme="dark"] .gym-interior .dash-table thead th { color: var(--muted); }
+[data-bs-theme="dark"] .dash-table tbody tr:hover { background: rgba(255, 255, 255, .03); }
+
+/* ─── Formularios y botones ─── */
+[data-bs-theme="dark"] .gym-interior .input-group-text { background: var(--surface-2) !important; color: var(--muted); }
+[data-bs-theme="dark"] .gym-interior .form-control::placeholder { color: #8d8f86; }
+[data-bs-theme="dark"] .gym-interior .auth-icon-circle { background: rgba(244, 81, 36, .16); }
+[data-bs-theme="dark"] .btn-outline-primary:hover,
+[data-bs-theme="dark"] .btn-outline-primary:focus-visible { background: var(--brand); border-color: var(--brand); color: #191b18; }
+[data-bs-theme="dark"] .btn-outline-secondary { --bs-btn-color: #c9cbc2; --bs-btn-border-color: #5c5f66; --bs-btn-hover-bg: #2e3035; --bs-btn-hover-border-color: #6d7068; --bs-btn-hover-color: #fff; }
+[data-bs-theme="dark"] .btn-outline-danger { --bs-btn-color: #ff8a8a; --bs-btn-border-color: #a8474f; --bs-btn-hover-bg: #a8474f; --bs-btn-hover-color: #fff; }
+[data-bs-theme="dark"] .btn-dark { --bs-btn-bg: #ecebe6; --bs-btn-color: #121315; --bs-btn-border-color: #ecebe6; --bs-btn-hover-bg: #ffffff; --bs-btn-hover-color: #121315; }
+[data-bs-theme="dark"] .text-dark { color: var(--ink) !important; }
+[data-bs-theme="dark"] .bg-white,
+[data-bs-theme="dark"] .bg-light { background-color: var(--surface) !important; }
+
+/* Textos en naranja oscuro y avisos de estado (en claro tienen poco contraste en oscuro). */
+[data-bs-theme="dark"] .gym-interior .text-primary { color: #ff8c66 !important; }
+[data-bs-theme="dark"] .text-warning { color: #f3c97a !important; }
+[data-bs-theme="dark"] .text-success { color: #8fd6a8 !important; }
+[data-bs-theme="dark"] .text-danger { color: #ff8a8a !important; }
+[data-bs-theme="dark"] .text-info { color: #7fd3e6 !important; }
+
+/* Ventanas: la misma superficie que las tarjetas, un poco más clara. */
+[data-bs-theme="dark"] .modal-content { background: #1d1f22; }
+[data-bs-theme="dark"] .dropdown-menu { background: #1d1f22; }
+
+/* Fotos de ejercicios y del catálogo. */
+[data-bs-theme="dark"] .ejercicio-foto,
+[data-bs-theme="dark"] .catalogo-portada { background: var(--surface-2); }
+[data-bs-theme="dark"] .catalogo-maquina.es-abierta { border-color: #6d7068 !important; }
