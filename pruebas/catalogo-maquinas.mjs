@@ -25,7 +25,7 @@ ok(r.body.categorias.every(c => r.body.maquinas.some(m => m.categoria === c)), '
 ok(r.body.maquinas.every(m => m.ejercicios.length && m.ejercicios.every(e => e.musculo && e.instrucciones)),
   'cada máquina trae ejercicios con músculo y cómo se hacen');
 const conFoto = r.body.maquinas.flatMap(m => m.ejercicios).filter(e => e.imagenes?.length).length;
-ok(conFoto >= 120, 'casi todos los ejercicios traen fotos', conFoto);
+ok(conFoto === r.body.maquinas.flatMap(m => m.ejercicios).length, 'todos los ejercicios traen ilustración', conFoto);
 const mancuernas = r.body.maquinas.find(m => m.nombre === 'Rack de mancuernas');
 ok(mancuernas && new Set(mancuernas.ejercicios.map(e => e.musculo)).size >= 5, 'una máquina sirve para varios músculos', mancuernas?.ejercicios.map(e => e.musculo));
 
@@ -36,8 +36,25 @@ const id = r.body?.maquina?.id;
 let m = (await api('GET', `/api/gyms/${gymId}/machines`, null, owner)).body.find(x => x.id === id);
 ok(m && m.ejercicios.length === 2 && m.ejercicios.every(e => e.id && e.instrucciones), 'la máquina del gimnasio los tiene, con id y cómo se hacen', m?.ejercicios);
 ok(m.ejercicios.find(e => e.nombre === 'Curl martillo')?.musculo === 'Bíceps', 'el curl martillo queda como Bíceps');
-ok(m.ejercicios.every(e => e.imagenes?.length === 2 && e.imagenes.every(u => u.startsWith('https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@'))),
-  'cada ejercicio trae sus fotos de inicio y final', m.ejercicios.map(e => e.imagenes?.length));
+const ILUSTRACIONES = 'https://cdn.jsdelivr.net/gh/hitmanrepo/open-exercise-illustrations@';
+ok(m.ejercicios.every(e => e.imagenes?.length === 2 && e.imagenes.every(u => u.startsWith(ILUSTRACIONES) && u.endsWith('.webp'))),
+  'cada ejercicio trae sus ilustraciones de inicio y final', m.ejercicios.map(e => e.imagenes?.length));
+
+// Las máquinas que guardaron las fotos anteriores (personas reales) ya no las muestran.
+const VIEJA = 'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5/exercises/Hammer_Curls/0.jpg';
+r = await api('POST', `/api/gyms/${gymId}/machines`, { nombre: 'Máquina con fotos viejas', zona: 'Pesas', ejercicios: [
+  { nombre: 'curl  MARTILLO', musculo: 'Bíceps', imagenes: [VIEJA] },
+  { nombre: 'Ejercicio inventado', musculo: 'Otro', imagenes: [VIEJA] },
+  { nombre: 'Prensa a 45°', musculo: 'Pierna' },
+  { nombre: 'Curl femoral', musculo: 'Pierna' },
+  { nombre: 'Peso muerto convencional', musculo: 'Espalda' },
+  { nombre: 'Ondas alternas', musculo: 'Cardio' },
+] }, owner);
+const vieja = (await api('GET', `/api/gyms/${gymId}/machines`, null, owner)).body.find(x => x.nombre === 'Máquina con fotos viejas');
+ok(vieja?.ejercicios[0].imagenes?.every(u => u.startsWith(ILUSTRACIONES)), 'el nombre del catálogo (sin importar mayúsculas ni espacios) toma la ilustración', vieja?.ejercicios[0].imagenes?.[0]);
+ok(vieja && !vieja.ejercicios[1].imagenes?.length, 'un ejercicio fuera del catálogo ya no muestra la foto anterior', vieja?.ejercicios[1].imagenes);
+ok(vieja?.ejercicios.slice(2).every(e => e.imagenes?.[0]?.startsWith(ILUSTRACIONES)), 'los nombres que escriben los gimnasios (alias o parecidos) también la toman', vieja?.ejercicios.slice(2).map(e => e.imagenes?.[0]?.split('/images/')[1]));
+if (vieja) await api('DELETE', `/api/machines/${vieja.id}`, null, owner);
 
 r = await api('POST', ruta, { nombre: 'rack de mancuernas', ejercicios: ['Curl martillo', 'Patada de tríceps'] }, owner);
 ok(r.status === 200 && r.body.agregados === 1 && r.body.maquina.id === id, 'la misma máquina: solo suma el que faltaba', r.body?.agregados);

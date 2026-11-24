@@ -60,8 +60,8 @@ public class Machine {
         private Integer series;
         private String repeticiones;
         private String instrucciones;
-        // Fotos de cómo se hace (posición inicial y final). Las del catálogo
-        // son de free-exercise-db (dominio público).
+        // Cómo se hace, en imágenes (posición inicial y final). Las del catálogo
+        // son ilustraciones de open-exercise-illustrations (CC0).
         private List<String> imagenes;
 
         public Exercise() {}

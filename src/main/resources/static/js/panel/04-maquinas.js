@@ -146,10 +146,13 @@ function initMachines() {
    que sí se hacen en su gimnasio y la máquina se agrega (o se completa si ya
    la tenía). Esos ejercicios son los que luego elige en las rutinas. */
 // Las fotos de cómo se hace un ejercicio: posición inicial y final.
+// Las ilustraciones traen 2 cuadros (inicio y final), 3 (con uno intermedio)
+// o 1 (planchas y estiramientos): se muestran el primero y el último.
 function fotosEjercicio(e) {
-    const fotos = (e.imagenes || []).slice(0, 2);
+    const todas = e.imagenes || [];
+    const fotos = todas.length > 2 ? [todas[0], todas[todas.length - 1]] : todas;
     if (!fotos.length) return '';
-    const pasos = ['Inicio', 'Final'];
+    const pasos = fotos.length === 1 ? ['Posición'] : ['Inicio', 'Final'];
     return `<span class="ejercicio-fotos">${fotos.map((src, i) => `
         <figure class="mb-0">
             <img src="${escapeHtml(src)}" alt="${escapeHtml(e.nombre)}: ${pasos[i].toLowerCase()}" class="ejercicio-foto" loading="lazy" width="120" height="90">
