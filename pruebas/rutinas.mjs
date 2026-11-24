@@ -23,6 +23,7 @@ const poleas = (r.body || []).find(m => m.nombre === 'Poleas cruzadas');
 ok(banca && poleas, 'hay Press banca y Poleas cruzadas', (r.body || []).map(m => m.nombre));
 const plano = banca.ejercicios.find(e => e.nombre === 'Press banca plano');
 const cruce = poleas.ejercicios.find(e => e.nombre === 'Cruce de poleas alto');
+ok(plano.instrucciones && plano.instrucciones.includes('pecho'), 'los ejercicios del catálogo traen cómo se hacen', plano.instrucciones);
 
 console.log('\n2. El coach arma la rutina');
 const base = `/api/gyms/${gymId}/routines`;
@@ -68,9 +69,13 @@ ok(r.status === 200 && r.body.items.length === 0 && r.body.ejercicios[0] === 'Se
 console.log('\n5. El entrenamiento recuerda de qué rutina salió');
 r = await api('POST', `/api/users/${member}/workouts`, {
   nombre: 'Pecho corto', rutinaId: id, duracionMinutos: 42,
-  ejercicios: [{ nombre: 'Cruce de poleas alto', musculo: 'Pecho', series: [{ repeticiones: 15, peso: 20, completada: true }] }],
+  ejercicios: [
+    { nombre: 'Cruce de poleas alto', musculo: 'Pecho', series: [{ repeticiones: 15, peso: 20, completada: true }] },
+    { nombre: 'Plancha frontal', musculo: 'Core', series: [{ repeticiones: null, peso: null, segundos: 40, completada: true }] },
+  ],
 }, member);
 ok(r.status === 200 && r.body.rutinaId === id, 'el entrenamiento guarda rutinaId', r.body && (r.body.error || r.body.rutinaId));
+ok(r.body.ejercicios && r.body.ejercicios[1].series[0].segundos === 40, 'una serie por tiempo guarda sus segundos', r.body.ejercicios && r.body.ejercicios[1].series[0]);
 if (r.body && r.body.id) await api('DELETE', `/api/users/${member}/workouts/${r.body.id}`, null, member);
 await api('DELETE', `/api/routines/${id}`, null, owner);
 
