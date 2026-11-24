@@ -95,7 +95,7 @@ function initMembers() {
 /* ─── Simular entrada (prueba, mientras se termina la puerta RFID) ───
    "Pasa la tarjeta" de un socio con las mismas reglas que el lector: con la
    membresía vencida se niega y le llega un push para renovar desde la app (al
-   pagar, la puerta se abre sola); al día, entra y el lector abre el servo.
+   pagar, vuelve a pasar la tarjeta); al día, entra y el lector prende el verde.
    Se apaga en el servidor con ACCESO_SIMULACION=false. */
 let simulacionAcceso = null;   // {activa, lector: {nombre, enLinea}} o null mientras se pregunta
 let simulacionSocio = null;    // {id, nombre} de la última simulación, para "Simular otra vez"
@@ -111,8 +111,8 @@ function cargarSimulacion(gymId) {
             if (s.activa) {
                 document.getElementById('members-simulacion-texto').innerHTML = s.lector
                     ? '"Simular entrada" hace como si el socio pasara su tarjeta en <strong>' + escapeHtml(s.lector.nombre) + '</strong> ('
-                        + (s.lector.enLinea ? 'conectado: la puerta se abre de verdad' : 'desconectado: solo queda registrado') + '). '
-                        + 'Con la membresía vencida se niega y le llega un aviso a su teléfono para renovar; al pagar, la puerta se abre sola.'
+                        + (s.lector.enLinea ? 'conectado: el lector responde de verdad' : 'desconectado: solo queda registrado') + '). '
+                        + 'Con la membresía vencida se niega y le llega un aviso a su teléfono para renovar; al pagar, vuelve a pasar su tarjeta para entrar.'
                     : 'Para simular entradas, primero agrega el lector de la puerta en Accesos RFID.';
             }
             return s;
@@ -171,7 +171,7 @@ function vistaSimulacion(r) {
                 ? 'Ya tenía una alerta de hace menos de 2 minutos, así que no se le volvió a avisar.'
                 : 'No tiene la app con las notificaciones activas, así que no le llegó el aviso; puede renovar desde la app.';
         return tarjeta('bx-block', 'danger', 'Acceso negado: ' + escapeHtml(r.motivo || 'sin permiso'), aviso,
-            'Cuando pague desde el teléfono (tiene 10 minutos), la puerta se abre sola y queda su entrada. También aparece en Accesos RFID como alerta.');
+            'Cuando pague desde el teléfono, vuelve a pasar su tarjeta (o "Simular entrada") y ya entra. También aparece en Accesos RFID como alerta.');
     }
     return tarjeta('bx-time-five', 'secondary', 'Espera un momento', escapeHtml(r.motivo || 'Muy pronto desde su último pase') + ': vuelve a intentar en 10 segundos.', '');
 }

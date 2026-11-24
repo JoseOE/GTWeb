@@ -24,6 +24,7 @@ function initAccesos() {
         PENDIENTE: ['Esperando tu decisión', 'bg-warning-subtle text-warning-emphasis'],
         APROBADA: ['Abriste la puerta', 'bg-success-subtle text-success-emphasis'],
         RECHAZADA: ['Negaste el acceso', 'bg-secondary-subtle text-secondary-emphasis'],
+        RENOVADA: ['Renovó desde la app', 'bg-info-subtle text-info-emphasis'],
         EXPIRADA: ['Expiró', 'bg-secondary-subtle text-secondary-emphasis']
     };
 
