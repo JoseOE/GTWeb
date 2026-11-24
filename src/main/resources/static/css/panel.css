@@ -371,3 +371,40 @@ a.panel-cuenta:focus-visible { background: rgba(244, 242, 235, .1); color: var(-
 .resumen-al-dia { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 10px; background: #eef4ec; color: #1d4a2c; }
 .resumen-al-dia .bx { font-size: 1.75rem; flex-shrink: 0; }
 .resumen-al-dia strong { display: block; }
+
+/* ─── Fotos de los ejercicios (catálogo de máquinas) ───
+   De free-exercise-db (dominio público): posición inicial y final. */
+.ejercicio-foto {
+    display: block;
+    width: 120px;
+    aspect-ratio: 4 / 3;
+    height: auto;
+    object-fit: cover;
+    border-radius: 8px;
+    background: var(--surface-2, #e8e9df);
+}
+.ejercicio-foto-sm { width: 40px; aspect-ratio: 1; border-radius: 6px; flex-shrink: 0; }
+.ejercicio-sin-foto { display: grid; place-items: center; color: var(--muted); font-size: 1.1rem; }
+.ejercicio-fotos { display: flex; gap: 8px; margin: 8px 0 6px; }
+.ejercicio-fotos figcaption { font-size: .6875rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+/* Al abrir una máquina ocupa todo el ancho y sus ejercicios van en cuadrícula. */
+.catalogo-ejercicios { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.catalogo-ejercicio { margin: 0; padding: 12px 12px 12px 2.25em; border: 1px solid var(--line); border-radius: 10px; }
+.catalogo-ejercicio:has(.form-check-input:checked:not(:disabled)) { border-color: rgba(var(--brand-rgb), .55); }
+.catalogo-maquina.es-abierta { border-color: var(--ink) !important; }
+.catalogo-portada {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: 10px;
+    background: var(--surface-2, #e8e9df);
+}
+.catalogo-portada.ejercicio-sin-foto { font-size: 2rem; }
+.maquina-ejercicio {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--line);
+}
+.maquina-ejercicio:last-child { border-bottom: 0; }
