@@ -57,10 +57,13 @@
         if (suave) setTimeout(() => raiz.classList.remove('tema-cambiando'), 260);
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        aplicar(actual());
-        document.querySelectorAll('[data-tema-alternar]').forEach(b => b.addEventListener('click', cambiar));
+    // Un solo escucha para toda la página: también sirve para los botones que
+    // se agregan después (la barra de la tienda se arma con JavaScript).
+    document.addEventListener('click', e => {
+        if (e.target.closest('[data-tema-alternar]')) cambiar();
     });
+    document.addEventListener('DOMContentLoaded', () => aplicar(actual()));
 
-    window.Tema = { actual, cambiar };
+    // refrescar(): pone el ícono correcto a botones agregados después.
+    window.Tema = { actual, cambiar, refrescar: () => aplicar(actual()) };
 })();

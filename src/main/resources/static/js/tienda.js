@@ -111,6 +111,9 @@ const Tienda = (() => {
                     <button type="button" class="icono-nav" id="boton-carrito" aria-label="Abrir carrito" title="Carrito" ${esDueno ? 'hidden' : ''}>
                         <i class='bx bx-shopping-bag'></i><span class="badge-carrito" id="badge-carrito" aria-hidden="true"></span>
                     </button>
+                    <button type="button" class="icono-nav" data-tema-alternar aria-label="Cambiar a tema oscuro" title="Tema oscuro">
+                        <i class='bx bx-moon' aria-hidden="true"></i>
+                    </button>
                     <div class="dropdown">
                         <button type="button" class="icono-nav" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menú de la cuenta" title="Cuenta">
                             <i class='bx bx-user-circle'></i>
@@ -125,6 +128,7 @@ const Tienda = (() => {
                     </div>
                 </div>
             </nav>`;
+        if (window.Tema) window.Tema.refrescar();
 
         document.body.insertAdjacentHTML('beforeend', `
             <div class="offcanvas offcanvas-end" tabindex="-1" id="minicarrito" aria-labelledby="minicarrito-titulo">

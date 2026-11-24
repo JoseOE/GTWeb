@@ -1950,6 +1950,12 @@ button,a,input,summary {
         flex-direction:column;
         align-items:stretch
     }
+    /* Sin esto la fila de filtros ensanchaba toda la página en el celular
+       (la barra de arriba se salía y el botón del menú quedaba fuera de vista). */
+    .soluciones-barra > * {
+        min-width:0;
+        max-width:100%
+    }
     /* Los filtros se deslizan en una sola fila en lugar de ocupar tres renglones. */
     .soluciones-barra .catalog-filters {
         flex-wrap:nowrap;
