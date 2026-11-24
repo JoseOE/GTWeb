@@ -659,5 +659,32 @@ footer.bg-dark::before {
 }
 .min-w-0 { min-width: 0; }
 
+/* Esperando la tarjeta RFID del socio: el ícono "late" como el lector. */
+.entrega-tarjeta-espera {
+    text-align: center;
+    padding: 20px 16px 8px;
+    border: 1px dashed var(--bs-border-color);
+    border-radius: 14px;
+}
+.entrega-tarjeta-icono {
+    display: inline-grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    margin-bottom: 12px;
+    border-radius: 50%;
+    background: var(--bs-info-bg-subtle);
+    color: var(--bs-info-text-emphasis);
+    font-size: 30px;
+}
+@media (prefers-reduced-motion: no-preference) {
+    .entrega-tarjeta-icono { animation: entrega-latido 1.6s ease-out infinite; }
+}
+@keyframes entrega-latido {
+    0% { box-shadow: 0 0 0 0 rgba(13, 110, 253, .35); }
+    70%, 100% { box-shadow: 0 0 0 16px rgba(13, 110, 253, 0); }
+}
+.entrega-tiempo { font-variant-numeric: tabular-nums; }
+
 /* Producto sin foto en el panel: una franja corta en lugar de un hueco 16:9. */
 .ratio.producto-sin-foto { --bs-aspect-ratio: 28%; }

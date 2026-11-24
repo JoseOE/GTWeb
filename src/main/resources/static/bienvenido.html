@@ -882,14 +882,17 @@
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                         </div>
                         <div class="modal-body">
-                            <p class="small text-body-secondary">Escanea el código QR del comprobante del miembro (en su celular o impreso), o escribe el folio del pedido.</p>
+                            <p class="small text-body-secondary">Escanea el código QR del comprobante del miembro (en su celular o impreso), pídele que pase su tarjeta RFID por el lector, o escribe el folio del pedido.</p>
                             <form id="entrega-form" class="d-flex gap-2 mb-2" novalidate>
                                 <label for="entrega-codigo" class="visually-hidden">Folio o código del comprobante</label>
                                 <input type="text" id="entrega-codigo" class="form-control" placeholder="Folio (p. ej. 189) o código" autocomplete="off" spellcheck="false">
                                 <button type="submit" class="btn btn-primary rounded-pill px-3">Buscar</button>
                             </form>
-                            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 mb-3" id="entrega-camara-btn"><i class='bx bx-camera'></i> Escanear con la cámara</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 mb-3" id="entrega-camara-apagar" hidden><i class='bx bx-camera-off'></i> Apagar cámara</button>
+                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="entrega-camara-btn"><i class='bx bx-camera'></i> Escanear con la cámara</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="entrega-camara-apagar" hidden><i class='bx bx-camera-off'></i> Apagar cámara</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="entrega-tarjeta-btn"><i class='bx bx-id-card'></i> Pasar tarjeta RFID</button>
+                            </div>
                             <div id="entrega-camara" class="entrega-camara mb-3" hidden></div>
                             <div class="alert d-none small py-2 mb-3" id="entrega-aviso" role="alert"></div>
                             <div id="entrega-resultado" aria-live="polite"></div>
