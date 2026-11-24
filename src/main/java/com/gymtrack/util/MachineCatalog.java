@@ -5,9 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymtrack.model.Machine;
 
 import java.io.IOException;
+import java.text.Normalizer;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,7 +72,7 @@ public final class MachineCatalog {
         for (MaquinaCatalogo maq : CATALOGO) {
             for (Machine.Exercise e : maq.ejercicios) {
                 if (e.getImagenes() != null && !e.getImagenes().isEmpty()) {
-                    m.putIfAbsent(e.getNombre().trim().toLowerCase(), List.copyOf(e.getImagenes()));
+                    m.putIfAbsent(clave(e.getNombre()), List.copyOf(e.getImagenes()));
                 }
             }
         }
@@ -81,18 +83,78 @@ public final class MachineCatalog {
         return CATALOGO;
     }
 
-    // Fotos de un ejercicio por su nombre, si está en el catálogo (o null).
-    public static List<String> imagenes(String nombre) {
-        return nombre == null ? null : IMAGENES_CATALOGO.get(nombre.trim().toLowerCase());
+    // Nombre sin acentos, en minúsculas y con un solo espacio: "Jalón  al Pecho" = "jalon al pecho".
+    static String clave(String nombre) {
+        return Normalizer.normalize(nombre.trim(), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "").toLowerCase().replaceAll("\\s+", " ");
     }
 
-    // A los ejercicios de una máquina del gimnasio que no traen fotos se les
-    // ponen las del catálogo con el mismo nombre. No se guarda: solo se agrega
-    // a lo que se responde, así también lo ven las máquinas capturadas antes.
+    // Otra forma de llamar a un ejercicio del catálogo (la app usa la misma lista,
+    // en GTApp/constants/ImagenesEjercicios.ts).
+    private static final Map<String, String> ALIAS = Map.ofEntries(
+            Map.entry("sentadilla", "sentadilla trasera"),
+            Map.entry("fondos", "fondos en paralelas"),
+            Map.entry("press banca", "press banca plano"),
+            Map.entry("jalon al pecho", "jalon agarre ancho"),
+            Map.entry("remo en polea baja", "remo bajo en estacion"),
+            Map.entry("extension de piernas", "extension a dos piernas"),
+            Map.entry("pantorrilla de pie", "elevacion de talones de pie"),
+            Map.entry("prensa", "prensa 45°"),
+            Map.entry("prensa a 45°", "prensa 45°"),
+            Map.entry("pajaros en pec deck", "pec deck inverso"),
+            Map.entry("caminata inclinada", "caminata en pendiente"),
+            Map.entry("remo de 500 m", "remo en remadora"),
+            Map.entry("bici", "pedaleo continuo"),
+            Map.entry("intervalos en bici", "sprints en bici"),
+            Map.entry("escaladora", "escaladora continua"),
+            Map.entry("hip thrust", "hip thrust en maquina"),
+            Map.entry("curl femoral", "curl femoral acostado"));
+
+    // El nombre del catálogo que corresponde a como lo escribió el gimnasio:
+    // el mismo (sin importar acentos ni mayúsculas), un alias, el más corto que
+    // empiece igual ("Curl femoral" → "Curl femoral sentado") o el más largo con
+    // el que empiece ("Peso muerto convencional" → "Peso muerto"). null si nada.
+    static String claveDelCatalogo(String nombre) {
+        if (nombre == null || nombre.isBlank()) return null;
+        String q = clave(nombre);
+        if (IMAGENES_CATALOGO.containsKey(q)) return q;
+        String alias = ALIAS.get(q);
+        if (alias != null && IMAGENES_CATALOGO.containsKey(alias)) return alias;
+        String parecido = IMAGENES_CATALOGO.keySet().stream()
+                .filter(k -> k.startsWith(q + " "))
+                .min(Comparator.comparingInt(String::length).thenComparing(Comparator.naturalOrder()))
+                .orElse(null);
+        if (parecido != null) return parecido;
+        return IMAGENES_CATALOGO.keySet().stream()
+                .filter(k -> q.startsWith(k + " "))
+                .max(Comparator.comparingInt(String::length).thenComparing(Comparator.naturalOrder()))
+                .orElse(null);
+    }
+
+    // Ilustraciones de un ejercicio por su nombre, si está (o se parece a uno) en el catálogo; si no, null.
+    public static List<String> imagenes(String nombre) {
+        String k = claveDelCatalogo(nombre);
+        return k == null ? null : IMAGENES_CATALOGO.get(k);
+    }
+
+    // Las fotos de personas reales que se usaron antes (free-exercise-db). Si
+    // una máquina las guardó, ya no se muestran.
+    static final String FOTOS_ANTERIORES = "free-exercise-db";
+
+    // Las ilustraciones de cada ejercicio de una máquina del gimnasio: las del
+    // catálogo con su nombre (aunque la máquina haya guardado otras antes) o,
+    // si no está en el catálogo, las que trae, salvo las fotos anteriores. No
+    // se guarda: solo cambia lo que se responde, así se actualizan también las
+    // máquinas capturadas antes.
     public static void completarImagenes(Machine m) {
         if (m.getEjercicios() == null) return;
         for (Machine.Exercise e : m.getEjercicios()) {
-            if (e.getImagenes() == null || e.getImagenes().isEmpty()) e.setImagenes(imagenes(e.getNombre()));
+            List<String> delCatalogo = imagenes(e.getNombre());
+            if (delCatalogo != null) {
+                e.setImagenes(delCatalogo);
+            } else if (e.getImagenes() != null && e.getImagenes().stream().anyMatch(u -> u != null && u.contains(FOTOS_ANTERIORES))) {
+                e.setImagenes(null);
+            }
         }
     }
 
