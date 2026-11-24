@@ -2,11 +2,11 @@
 //
 // Cada tag que lee se lo pregunta a GTWeb (POST /api/lectores/accesos) y hace
 // lo que el servidor responda:
-//   ENTRADA  -> LED verde, 1 pitido y abre la puerta (servo)
-//   SALIDA   -> LED azul, 2 pitidos y abre la puerta
+//   ENTRADA  -> LED verde y 1 pitido (acceso permitido)
+//   SALIDA   -> LED azul y 2 pitidos
 //   NEGADO   -> LED rojo y 3 pitidos. Si la membresía venció, al socio le llega
 //               un aviso al teléfono para renovar; al pagar, el servidor manda
-//               "abrir" y la puerta se abre sola.
+//               "abrir" y se da el acceso (LED verde).
 //   REGISTRO -> LED azul y un pitido largo: el panel estaba en "Registrar tag
 //               nuevo" y capturó este tag
 //   IGNORADO -> nada (pasó otra vez muy pronto)
@@ -26,7 +26,7 @@
 // Comandos por el monitor serie (115200):
 //   a  red automática (WiFi y si no, datos)   w  solo WiFi
 //   l  solo LTE-M                             g  solo 2G
-//   r  estado de la red    p  probar la puerta (servo)    n  simular un tag desconocido
+//   r  estado de la red    p  probar LEDs y buzzer    n  simular un tag desconocido
 //   +  subir la potencia 1 dBm      -  bajarla 1 dBm
 //
 // Placa: "ESP32 Wrover Module". Librerías: TinyGSM y ArduinoHttpClient.
@@ -45,7 +45,6 @@
 #include <Preferences.h>
 #include <TinyGsmClient.h>
 #include <ArduinoHttpClient.h>
-#include <esp_arduino_version.h>
 #include "secrets.h"
 
 // Lo opcional de secrets.h: un secrets.h viejo, sin esto, también compila.
@@ -66,19 +65,13 @@
 // ============================================================
 #define RFID_RX         32   // llega del TXD del YRM
 #define RFID_TX         33   // va al RXD del YRM
-#define LED_VERDE       18   // entrada / puerta abierta
+#define LED_VERDE       18   // entrada / acceso permitido
 #define LED_AZUL        19   // salida, registro y "sin internet"
 #define LED_ROJO        21   // negado
-#define BUZZER          22   // buzzer activo (suena con HIGH)
-#define SERVO           23   // señal del servo de la puerta
+#define BUZZER          22   // buzzer pasivo (suena con un tono)
 #define MODEM_RX        26   // llega del TX del módem (dentro de la placa)
 #define MODEM_TX        27
 #define MODEM_PWR       4    // pulso para encender el módem
-
-// La puerta: ángulos del servo y cuánto se queda abierta.
-const int      SERVO_CERRADO    = 0;       // grados
-const int      SERVO_ABIERTO    = 90;
-const uint32_t PUERTA_ABIERTA_MS = 3000;
 
 const uint32_t REARME_MS        = 3000;    // el tag tiene que alejarse esto para contar otra vez
 const uint32_t SENAL_MS         = 1500;
@@ -215,69 +208,17 @@ bool fijarPotencia(int dbm) {
 }
 
 // ============================================================
-// SECCIÓN 3 · Señales: LEDs, buzzer y la puerta (servo)
-// El servo se mueve con PWM de 50 Hz (LEDC, sin librería extra): 500 µs = 0°
-// y 2500 µs = 180°. La puerta se abre y se cierra sola a los 3 s, sin
-// detener la lectura de tags (vigilarPuerta en loop).
+// SECCIÓN 3 · Señales: LEDs y buzzer
+// Sin mecanismo de puerta por ahora: el acceso se indica con el LED verde y
+// el pitido.
 // ============================================================
-#define SERVO_CANAL 2      // solo para el core 2.x del ESP32 (el 0 lo usa tone())
-#define SERVO_BITS  14
-#define SERVO_MOVER_MS 700 // tiempo para llegar; después se dejan de mandar pulsos
-
-uint32_t servoReposoEn = 0;     // cuándo quitarle la señal al servo (0 = ya sin señal)
-
-void pwmServo(uint32_t duty) {
-#if ESP_ARDUINO_VERSION_MAJOR >= 3
-  ledcWrite(SERVO, duty);
-#else
-  ledcWrite(SERVO_CANAL, duty);
-#endif
-}
-
-// Mueve el servo y, al llegar, deja de mandarle pulsos: así no se queda
-// zumbando ni "crujiendo" por corregir su posición todo el tiempo.
-void escribirServo(int grados) {
-  uint32_t us = 500 + (uint32_t)constrain(grados, 0, 180) * 2000 / 180;
-  pwmServo(us * ((1UL << SERVO_BITS) - 1) / 20000);
-  servoReposoEn = millis() + SERVO_MOVER_MS;
-}
-
-void reposarServo() {
-  if (servoReposoEn && (int32_t)(millis() - servoReposoEn) >= 0) {
-    pwmServo(0);
-    servoReposoEn = 0;
-  }
-}
-
-void iniciarServo() {
-#if ESP_ARDUINO_VERSION_MAJOR >= 3
-  ledcAttach(SERVO, 50, SERVO_BITS);
-#else
-  ledcSetup(SERVO_CANAL, 50, SERVO_BITS);
-  ledcAttachPin(SERVO, SERVO_CANAL);
-#endif
-  escribirServo(SERVO_CERRADO);
-}
-
-uint32_t cerrarPuertaEn = 0;    // 0 = cerrada
-
+// Por ahora solo se anuncia en el monitor (aquí iría la chapa eléctrica).
 void abrirPuerta() {
-  if (!cerrarPuertaEn) Serial.println("         [puerta] abierta");
-  escribirServo(SERVO_ABIERTO);
-  cerrarPuertaEn = millis() + PUERTA_ABIERTA_MS;
+  Serial.println("         [puerta] acceso permitido");
 }
 
-void vigilarPuerta() {
-  reposarServo();
-  if (cerrarPuertaEn && (int32_t)(millis() - cerrarPuertaEn) >= 0) {
-    escribirServo(SERVO_CERRADO);
-    cerrarPuertaEn = 0;
-    Serial.println("         [puerta] cerrada");
-  }
-}
-
-// Con un tono de 2.7 kHz suena tanto un buzzer activo como uno pasivo (el
-// pasivo no hace nada si solo se le da voltaje fijo).
+// El buzzer es pasivo: necesita un tono (2.7 kHz), con voltaje fijo no suena.
+// Un buzzer activo también suena así.
 #define BUZZER_HZ 2700
 
 void pitido(int ms) {
@@ -293,7 +234,7 @@ void senalCon(int led, int pitidos, int msPitido) {
   digitalWrite(led, HIGH);
   uint32_t inicio = millis();
   for (int i = 0; i < pitidos; i++) { pitido(msPitido); delay(80); }
-  while (millis() - inicio < SENAL_MS) { vigilarPuerta(); delay(10); }
+  while (millis() - inicio < SENAL_MS) delay(10);
   digitalWrite(led, LOW);
 }
 
@@ -301,7 +242,7 @@ void senal(int led, int pitidos) {
   senalCon(led, pitidos, 80);
 }
 
-// Al arrancar: cada LED, un pitido y la puerta, para revisar las conexiones.
+// Al arrancar: cada LED y un pitido, para revisar las conexiones.
 void probarSalidas() {
   int leds[] = {LED_VERDE, LED_AZUL, LED_ROJO};
   for (int led : leds) { digitalWrite(led, HIGH); delay(250); digitalWrite(led, LOW); }
@@ -900,9 +841,7 @@ void setup() {
 
   pinMode(LED_VERDE, OUTPUT); pinMode(LED_AZUL, OUTPUT);
   pinMode(LED_ROJO, OUTPUT);  pinMode(BUZZER, OUTPUT);
-  iniciarServo();
   probarSalidas();
-  reposarServo();                 // ya llegó a 0°: sin señal mientras arranca la red
 
   // El YRM puede tardar en encender más que la LILYGO: se reintenta unos segundos.
   yrm.begin(115200, SERIAL_8N1, RFID_RX, RFID_TX);
@@ -929,7 +868,7 @@ void setup() {
   // respuesta sin soltar el procesador, y en el núcleo 0 eso dispara el
   // watchdog del sistema (task_wdt) y reinicia la placa.
   xTaskCreatePinnedToCore(tareaComandos, "comandos", 10240, nullptr, 1, nullptr, 1);
-  Serial.println("Listo. Comandos: a / w / l / g (red), r (estado), p (probar puerta), n (tag desconocido), + / - (potencia)");
+  Serial.println("Listo. Comandos: a / w / l / g (red), r (estado), p (probar LEDs y buzzer), n (tag desconocido), + / - (potencia)");
 }
 
 void loop() {
@@ -940,13 +879,17 @@ void loop() {
     if (c == 'l') cambiarModo(MODO_LTE);
     if (c == 'g') cambiarModo(MODO_2G);
     if (c == 'r') mostrarEstado();
-    if (c == 'p') { Serial.println("PRUEBA   puerta"); abrirPuerta(); senal(LED_VERDE, 1); }
+    if (c == 'p') {
+      // Las mismas señales que un acceso real: entrada, salida y negado.
+      Serial.println("PRUEBA   entrada (verde, 1 pitido)");  senal(LED_VERDE, 1);
+      Serial.println("PRUEBA   salida (azul, 2 pitidos)");   senal(LED_AZUL, 2);
+      Serial.println("PRUEBA   negado (rojo, 3 pitidos)");   senal(LED_ROJO, 3);
+    }
     if (c == 'n') alLeerTag(EPC_SIMULADO, 0, true);
     if (c == '+' && potenciaDbm < 26) fijarPotencia(++potenciaDbm);
     if (c == '-' && potenciaDbm > 5)  fijarPotencia(--potenciaDbm);
   }
   atenderComando();
-  vigilarPuerta();
   // Con WiFi pero sin poder preguntar por los comandos tanto tiempo: se
   // reinicia la placa (así se recupera si se quedó sin memoria para el https).
   if (redLista && red == RED_WIFI && WiFi.status() == WL_CONNECTED &&

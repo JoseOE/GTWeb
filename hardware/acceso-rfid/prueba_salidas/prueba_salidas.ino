@@ -1,61 +1,63 @@
-// Prueba del buzzer (GPIO 22) y del servo (GPIO 23) de la LILYGO, sin nada más.
-// Sirve para saber si falla la conexión o el programa del lector.
+// Prueba de los LEDs (GPIO 18, 19, 21) y del buzzer pasivo (GPIO 22) de la
+// LILYGO, sin YRM ni internet. Sirve para revisar las conexiones.
 //
 // Monitor serie a 115200 (con "New Line" o "No line ending"), escribe un número:
-//   1  buzzer con voltaje fijo 1 s        (buzzer ACTIVO de 2 patas)
-//   2  buzzer con tono de 2.7 kHz 1 s     (buzzer PASIVO)
-//   3  buzzer "al revés" 1 s: pin en BAJO (módulo de 3 patas que suena con LOW)
-//   4  servo a 0°      5  servo a 90°     6  servo a 180°
-//   7  parpadeo en GPIO 22 y 23 (pon un LED con 220 Ω en cada pin para ver si el pin funciona)
+//   1  entrada: LED verde y 1 pitido
+//   2  salida:  LED azul y 2 pitidos
+//   3  negado:  LED rojo y 3 pitidos
+//   4  buzzer: escala de tonos (si suena, el buzzer y su conexión están bien)
+//   5  todo seguido (1, 2 y 3)
 //
-// Placa: "ESP32 Wrover Module". Núcleo ESP32 3.x.
+// Placa: "ESP32 Wrover Module".
 
-#define BUZZER 22
-#define SERVO  23
-#define SERVO_BITS 14
+#define LED_VERDE 18
+#define LED_AZUL  19
+#define LED_ROJO  21
+#define BUZZER    22
+#define BUZZER_HZ 2700   // el mismo tono que usa el lector
 
-void servoGrados(int grados) {
-  uint32_t us = 500 + (uint32_t)constrain(grados, 0, 180) * 2000 / 180;
-  ledcAttach(SERVO, 50, SERVO_BITS);
-  ledcWrite(SERVO, us * ((1UL << SERVO_BITS) - 1) / 20000);
-  Serial.printf("Servo a %d° (pulso de %lu µs). Debe girar y quedarse ahí.\n", grados, (unsigned long)us);
+// El buzzer es pasivo: suena con un tono, no con voltaje fijo.
+void pitido(int ms, int hz = BUZZER_HZ) {
+  tone(BUZZER, hz);
+  delay(ms);
+  noTone(BUZZER);
+  pinMode(BUZZER, OUTPUT);
+  digitalWrite(BUZZER, LOW);
+}
+
+void senal(const char* nombre, int led, int pitidos) {
+  Serial.printf("%s: LED en GPIO %d y %d pitido(s)\n", nombre, led, pitidos);
+  digitalWrite(led, HIGH);
+  for (int i = 0; i < pitidos; i++) { pitido(80); delay(80); }
+  delay(1200);
+  digitalWrite(led, LOW);
 }
 
 void setup() {
   Serial.begin(115200);
   delay(500);
-  pinMode(BUZZER, OUTPUT);
-  digitalWrite(BUZZER, LOW);
-  Serial.println("\n=== Prueba de buzzer (GPIO 22) y servo (GPIO 23) ===");
-  Serial.println("1 fijo · 2 tono · 3 al revés · 4/5/6 servo 0/90/180 · 7 parpadeo de pines");
+  pinMode(LED_VERDE, OUTPUT); pinMode(LED_AZUL, OUTPUT);
+  pinMode(LED_ROJO, OUTPUT);  pinMode(BUZZER, OUTPUT);
+  digitalWrite(LED_VERDE, LOW); digitalWrite(LED_AZUL, LOW);
+  digitalWrite(LED_ROJO, LOW);  digitalWrite(BUZZER, LOW);
+  Serial.println("\n=== Prueba de LEDs y buzzer ===");
+  Serial.println("1 entrada · 2 salida · 3 negado · 4 escala del buzzer · 5 todo");
+  Serial.println("Con nada pulsado los 3 LEDs deben quedar APAGADOS por completo.");
 }
 
 void loop() {
   if (!Serial.available()) return;
   char c = Serial.read();
-  if (c == '1') {
-    Serial.println("Buzzer: voltaje fijo 1 s");
-    pinMode(BUZZER, OUTPUT); digitalWrite(BUZZER, HIGH); delay(1000); digitalWrite(BUZZER, LOW);
-  } else if (c == '2') {
-    Serial.println("Buzzer: tono de 2.7 kHz 1 s");
-    tone(BUZZER, 2700); delay(1000); noTone(BUZZER);
-    pinMode(BUZZER, OUTPUT); digitalWrite(BUZZER, LOW);
-  } else if (c == '3') {
-    Serial.println("Buzzer: pin en BAJO 1 s (y luego queda en ALTO para que calle)");
-    pinMode(BUZZER, OUTPUT); digitalWrite(BUZZER, LOW); delay(1000); digitalWrite(BUZZER, HIGH);
-  } else if (c == '4') {
-    servoGrados(0);
-  } else if (c == '5') {
-    servoGrados(90);
-  } else if (c == '6') {
-    servoGrados(180);
-  } else if (c == '7') {
-    Serial.println("Parpadeo de GPIO 22 y 23, 5 veces");
-    ledcDetach(SERVO);
-    pinMode(BUZZER, OUTPUT); pinMode(SERVO, OUTPUT);
-    for (int i = 0; i < 5; i++) {
-      digitalWrite(BUZZER, HIGH); digitalWrite(SERVO, HIGH); delay(400);
-      digitalWrite(BUZZER, LOW);  digitalWrite(SERVO, LOW);  delay(400);
-    }
+  if (c == '1') senal("Entrada", LED_VERDE, 1);
+  if (c == '2') senal("Salida", LED_AZUL, 2);
+  if (c == '3') senal("Negado", LED_ROJO, 3);
+  if (c == '4') {
+    Serial.println("Buzzer: escala de 1 a 4 kHz");
+    for (int hz = 1000; hz <= 4000; hz += 500) pitido(200, hz);
+  }
+  if (c == '5') {
+    senal("Entrada", LED_VERDE, 1);
+    senal("Salida", LED_AZUL, 2);
+    senal("Negado", LED_ROJO, 3);
   }
 }
