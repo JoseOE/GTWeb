@@ -76,6 +76,12 @@ function avatar(nombre) {
     return '<span class="avatar-iniciales" aria-hidden="true">' + escapeHtml(iniciales(nombre)) + '</span>';
 }
 
+// "Coach Arturo" → "Arturo": el panel ya antepone "Coach", y había rutinas
+// guardadas con la palabra repetida.
+function sinPrefijoCoach(nombre) {
+    return String(nombre || '').replace(/^\s*coach\s+/i, '').trim();
+}
+
 function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str == null ? '' : String(str);

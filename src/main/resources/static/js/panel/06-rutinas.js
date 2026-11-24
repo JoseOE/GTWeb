@@ -195,7 +195,7 @@ function initRoutines() {
             document.getElementById('routine-duracion').value = r.duracion || '';
             document.getElementById('routine-descripcion').value = r.descripcion || '';
             document.getElementById('routine-dia').value = r.dia || '';
-            document.getElementById('routine-coach').value = r.coach || '';
+            document.getElementById('routine-coach').value = sinPrefijoCoach(r.coach);
             document.getElementById('routine-nivel').value = r.nivel || '';
             document.getElementById('routineModalLabel').textContent = 'Editar rutina';
             alertBox.classList.add('d-none');
@@ -225,7 +225,7 @@ function initRoutines() {
             descripcion: document.getElementById('routine-descripcion').value.trim(),
             items,
             dia: document.getElementById('routine-dia').value,
-            coach: document.getElementById('routine-coach').value.trim(),
+            coach: sinPrefijoCoach(document.getElementById('routine-coach').value),
             nivel: document.getElementById('routine-nivel').value
         };
         const url = id ? '/api/routines/' + id : '/api/gyms/' + gymId + '/routines';
@@ -289,7 +289,7 @@ function loadRoutines(gymId) {
                                     ${r.nivel ? '<span class="badge rounded-pill bg-secondary bg-opacity-10 text-body-secondary">' + escapeHtml(r.nivel) + '</span>' : ''}
                                     ${r.duracion ? '<span class="badge rounded-pill bg-secondary bg-opacity-10 text-body-secondary"><i class="bx bx-time-five"></i> ' + escapeHtml(r.duracion) + '</span>' : ''}
                                 </div>
-                                ${r.coach ? '<small class="text-body-secondary d-block mb-1"><i class="bx bx-user-voice"></i> Coach ' + escapeHtml(r.coach) + '</small>' : ''}
+                                ${r.coach ? '<small class="text-body-secondary d-block mb-1"><i class="bx bx-user-voice"></i> Coach ' + escapeHtml(sinPrefijoCoach(r.coach)) + '</small>' : ''}
                                 <p class="text-body-secondary small mb-3">${escapeHtml(r.descripcion || (r.ejercicios || []).join(', '))}</p>
                                 <div class="mt-auto d-flex gap-2">
                                     <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-edit-routine='${JSON.stringify(r).replace(/'/g, "&#39;")}'>Editar</button>

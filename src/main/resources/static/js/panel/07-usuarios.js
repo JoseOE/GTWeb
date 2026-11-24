@@ -122,9 +122,10 @@ function cargarSimulacion(gymId) {
 function botonSimular(m) {
     if (!simulacionAcceso || !simulacionAcceso.activa || !simulacionAcceso.lector) return '';
     const vencida = m.diasParaVencer != null && m.diasParaVencer < 0;
-    return `<button type="button" class="btn ${vencida ? 'btn-outline-danger' : 'btn-outline-secondary'} btn-sm rounded-pill px-3 mb-1"
+    // Va dentro del menú "⋯" de cada socio.
+    return `<button type="button" class="dropdown-item ${vencida ? 'text-danger' : ''}"
                 data-simular-user="${m.id}" data-simular-name="${escapeHtml(m.nombre)}" title="Prueba: como si pasara su tarjeta">
-                <i class='bx bx-door-open'></i> Simular entrada
+                <i class='bx bx-door-open me-2'></i>Simular entrada${vencida ? ' (vencida)' : ''}
             </button>`;
 }
 
@@ -201,17 +202,33 @@ function loadMembers(gymId) {
                         '<button type="button" class="btn btn-success btn-sm rounded-pill px-3" data-member-action="active" data-user-id="' + id + '">Aprobar</button>'
                         + ' <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" data-member-action="remove" data-user-id="' + id + '">Rechazar</button>'
                 },
+                // Socios: "Pago" queda a la vista y lo demás en el menú "⋯",
+                // así cada fila tiene una sola acción principal.
                 active: {
                     badge: '<span class="badge rounded-pill bg-success bg-opacity-10 text-success px-3 py-2"><i class="bx bx-check-circle"></i> Activo</span>',
-                    acciones: (id) =>
-                        '<button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" data-member-action="inactive" data-user-id="' + id + '">Dar de baja</button>'
+                    menu: (id) =>
+                        '<li><button type="button" class="dropdown-item text-danger" data-member-action="inactive" data-user-id="' + id + '"><i class="bx bx-user-x me-2"></i>Dar de baja</button></li>'
                 },
                 inactive: {
                     badge: '<span class="badge rounded-pill bg-danger bg-opacity-10 text-danger px-3 py-2"><i class="bx bx-block"></i> Dado de baja</span>',
-                    acciones: (id) =>
-                        '<button type="button" class="btn btn-outline-success btn-sm rounded-pill px-3" data-member-action="active" data-user-id="' + id + '">Dar de alta</button>'
-                        + ' <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-member-action="remove" data-user-id="' + id + '">Quitar</button>'
+                    menu: (id) =>
+                        '<li><button type="button" class="dropdown-item" data-member-action="active" data-user-id="' + id + '"><i class="bx bx-user-check me-2"></i>Dar de alta</button></li>'
+                        + '<li><button type="button" class="dropdown-item text-danger" data-member-action="remove" data-user-id="' + id + '"><i class="bx bx-unlink me-2"></i>Quitar del gimnasio</button></li>'
                 }
+            };
+
+            // El menú "⋯" de un socio: simular su entrada (si está activa la prueba) y cambiar su estado.
+            const menuSocio = (m, estado) => {
+                const simular = botonSimular(m);
+                return `<div class="dropdown d-inline-block">
+                    <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-2" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Más acciones para ${escapeHtml(m.nombre)}">
+                        <i class="bx bx-dots-horizontal-rounded" aria-hidden="true"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                        ${simular ? '<li>' + simular + '</li><li><hr class="dropdown-divider"></li>' : ''}
+                        ${estado.menu(m.id)}
+                    </ul>
+                </div>`;
             };
 
             tbody.innerHTML = members.map(m => {
@@ -229,12 +246,11 @@ function loadMembers(gymId) {
                         <span class="badge rounded-pill ${pago.clase} px-3 py-2"><i class="bx ${pago.icono}"></i> ${pago.texto}</span>
                         ${m.fechaProximoPago ? '<div class="text-body-secondary small mt-1">Vence el ' + escapeHtml(fechaCorta(m.fechaProximoPago)) + '</div>' : ''}`}
                     </td>
-                    <td class="pe-4 text-end">
-                        ${esSolicitud ? '' : `<button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3 mb-1" data-pay-user="${m.id}" data-pay-name="${escapeHtml(m.nombre)}">
+                    <td class="pe-4 text-end text-nowrap">
+                        ${esSolicitud ? estado.acciones(m.id) : `<button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-pay-user="${m.id}" data-pay-name="${escapeHtml(m.nombre)}">
                             <i class='bx bx-dollar'></i> Pago
-                        </button>`}
-                        ${esSolicitud ? '' : botonSimular(m)}
-                        ${estado.acciones(m.id)}
+                        </button>
+                        ${menuSocio(m, estado)}`}
                     </td>
                 </tr>`;
             }).join('');
