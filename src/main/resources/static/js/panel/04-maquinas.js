@@ -32,6 +32,9 @@ function initMachines() {
             </div>
             <div class="col-md-1 text-end">
                 <button type="button" class="btn btn-outline-danger btn-sm rounded-circle ex-remove" title="Quitar"><i class='bx bx-x'></i></button>
+            </div>
+            <div class="col-12">
+                <input type="text" class="form-control form-control-sm ex-instrucciones" maxlength="300" placeholder="Cómo se hace (opcional): la app se lo muestra al miembro al entrenar" value="${escapeHtml(ej.instrucciones || '')}">
             </div>`;
         row.querySelector('.ex-remove').addEventListener('click', () => row.remove());
         rows.appendChild(row);
@@ -90,7 +93,8 @@ function initMachines() {
             nombre: r.querySelector('.ex-nombre').value.trim(),
             musculo: r.querySelector('.ex-musculo').value.trim(),
             series: r.querySelector('.ex-series').value ? parseInt(r.querySelector('.ex-series').value, 10) : null,
-            repeticiones: r.querySelector('.ex-reps').value.trim()
+            repeticiones: r.querySelector('.ex-reps').value.trim(),
+            instrucciones: r.querySelector('.ex-instrucciones').value.trim() || null
         })).filter(ej => ej.nombre);
 
         const payload = {
