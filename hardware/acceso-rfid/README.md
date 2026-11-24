@@ -1,10 +1,11 @@
 # Lector de acceso RFID (LILYGO T-SIM7070G + YRM1004)
 
-La puerta del gimnasio: lee el tag UHF de cada socio, le pregunta a GTWeb si puede pasar y responde con LEDs, buzzer y un servo que simula la puerta. Se conecta por WiFi y, si no hay, por datos móviles.
+La puerta del gimnasio: lee el tag UHF de cada socio, le pregunta a GTWeb si puede pasar y responde con LEDs y un buzzer. Se conecta por WiFi y, si no hay, por datos móviles.
 
 | Programa | Para qué |
 |---|---|
 | `prueba_conexion/` | Etapa 1: que la LILYGO hable con el YRM (versión y potencia). |
+| `prueba_salidas/` | Revisar los LEDs y el buzzer, sin YRM ni internet. |
 | `prueba_puerta/` | Etapa 2: LEDs y buzzer con una lista fija, sin internet. |
 | `lector_wifi/` | El lector completo, conectado a GTWeb. |
 
@@ -17,17 +18,17 @@ La puerta del gimnasio: lee el tag UHF de cada socio, le pregunta a GTWeb si pue
 | | EN | 3V3 |
 | | VCC | **5 V externos** (el YRM pide más corriente de la que da la LILYGO) |
 | | GND | GND común |
-| LED verde (entrada, puerta abierta) | ánodo, con resistencia de 220 Ω | GPIO 18 |
+| LED verde (entrada, acceso permitido) | ánodo, con resistencia de 220 Ω | GPIO 18 |
 | LED azul (salida, registro, "sin internet") | ánodo, con 220 Ω | GPIO 19 |
 | LED rojo (negado) | ánodo, con 220 Ω | GPIO 21 |
-| Buzzer activo | + | GPIO 22 |
-| Servo (SG90 o MG90S) | señal (naranja o amarillo) | GPIO 23 |
-| | + (rojo) | **5 V externos** |
-| | − (café o negro) | GND común |
+| Los 3 LEDs | cátodo (pata corta) | GND común |
+| Buzzer pasivo | + | GPIO 22 |
+| | − | GND común |
 
-- **Tierra común:** el GND de la fuente de 5 V, el del YRM, el del servo y el de la LILYGO van juntos. Sin eso el YRM manda tramas con error y el servo tiembla.
-- **Servo:** no lo alimentes del 3V3 de la LILYGO; al moverse baja el voltaje y la placa se reinicia. Un capacitor de 470 µF entre + y − del servo, cerca de él, ayuda.
-- **Buzzer:** si es pasivo (no suena con solo darle voltaje), cámbialo por uno activo o usa un transistor.
+- **Tierra común:** el GND de la fuente de 5 V, el del YRM y el de la LILYGO van juntos. Sin eso el YRM manda tramas con error.
+- **Fuente externa:** solo alimenta al YRM. No lo conectes al 3V3 de la LILYGO: no da la corriente suficiente.
+- **Buzzer:** es pasivo, así que el programa lo hace sonar con un tono de 2.7 kHz (con voltaje fijo no suena). Un buzzer activo también funciona.
+- **Sin mecanismo de puerta por ahora:** el acceso se indica con el LED verde y el pitido. El GPIO 23 queda libre para un servo o una chapa.
 
 ## Internet
 
@@ -46,7 +47,7 @@ La puerta del gimnasio: lee el tag UHF de cada socio, le pregunta a GTWeb si pue
    - el APN.
 
    `secrets.h` no se sube a GitHub.
-3. Súbelo y abre el monitor serie a 115200. Al arrancar se prenden los 3 LEDs, suena un pitido y el servo va a 0°.
+3. Súbelo y abre el monitor serie a 115200. Al arrancar se prenden los 3 LEDs uno por uno y suena un pitido.
 
 ## Monitor serie
 
@@ -55,12 +56,10 @@ La puerta del gimnasio: lee el tag UHF de cada socio, le pregunta a GTWeb si pue
 | `a` | Red automática (WiFi y, si no hay, datos) |
 | `w` · `l` · `g` | Solo WiFi · solo LTE-M · solo 2G |
 | `r` | Estado de la red, del servidor y de la lista local |
-| `p` | Probar la puerta (abre el servo 3 s) |
+| `p` | Probar las señales: entrada (verde, 1 pitido), salida (azul, 2) y negado (rojo, 3) |
 | `n` | Simular un tag desconocido (crea una alerta en el panel) |
 | `+` · `-` | Subir o bajar 1 dBm la potencia del YRM |
 
-Si el servo abre al revés o poco, cambia `SERVO_CERRADO` y `SERVO_ABIERTO` al inicio de `lector_wifi.ino`.
-
 ## Probar sin pasar tarjetas
 
-En el panel, **Mis Usuarios → Simular entrada** hace como si el socio pasara su tarjeta. Con el lector conectado, una entrada permitida mueve el servo de verdad. Ver "Simular entrada" en el README principal.
+En el panel, **Mis Usuarios → Simular entrada** hace como si el socio pasara su tarjeta. Con el lector conectado, una entrada permitida prende el LED verde y suena el pitido de verdad. Ver "Simular entrada" en el README principal.

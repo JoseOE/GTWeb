@@ -182,24 +182,24 @@ public class PedidoService {
     public void confirmarPago(Pedido p) {
         if (Pedido.ESTADO_PAGADO.equals(p.getEstado()) && !p.isPlanAplicado() && p.incluyePlan()) {
             aplicarPlan(p);
-            abrirPuertaSiEspera(p);
+            cerrarAlertaSiEspera(p);
         }
         avisos.alActualizar(p, vista(p));
     }
 
     // Renovó parado en la puerta (el lector lo negó por membresía vencida hace
-    // menos de 10 minutos): ya está al día, así que se abre sin volver a pasar
-    // la tarjeta. Nunca hace fallar el pago.
-    private void abrirPuertaSiEspera(Pedido p) {
+    // menos de 10 minutos): su alerta se cierra y, ya al día, vuelve a pasar su
+    // tarjeta para entrar. Nunca hace fallar el pago.
+    private void cerrarAlertaSiEspera(Pedido p) {
         if (p.getUserId() == null) return;
         try {
             userRepository.findById(p.getUserId()).ifPresent(socio -> {
-                if (controlAcceso.abrirTrasRenovar(socio)) {
-                    log.info("Pedido #{}: {} renovó desde la puerta y se le abrió.", p.getFolio(), socio.getEmail());
+                if (controlAcceso.cerrarTrasRenovar(socio)) {
+                    log.info("Pedido #{}: {} renovó desde la puerta; vuelve a pasar su tarjeta.", p.getFolio(), socio.getEmail());
                 }
             });
         } catch (RuntimeException e) {
-            log.warn("Pedido #{}: no se pudo abrir la puerta tras renovar: {}", p.getFolio(), e.getMessage());
+            log.warn("Pedido #{}: no se pudo cerrar la alerta de la puerta tras renovar: {}", p.getFolio(), e.getMessage());
         }
     }
 

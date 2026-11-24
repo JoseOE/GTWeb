@@ -46,8 +46,8 @@ import java.util.stream.Collectors;
 //   - membresía vencida o tag desconocido  -> NEGADO, y queda una solicitud
 //     para que el dueño decida desde el panel si abre.
 //   - membresía vencida: además le llega al socio un push para renovar desde
-//     la app; si paga mientras la alerta sigue vigente, se abre sola
-//     (RenovacionAccesoService y abrirTrasRenovar).
+//     la app; al pagar, la alerta se cierra y el socio vuelve a pasar su
+//     tarjeta para entrar (RenovacionAccesoService y cerrarTrasRenovar).
 // La decisión del dueño le llega al lector por /api/lectores/comandos, que el
 // lector consulta todo el tiempo (long polling): así no hace falta MQTT.
 @Service
@@ -55,7 +55,7 @@ public class ControlAccesoService {
 
     public static final String LLAVE = "X-Lector-Key";
     public static final String MOTIVO_VENCIDA = "Membresía vencida";
-    // Quién "atendió" una alerta que se abrió sola porque el socio renovó.
+    // Quién "atendió" una alerta que se cerró porque el socio renovó.
     public static final String ATENDIDA_POR_RENOVACION = "renovacion";
 
     // Entre un pase y el siguiente del mismo socio (en la puerta real, 2 min).
@@ -164,9 +164,9 @@ public class ControlAccesoService {
     // Mientras se termina la puerta: el dueño "pasa la tarjeta" de un socio
     // desde Mis Usuarios. Usa las mismas reglas que el lector de verdad:
     //   - membresía vencida → NEGADO, alerta y push para renovar desde la app;
-    //     al pagar, la puerta se abre sola (abrirTrasRenovar).
+    //     al pagar, la alerta se cierra y se vuelve a pasar la tarjeta.
     //   - al día → ENTRADA (o SALIDA si ya estaba dentro) y el lector de la
-    //     puerta, si está conectado, abre el servo.
+    //     puerta, si está conectado, prende el LED verde y pita.
     // Se apaga con ACCESO_SIMULACION=false.
     public Map<String, Object> simulacion(String gymId) {
         Map<String, Object> r = new LinkedHashMap<>();
@@ -539,21 +539,31 @@ public class ControlAccesoService {
         v.put("motivo", s.getMotivo());
         v.put("creadaEn", s.getCreadaEn());
         v.put("venceEn", s.getCreadaEn().plus(VIGENCIA_SOLICITUD));
-        v.put("abiertaPorRenovacion", ATENDIDA_POR_RENOVACION.equals(s.getAtendidaPor()));
+        // Ya no se abre sola al renovar (queda en false); se conserva para las
+        // versiones de la app que lo leen.
+        v.put("abiertaPorRenovacion", SolicitudAcceso.APROBADA.equals(s.getEstado())
+                && ATENDIDA_POR_RENOVACION.equals(s.getAtendidaPor()));
         v.put("lector", lectores.findById(s.getLectorId()).map(Lector::getNombre).orElse(null));
         return v;
     }
 
-    // Se acaba de confirmar un pago que extendió la membresía: si el socio sigue
-    // en la puerta (su alerta por membresía vencida sigue pendiente) y ya está al
-    // día, se abre sin que vuelva a pasar la tarjeta. true si abrió.
-    public boolean abrirTrasRenovar(User socio) {
+    // Se acaba de confirmar un pago que extendió la membresía: si su alerta por
+    // membresía vencida sigue pendiente, se cierra como RENOVADA, sin abrir ni
+    // registrar entrada. Para entrar, el socio vuelve a pasar su tarjeta: así la
+    // puerta solo responde con la persona enfrente y no depende de que una orden
+    // llegue a tiempo al lector. true si cerró la alerta.
+    public boolean cerrarTrasRenovar(User socio) {
         if (socio == null || !membresiaVigente(socio)) return false;
         Instant ahora = Instant.now();
         Optional<SolicitudAcceso> alerta = alertaReciente(socio.getId())
                 .filter(s -> MOTIVO_VENCIDA.equals(s.getMotivo()) && SolicitudAcceso.PENDIENTE.equals(estadoDe(s, ahora)));
         if (alerta.isEmpty()) return false;
-        decidir(alerta.get(), true, ATENDIDA_POR_RENOVACION, "Abierta al renovar desde la app");
+        SolicitudAcceso s = alerta.get();
+        s.setEstado(SolicitudAcceso.RENOVADA);
+        s.setAtendidaEn(ahora);
+        s.setAtendidaPor(ATENDIDA_POR_RENOVACION);
+        s.setComandoEntregado(true);   // el lector no recibe nada
+        solicitudes.save(s);
         return true;
     }
 

@@ -1,5 +1,6 @@
 // Renovar la membresía desde la puerta: el lector niega por membresía vencida,
-// se avisa al socio, la app prepara la renovación, paga y la puerta se abre sola.
+// se avisa al socio, la app prepara la renovación, paga, la alerta se cierra y,
+// al volver a pasar la tarjeta, entra.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { API, ESTADO, MONGO, CONSENTIMIENTO, leerLog } from './entorno.mjs';
@@ -56,16 +57,22 @@ const carrito = r.body?.carrito;
 ok(r.status === 200 && carrito?.items.length === 1 && carrito.items[0].esPlan && carrito.total === r.body.plan.precio,
   'deja el carrito de la app con el plan solo', carrito?.items.map(i => i.titulo));
 
-console.log('\n3. Paga y la puerta se abre sola');
+console.log('\n3. Paga y vuelve a pasar la tarjeta');
 const tok = (await api('POST', '/api/simuladores/stripe/tokens', { numero: '4242424242424242', titular: 'Socio Prueba', mes: '12', anio: '30', cvc: '123' }, member)).body.token;
 r = await api('POST', '/api/tienda/carrito/checkout?canal=app', { metodo: 'stripe', datos: { token: tok }, totalVisto: carrito.total, consentimiento: CONSENTIMIENTO }, member);
 ok(r.status === 200 && r.body.estado === 'pagado', 'pago de la renovación', r.body?.folio ?? r.body?.error);
 r = await api('GET', '/api/lectores/comandos?espera=0', null, null, llave);
-ok(r.status === 200 && r.body.comando === 'abrir' && r.body.solicitudId === solicitudId, 'el lector recibe "abrir"', r.body);
+ok(r.status === 204, 'al pagar, el lector no recibe "abrir"', r.status);
 r = await api('GET', '/api/tienda/renovacion', null, member);
-ok(r.body.vencida === false && r.body.puerta?.estado === 'APROBADA' && r.body.puerta.abiertaPorRenovacion === true, 'la app ve la membresía al día y la puerta abierta', r.body.puerta);
+ok(r.body.vencida === false && r.body.puerta?.estado === 'RENOVADA' && r.body.puerta.abiertaPorRenovacion === false,
+  'la app ve la membresía al día y la alerta cerrada', r.body.puerta);
 r = await api('GET', `/api/gyms/${gymId}/acceso`, null, owner);
-ok(JSON.stringify(r.body).includes('Abierta al renovar desde la app'), 'el historial del panel dice que se abrió al renovar');
+ok(r.body.solicitudes.some(s => s.id === solicitudId && s.estado === 'RENOVADA'), 'en el panel la alerta dice que renovó');
+ok(!r.body.accesos.some(a => a.tipo === 'ENTRADA' && a.epc === epc), 'pagar no registra una entrada');
+r = await api('POST', '/api/lectores/accesos', { epc }, null, llave);
+ok(r.status === 200 && r.body.resultado === 'ENTRADA', 'vuelve a pasar la tarjeta y entra', r.body);
+r = await api('POST', `/api/gyms/${gymId}/acceso/solicitudes/${solicitudId}/abrir`, {}, owner);
+ok(r.status === 409, 'la alerta ya cerrada no se puede abrir desde el panel', r.body?.error);
 
 console.log('\n4. Sin alerta pendiente no se abre nada');
 r = await api('POST', '/api/tienda/renovacion?canal=app', {}, member);

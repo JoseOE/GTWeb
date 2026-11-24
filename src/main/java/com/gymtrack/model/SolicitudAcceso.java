@@ -15,6 +15,9 @@ public class SolicitudAcceso {
     public static final String PENDIENTE = "PENDIENTE";
     public static final String APROBADA = "APROBADA";
     public static final String RECHAZADA = "RECHAZADA";
+    // El socio renovó desde la app: la alerta se cierra sin abrir. Para entrar
+    // vuelve a pasar su tarjeta (ya al día, entra normal).
+    public static final String RENOVADA = "RENOVADA";
 
     @Id
     private String id;

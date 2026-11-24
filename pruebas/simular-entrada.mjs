@@ -1,7 +1,7 @@
 // "Simular entrada" desde Mis Usuarios (prueba mientras se termina la puerta):
 // con la membresía vencida se niega y se avisa para renovar; al pagar desde la
-// app la puerta se abre sola; con la membresía al día entra o sale y el lector
-// recibe "abrir" para mover el servo.
+// app la alerta se cierra y se vuelve a simular; con la membresía al día entra
+// o sale y el lector recibe "abrir" (LED verde y pitido).
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { API, ESTADO, MONGO, CONSENTIMIENTO, leerLog } from './entorno.mjs';
@@ -57,7 +57,7 @@ ok(r.status === 204, 'negado: el lector no recibe "abrir"', r.status);
 r = await api('GET', `/api/gyms/${gymId}/acceso`, null, owner);
 ok(r.body.simulacion === true && r.body.solicitudes.some(s => s.id === solicitudId), 'la alerta aparece en Accesos RFID');
 
-console.log('\n3. Paga desde la app y la puerta se abre sola');
+console.log('\n3. Paga desde la app: la alerta se cierra y no se abre nada');
 r = await api('GET', '/api/tienda/renovacion', null, member);
 ok(r.body?.puerta?.solicitudId === solicitudId && r.body.puerta.estado === 'PENDIENTE', 'la app ve la alerta de la puerta', r.body?.puerta);
 r = await api('POST', '/api/tienda/renovacion?canal=app', {}, member);
@@ -66,21 +66,22 @@ const tok = (await api('POST', '/api/simuladores/stripe/tokens', { numero: '4242
 r = await api('POST', '/api/tienda/carrito/checkout?canal=app', { metodo: 'stripe', datos: { token: tok }, totalVisto: carrito?.total, consentimiento: CONSENTIMIENTO }, member);
 ok(r.status === 200 && r.body.estado === 'pagado', 'paga la renovación', r.body?.folio ?? r.body?.error);
 r = await api('GET', '/api/lectores/comandos?espera=0', null, null, llave);
-ok(r.status === 200 && r.body.comando === 'abrir' && r.body.solicitudId === solicitudId, 'el lector recibe "abrir" de la alerta', r.body);
+ok(r.status === 204, 'al pagar, el lector no recibe "abrir"', r.status);
+r = await api('GET', '/api/tienda/renovacion', null, member);
+ok(r.body?.vencida === false && r.body.puerta?.estado === 'RENOVADA', 'la app ve la membresía al día y la alerta cerrada', r.body?.puerta);
 
-console.log('\n4. Al día: simular otra vez abre la puerta');
+console.log('\n4. Al día: vuelve a pasar la tarjeta y entra');
 r = await simular(member);
-ok(r.body.resultado === 'IGNORADO', 'recién entró: un pase inmediato se ignora', r.body?.resultado);
-await espera(10500);
-r = await simular(member);
-ok(r.body.resultado === 'SALIDA' && r.body.puertaAbierta === true, 'ya estaba dentro: cuenta como salida y abre', r.body);
+ok(r.body.resultado === 'ENTRADA' && r.body.puertaAbierta === true && r.body.nombre === socio.nombre, 'entra con la membresía al día', r.body);
 r = await api('GET', '/api/lectores/comandos?espera=0', null, null, llave);
 ok(r.status === 200 && r.body.comando === 'abrir' && r.body.solicitudId === null && r.body.nombre === socio.nombre, 'el lector recibe "abrir" de la simulación', r.body);
 r = await api('GET', '/api/lectores/comandos?espera=0', null, null, llave);
 ok(r.status === 204, 'y solo una vez', r.status);
+r = await simular(member);
+ok(r.body.resultado === 'IGNORADO', 'recién entró: un pase inmediato se ignora', r.body?.resultado);
 await espera(10500);
 r = await simular(member);
-ok(r.body.resultado === 'ENTRADA' && r.body.puertaAbierta === true && r.body.nombre === socio.nombre, 'entra con la membresía al día', r.body);
+ok(r.body.resultado === 'SALIDA' && r.body.puertaAbierta === true, 'ya estaba dentro: cuenta como salida', r.body);
 r = await api('GET', '/api/lectores/comandos?espera=5', null, null, llave);
 ok(r.status === 200 && r.body.comando === 'abrir', 'el lector que esperaba comandos recibe "abrir"', r.body?.comando);
 r = await api('GET', `/api/gyms/${gymId}/acceso`, null, owner);
