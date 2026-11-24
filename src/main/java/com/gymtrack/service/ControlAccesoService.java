@@ -475,6 +475,58 @@ public class ControlAccesoService {
         lectores.save(l);
     }
 
+    // ─────────────── Entregas en recepción: leer la tarjeta del socio ───────────────
+    // El mismo modo de captura que "Registrar tag nuevo": el siguiente tag que
+    // pase por el lector no abre ni niega, solo se captura (LED azul y pitido
+    // largo). El panel lo usa para buscar los pedidos que ese socio va a recoger.
+
+    // Usa el lector que se conectó más recientemente (en la demo hay uno).
+    public Map<String, Object> iniciarLecturaEntrega(String gymId) {
+        Instant ahora = Instant.now();
+        Lector l = lectores.findByGymId(gymId).stream()
+                .max(Comparator.comparing((Lector x) -> x.getUltimaConexion() == null ? Instant.EPOCH : x.getUltimaConexion()))
+                .orElseThrow(() -> new TiendaException(HttpStatus.NOT_FOUND,
+                        "Tu gimnasio todavía no tiene lector RFID. Usa el QR del comprobante o el folio."));
+        iniciarRegistro(gymId, l.getId());
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("lectorId", l.getId());
+        r.put("lector", l.getNombre());
+        r.put("enLinea", l.getUltimaConexion() != null && Duration.between(l.getUltimaConexion(), ahora).compareTo(EN_LINEA) < 0);
+        r.put("segundos", MODO_REGISTRO.toSeconds());
+        return r;
+    }
+
+    // estado: "esperando" (aún no pasa la tarjeta), "sin_tarjeta" (se acabó el
+    // tiempo), "desconocida" (el tag no es de un socio de este gimnasio) o
+    // "leida" con el socio. La lectura se usa una sola vez.
+    public Map<String, Object> tarjetaParaEntrega(String gymId, String lectorId) {
+        Lector l = lectorDelGimnasio(gymId, lectorId);
+        Instant ahora = Instant.now();
+        Map<String, Object> r = new LinkedHashMap<>();
+        if (l.getEpcCapturado() == null) {
+            boolean esperando = l.getRegistroHasta() != null && ahora.isBefore(l.getRegistroHasta());
+            r.put("estado", esperando ? "esperando" : "sin_tarjeta");
+            return r;
+        }
+        String epc = l.getEpcCapturado();
+        l.setEpcCapturado(null);
+        l.setEpcCapturadoEn(null);
+        lectores.save(l);
+        User socio = tarjetas.findByEpc(epc)
+                .filter(t -> gymId.equals(t.getGymId()))
+                .flatMap(t -> users.findById(t.getUserId()))
+                .filter(u -> gymId.equals(u.getGymId()))
+                .orElse(null);
+        if (socio == null) {
+            r.put("estado", "desconocida");
+            return r;
+        }
+        r.put("estado", "leida");
+        r.put("userId", socio.getId());
+        r.put("nombre", nombreDe(socio));
+        return r;
+    }
+
     private Lector lectorDelGimnasio(String gymId, String lectorId) {
         return lectores.findById(lectorId).filter(l -> gymId.equals(l.getGymId()))
                 .orElseThrow(() -> new TiendaException(HttpStatus.NOT_FOUND, "Ese lector no existe."));

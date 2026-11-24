@@ -1,14 +1,17 @@
 package com.gymtrack.controller;
 
 import com.gymtrack.service.AccesoService;
+import com.gymtrack.service.ControlAccesoService;
 import com.gymtrack.service.FichasService;
 import com.gymtrack.service.TiendaException;
 import com.gymtrack.service.VentasService;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 // Dashboard de ventas del panel: solo el dueño del gimnasio.
@@ -23,11 +26,13 @@ public class VentasController {
     private final VentasService ventas;
     private final AccesoService acceso;
     private final FichasService fichas;
+    private final ControlAccesoService control;
 
-    public VentasController(VentasService ventas, AccesoService acceso, FichasService fichas) {
+    public VentasController(VentasService ventas, AccesoService acceso, FichasService fichas, ControlAccesoService control) {
         this.ventas = ventas;
         this.acceso = acceso;
         this.fichas = fichas;
+        this.control = control;
     }
 
     // GET /resumen?desde=2026-09-03&hasta=2026-10-02 (por defecto, los últimos 30 días)
@@ -93,6 +98,35 @@ public class VentasController {
                                              @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
         acceso.exigirDueno(gymId, userId);
         return ventas.buscarParaEntregar(gymId, codigo);
+    }
+
+    // Entregar con la tarjeta RFID del socio, en lugar del QR:
+    // POST   /entregas/tarjeta              → pone el lector a esperar una tarjeta (60 s)
+    // GET    /entregas/tarjeta?lectorId=…   → {estado, nombre?, pedidos?}
+    // DELETE /entregas/tarjeta?lectorId=…   → cancela la espera
+    @PostMapping("/entregas/tarjeta")
+    public Map<String, Object> esperarTarjeta(@PathVariable String gymId,
+                                              @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
+        acceso.exigirDueno(gymId, userId);
+        return control.iniciarLecturaEntrega(gymId);
+    }
+
+    @GetMapping("/entregas/tarjeta")
+    public Map<String, Object> leerTarjeta(@PathVariable String gymId, @RequestParam String lectorId,
+                                           @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
+        acceso.exigirDueno(gymId, userId);
+        Map<String, Object> r = new LinkedHashMap<>(control.tarjetaParaEntrega(gymId, lectorId));
+        if ("leida".equals(r.get("estado"))) r.put("pedidos", ventas.porEntregarDe(gymId, (String) r.get("userId")));
+        r.remove("userId");
+        return r;
+    }
+
+    @DeleteMapping("/entregas/tarjeta")
+    public ResponseEntity<Void> cancelarTarjeta(@PathVariable String gymId, @RequestParam String lectorId,
+                                                @RequestHeader(value = AccesoService.ENCABEZADO, required = false) String userId) {
+        acceso.exigirDueno(gymId, userId);
+        control.cancelarRegistro(gymId, lectorId);
+        return ResponseEntity.noContent().build();
     }
 
     // Marca como entregados en recepción los productos de un pedido de la tienda o la app.

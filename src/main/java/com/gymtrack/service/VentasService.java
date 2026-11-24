@@ -443,6 +443,16 @@ public class VentasService {
         return detalle(p);
     }
 
+    // Los pedidos que un socio tiene pagados y sin recoger (al pasar su tarjeta
+    // RFID en recepción), del más antiguo al más nuevo.
+    public List<Map<String, Object>> porEntregarDe(String gymId, String socioId) {
+        List<Pedido> lista = mongo.find(Query.query(new Criteria().andOperator(
+                        Criteria.where("gymId").is(gymId), Criteria.where("userId").is(socioId), porEntregar()))
+                .with(Sort.by(Sort.Direction.ASC, "pagadoEn")), Pedido.class);
+        Map<String, User> miembros = miembros(lista);
+        return lista.stream().map(p -> fila(p, miembros)).toList();
+    }
+
     public Map<String, Object> entregar(String gymId, String orderId, String userId) {
         Pedido entregado = pedidos.entregar(exigirPedido(gymId, orderId), userId);
         return detalle(entregado);
