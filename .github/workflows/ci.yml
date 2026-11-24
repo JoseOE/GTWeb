@@ -54,6 +54,8 @@ jobs:
       # Cuenta de administrador solo para las pruebas (pruebas/admin.mjs); la real vive en Render.
       ADMIN_EMAIL: admin@prueba.mx
       ADMIN_PASSWORD: Admin#Prueba2026
+      # "Simular entrada" está apagado en producción; pruebas/simular-entrada.mjs lo necesita.
+      ACCESO_SIMULACION: "true"
     steps:
       - name: Descargar el repositorio
         uses: actions/checkout@v4

@@ -42,6 +42,8 @@ public final class MachineCatalog {
     private static final List<MaquinaCatalogo> CATALOGO = leerCatalogo();
     // Cómo se hace cada ejercicio del catálogo grande, por nombre en minúsculas.
     private static final Map<String, String> INSTRUCCIONES_CATALOGO = indexarInstrucciones();
+    // Fotos de cada ejercicio del catálogo grande, por nombre en minúsculas.
+    private static final Map<String, List<String>> IMAGENES_CATALOGO = indexarImagenes();
 
     private static List<MaquinaCatalogo> leerCatalogo() {
         ObjectMapper json = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -63,8 +65,35 @@ public final class MachineCatalog {
         return m;
     }
 
+    private static Map<String, List<String>> indexarImagenes() {
+        Map<String, List<String>> m = new HashMap<>();
+        for (MaquinaCatalogo maq : CATALOGO) {
+            for (Machine.Exercise e : maq.ejercicios) {
+                if (e.getImagenes() != null && !e.getImagenes().isEmpty()) {
+                    m.putIfAbsent(e.getNombre().trim().toLowerCase(), List.copyOf(e.getImagenes()));
+                }
+            }
+        }
+        return m;
+    }
+
     public static List<MaquinaCatalogo> catalogo() {
         return CATALOGO;
+    }
+
+    // Fotos de un ejercicio por su nombre, si está en el catálogo (o null).
+    public static List<String> imagenes(String nombre) {
+        return nombre == null ? null : IMAGENES_CATALOGO.get(nombre.trim().toLowerCase());
+    }
+
+    // A los ejercicios de una máquina del gimnasio que no traen fotos se les
+    // ponen las del catálogo con el mismo nombre. No se guarda: solo se agrega
+    // a lo que se responde, así también lo ven las máquinas capturadas antes.
+    public static void completarImagenes(Machine m) {
+        if (m.getEjercicios() == null) return;
+        for (Machine.Exercise e : m.getEjercicios()) {
+            if (e.getImagenes() == null || e.getImagenes().isEmpty()) e.setImagenes(imagenes(e.getNombre()));
+        }
     }
 
     // Cómo se hace un ejercicio, si está en alguno de los catálogos.
@@ -79,6 +108,7 @@ public final class MachineCatalog {
         Machine.Exercise c = new Machine.Exercise(UUID.randomUUID().toString(), e.getNombre(), e.getMusculo(),
                 e.getSeries(), e.getRepeticiones());
         c.setInstrucciones(e.getInstrucciones());
+        c.setImagenes(e.getImagenes());
         return c;
     }
 
@@ -149,6 +179,7 @@ public final class MachineCatalog {
     private static Machine.Exercise ej(String nombre, String musculo, int series, String reps) {
         Machine.Exercise e = new Machine.Exercise(UUID.randomUUID().toString(), nombre, musculo, series, reps);
         e.setInstrucciones(INSTRUCCIONES.get(nombre));
+        e.setImagenes(imagenes(nombre));
         return e;
     }
 

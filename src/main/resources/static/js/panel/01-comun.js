@@ -76,6 +76,25 @@ function avatar(nombre) {
     return '<span class="avatar-iniciales" aria-hidden="true">' + escapeHtml(iniciales(nombre)) + '</span>';
 }
 
+// "Coach Arturo" → "Arturo": el panel ya antepone "Coach", y había rutinas
+// guardadas con la palabra repetida.
+function sinPrefijoCoach(nombre) {
+    return String(nombre || '').replace(/^\s*coach\s+/i, '').trim();
+}
+
+// El botón "⋯" con las acciones secundarias de una fila o tarjeta (el mismo
+// criterio que Mis Usuarios: una acción principal a la vista y el resto aquí,
+// con lo destructivo al final y en rojo). `items` ya trae los <li>.
+// strategy fixed: el menú no se recorta dentro de tarjetas con overflow-hidden.
+function menuMas(nombre, items) {
+    return `<div class="dropdown">
+        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-2" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" aria-label="Más acciones para ${escapeHtml(nombre)}">
+            <i class="bx bx-dots-horizontal-rounded" aria-hidden="true"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow-sm">${items}</ul>
+    </div>`;
+}
+
 function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str == null ? '' : String(str);

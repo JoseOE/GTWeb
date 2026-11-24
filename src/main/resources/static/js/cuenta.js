@@ -80,5 +80,8 @@ function botonCargando(btn, cargando, texto) {
     const volver = document.getElementById('cuenta-volver');
     if (!volver || localStorage.getItem('role') !== 'member') return;
     volver.href = 'tienda.html';
+    // El logo también lleva a donde trabaja cada quien, no al sitio público.
+    const logo = document.getElementById('cuenta-logo');
+    if (logo) logo.href = 'tienda.html';
     volver.innerHTML = "<i class='bx bx-store' aria-hidden=\"true\"></i> <span class=\"d-none d-sm-inline\">Tienda</span>";
 })();

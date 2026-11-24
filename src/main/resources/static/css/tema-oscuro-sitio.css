@@ -1,0 +1,156 @@
+/* ═══════════════════════════════════════
+   Tema oscuro del sitio público, la tienda y las páginas legales
+   ───────────────────────────────────────
+   Va después de tema-oscuro.css (que cubre el panel y las páginas con
+   .gym-interior, como el login). Aquí:
+   - La portada (.gym-editorial): en oscuro --ink pasa a ser el texto claro y
+     --paper el fondo oscuro. Las secciones que ya eran oscuras (barra, portada,
+     opiniones, pie…) recuperan sus valores de siempre, así sus hijos se ven
+     igual que en claro.
+   - La tienda (.tienda) y las páginas legales (.legal): superficies blancas a
+     grafito y los avisos de color en tonos oscuros.
+═══════════════════════════════════════ */
+
+/* Botones del tema en la portada y en las páginas legales. */
+.nav-tema,
+.legal-tema {
+    display: inline-grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: #e9e8e1;
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: background-color .2s ease;
+}
+.nav-tema:hover,
+.legal-tema:hover { background: rgba(255, 255, 255, .1); }
+.nav-tema:focus-visible,
+.legal-tema:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.legal-barra .contenedor .legal-tema { margin-left: auto; margin-right: 4px; }
+
+/* ─── Portada (index.html) ─── */
+[data-bs-theme="dark"] .gym-editorial,
+[data-bs-theme="dark"] body.gym-editorial {
+    --ink: #ecebe6;
+    --paper: #121315;
+    --muted: #a4a69d;
+    --line: #2e3035;
+    --brand-dark: #ff8c66;
+    background: #121315;
+    color: #ecebe6;
+}
+/* Secciones que ya eran oscuras: con sus valores de siempre. */
+[data-bs-theme="dark"] .gym-editorial #main-navbar,
+[data-bs-theme="dark"] .gym-editorial .athletic-hero,
+[data-bs-theme="dark"] .gym-editorial .opinions-section,
+[data-bs-theme="dark"] .gym-editorial .editorial-footer,
+[data-bs-theme="dark"] .gym-editorial .solucion.es-destacado,
+[data-bs-theme="dark"] .gym-editorial .ecosystem-photo,
+[data-bs-theme="dark"] .gym-editorial .hero-visual,
+[data-bs-theme="dark"] .gym-editorial .solucion-foto,
+[data-bs-theme="dark"] .gym-editorial .acceso-foto,
+[data-bs-theme="dark"] .gym-editorial .gt-button-dark,
+[data-bs-theme="dark"] .gym-editorial .catalog-filters button[aria-pressed="true"],
+[data-bs-theme="dark"] .gym-editorial .solucion-icono,
+[data-bs-theme="dark"] .gym-editorial .mapa-globo {
+    --ink: #20221f;
+    --paper: #f4f2eb;
+    --muted: #62645d;
+    --line: #d5d6cc;
+}
+/* La franja naranja de contacto: su botón oscuro se queda oscuro. */
+[data-bs-theme="dark"] .gym-editorial .gt-button-dark { background: #20221f; color: #f4f2eb; }
+[data-bs-theme="dark"] .gym-editorial .gt-button-dark:hover { background: #373a33; }
+[data-bs-theme="dark"] .gym-editorial .ecosystem-section { background: #17181b; }
+[data-bs-theme="dark"] .gym-editorial .solucion { background: #1b1c1f; border-color: #2e3035; }
+[data-bs-theme="dark"] .gym-editorial .solucion:hover { border-color: #5c5f66; }
+[data-bs-theme="dark"] .gym-editorial .solucion-icono { box-shadow: 0 0 0 4px #1b1c1f; }
+[data-bs-theme="dark"] .gym-editorial .solucion-precio .text-success { color: #86d49f !important; }
+[data-bs-theme="dark"] .gym-editorial .development-note { background: #26282c; color: #c9cbc2; }
+[data-bs-theme="dark"] .gym-editorial .development-note.available-note { background: rgba(46, 139, 87, .18); color: #8fd6a8; }
+[data-bs-theme="dark"] .gym-editorial .feature-accordion,
+[data-bs-theme="dark"] .gym-editorial .feature-accordion details { border-color: #3a3c41; }
+[data-bs-theme="dark"] .gym-editorial .catalog-state button,
+[data-bs-theme="dark"] .gym-editorial .slider-flecha,
+[data-bs-theme="dark"] .gym-editorial .catalog-filters button { border-color: #4a4d53; color: #ecebe6; }
+[data-bs-theme="dark"] .gym-editorial .location-section .map-frame { background: #1d1f22; }
+[data-bs-theme="dark"] .gym-editorial .text-link { border-bottom-color: #6d7068; }
+[data-bs-theme="dark"] .gym-editorial .solucion-modal .modal-content { background: #1d1f22; color: #ecebe6; }
+[data-bs-theme="dark"] .gym-editorial fieldset:disabled .btn-primary { background: #2e3035 !important; border-color: #2e3035 !important; color: #8d8f86 !important; }
+[data-bs-theme="dark"] html,
+[data-bs-theme="dark"] { scrollbar-color: #4a4d53 #121315; }
+
+/* ─── Tienda (tienda, producto, checkout, confirmación, pedidos) ─── */
+[data-bs-theme="dark"] .tienda { --paper: #121315; --ink: #ecebe6; --muted: #a4a69d; --line: #2e3035; --brand-dark: #ff8c66; }
+[data-bs-theme="dark"] .tienda .tienda-nav { --paper: #f4f2eb; --ink: #20221f; background: #0b0c0d; }
+[data-bs-theme="dark"] .tienda .estado-membresia,
+[data-bs-theme="dark"] .tienda .chip,
+[data-bs-theme="dark"] .tienda .plan-card,
+[data-bs-theme="dark"] .tienda .producto-card,
+[data-bs-theme="dark"] .tienda .cantidad,
+[data-bs-theme="dark"] .tienda .resenas-resumen,
+[data-bs-theme="dark"] .tienda .resena-form,
+[data-bs-theme="dark"] .tienda .pedido-calificar a,
+[data-bs-theme="dark"] .tienda .carrusel-tarjeta,
+[data-bs-theme="dark"] .tienda .icono-redondo,
+[data-bs-theme="dark"] .tienda .paso,
+[data-bs-theme="dark"] .tienda .metodo-opcion,
+[data-bs-theme="dark"] .tienda .pedido-card,
+[data-bs-theme="dark"] .tienda .aviso-tienda,
+[data-bs-theme="dark"] .tienda .pago-externo {
+    background: #1b1c1f;
+    border-color: #2e3035;
+    color: #ecebe6;
+}
+/* Los logos de las formas de pago, el del gimnasio y el QR van sobre blanco para que se lean. */
+[data-bs-theme="dark"] .tienda .logo-pago,
+[data-bs-theme="dark"] .tienda .tienda-encabezado .logo-gym,
+[data-bs-theme="dark"] .tienda .recoger-qr { background: #fff; }
+[data-bs-theme="dark"] .tienda .plan-card.destacado { --paper: #f4f2eb; --ink: #20221f; background: #0b0c0d; border-color: var(--brand); }
+[data-bs-theme="dark"] .tienda .chip[aria-pressed="true"] { background: #ecebe6; color: #b73511; border-color: #ecebe6; }
+[data-bs-theme="dark"] .tienda .producto-card:hover,
+[data-bs-theme="dark"] .tienda .carrusel-tarjeta:hover { border-color: #5c5f66; }
+[data-bs-theme="dark"] .tienda .producto-card .foto,
+[data-bs-theme="dark"] .tienda .partida .miniatura,
+[data-bs-theme="dark"] .tienda .carrusel-foto,
+[data-bs-theme="dark"] .tienda .detalle-foto,
+[data-bs-theme="dark"] .tienda .resenas-barra { background: #24262a; }
+[data-bs-theme="dark"] .tienda .producto-card .foto i,
+[data-bs-theme="dark"] .tienda .carrusel-foto i,
+[data-bs-theme="dark"] .tienda .detalle-foto i,
+[data-bs-theme="dark"] .tienda .estado-vacio > i { color: #6d7068; }
+[data-bs-theme="dark"] .tienda .esqueleto { background: linear-gradient(90deg, #1d1f22 25%, #26282c 37%, #1d1f22 63%); background-size: 400% 100%; }
+[data-bs-theme="dark"] .tienda .estado-vacio { background: #17181b; border-color: #2e3035; }
+[data-bs-theme="dark"] .tienda .boton-quitar:hover { background: #2e3035; color: #ff8a8a; }
+[data-bs-theme="dark"] .tienda .estrellas,
+[data-bs-theme="dark"] .tienda .resenas-distribucion li i,
+[data-bs-theme="dark"] .tienda .selector-estrellas label.activa,
+[data-bs-theme="dark"] .tienda .pedido-calificar a i { color: #f2b44a; }
+[data-bs-theme="dark"] .tienda .resenas-barra > span { background: #f2b44a; }
+[data-bs-theme="dark"] .tienda .aviso-sanitario { background: rgba(242, 165, 65, .12); border-color: rgba(242, 165, 65, .4); }
+[data-bs-theme="dark"] .tienda .aviso-sanitario i,
+[data-bs-theme="dark"] .tienda .aviso-sanitario a { color: #f3c97a; }
+[data-bs-theme="dark"] .tienda .estado-pedido.pagado { background: rgba(46, 139, 87, .18); color: #8fd6a8; }
+[data-bs-theme="dark"] .tienda .estado-pedido.pendiente_pago { background: rgba(244, 81, 36, .16); color: #ff9a7a; }
+[data-bs-theme="dark"] .tienda .estado-pedido.reembolsado,
+[data-bs-theme="dark"] .tienda .estado-entrega.entregado { background: #2a2c31; color: #c9cbc2; }
+[data-bs-theme="dark"] .tienda .estado-entrega.pendiente { background: rgba(91, 141, 239, .16); color: #9dbcf7; }
+[data-bs-theme="dark"] .tienda .pago-prueba { background: rgba(242, 165, 65, .14); color: #f3c97a; }
+[data-bs-theme="dark"] .tienda .icono-whatsapp { color: #4cd38a; }
+[data-bs-theme="dark"] .offcanvas { --bs-offcanvas-bg: #17181b; }
+
+/* ─── Páginas legales (privacidad y términos) ─── */
+[data-bs-theme="dark"] .legal { --paper: #121315; --ink: #ecebe6; --muted: #a4a69d; --line: #2e3035; background: #121315; color: #ecebe6; }
+[data-bs-theme="dark"] .legal .legal-barra,
+[data-bs-theme="dark"] .legal .legal-leyenda { background: #0b0c0d; }
+[data-bs-theme="dark"] .legal .legal-aviso,
+[data-bs-theme="dark"] .legal .legal-vendedor { background: #1b1c1f; border-color: #2e3035; }
+[data-bs-theme="dark"] .legal .btn-preferencias:hover { background: #ecebe6; color: #121315; }
+@media print {
+    /* Al imprimir, siempre claro. */
+    [data-bs-theme="dark"] .legal { background: #fff; color: #20221f; }
+}

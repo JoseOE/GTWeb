@@ -6,7 +6,13 @@
    acciones (entregar, recibos, cancelar). Todo sale de
    la colección de pedidos.
 ═══════════════════════════════════════ */
-const COLORES_VENTAS = ['#f45124', '#20221f', '#8a8c82', '#f2a541', '#5b8def'];
+// En oscuro el segundo color (casi negro) se cambia por uno claro para que se vea.
+const COLORES_VENTAS_CLARO = ['#f45124', '#20221f', '#8a8c82', '#f2a541', '#5b8def'];
+const COLORES_VENTAS_OSCURO = ['#f45124', '#ecebe6', '#8a8c82', '#f2a541', '#5b8def'];
+const temaOscuro = () => document.documentElement.getAttribute('data-bs-theme') === 'dark';
+let ultimasVentasGraficas = null;
+// Al cambiar de tema se vuelven a pintar las gráficas con sus colores.
+document.addEventListener('tema-cambio', () => { if (ultimasVentasGraficas) pintarGraficasVentas(ultimasVentasGraficas); });
 const CANALES_VENTAS = { web: 'Página web', app: 'App', mostrador: 'Mostrador' };
 const ESTADOS_VENTAS = {
     pagado: { texto: 'Pagado', clase: 'bg-success-subtle text-success-emphasis' },
@@ -148,6 +154,8 @@ function cargarChartJs() {
 function pintarGraficasVentas(r) {
     const dias = document.getElementById('ventas-dias');
     const metodos = document.getElementById('ventas-metodos');
+    ultimasVentasGraficas = r;
+    const COLORES_VENTAS = temaOscuro() ? COLORES_VENTAS_OSCURO : COLORES_VENTAS_CLARO;
     cargarChartJs().then(Chart => {
         graficasVentas.forEach(g => g.destroy());
         graficasVentas = [];
@@ -161,7 +169,8 @@ function pintarGraficasVentas(r) {
         }
         const sinAnimacion = matchMedia('(prefers-reduced-motion: reduce)').matches;
         Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
-        Chart.defaults.color = '#62645d';
+        Chart.defaults.color = temaOscuro() ? '#a4a69d' : '#62645d';
+        Chart.defaults.borderColor = temaOscuro() ? 'rgba(255, 255, 255, .08)' : 'rgba(0, 0, 0, .1)';
 
         dias.innerHTML = '<canvas role="img" aria-label="Ventas por día del periodo"></canvas>';
         graficasVentas.push(new Chart(dias.querySelector('canvas'), {

@@ -89,7 +89,7 @@ public class ControlAccesoService {
     public ControlAccesoService(LectorRepository lectores, TarjetaRepository tarjetas, AccesoRepository accesos,
                                 SolicitudAccesoRepository solicitudes, UserRepository users,
                                 MongoTemplate mongo, RenovacionAccesoService renovacion,
-                                @Value("${acceso.simulacion:true}") boolean simulacion) {
+                                @Value("${acceso.simulacion:false}") boolean simulacion) {
         this.simulacion = simulacion;
         this.lectores = lectores;
         this.tarjetas = tarjetas;
@@ -167,7 +167,7 @@ public class ControlAccesoService {
     //     al pagar, la alerta se cierra y se vuelve a pasar la tarjeta.
     //   - al día → ENTRADA (o SALIDA si ya estaba dentro) y el lector de la
     //     puerta, si está conectado, prende el LED verde y pita.
-    // Se apaga con ACCESO_SIMULACION=false.
+    // Apagado por defecto (sitio público); se prende con ACCESO_SIMULACION=true.
     public Map<String, Object> simulacion(String gymId) {
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("activa", simulacion);

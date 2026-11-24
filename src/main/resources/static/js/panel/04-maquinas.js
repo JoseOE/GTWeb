@@ -10,15 +10,18 @@ function initMachines() {
     const saveBtn = document.getElementById('machine-save-btn');
     const rows = document.getElementById('exercise-rows');
 
-    // Una fila por ejercicio. El id viaja oculto para no perder la
-    // referencia de ejercicios que ya existían al editar la máquina.
+    // Una fila por ejercicio. El id y las fotos viajan ocultos para no perder
+    // la referencia de ejercicios que ya existían al editar la máquina.
     function addExerciseRow(ej) {
         ej = ej || {};
         const row = document.createElement('div');
         row.className = 'row g-2 align-items-end exercise-row';
+        const fotos = Array.isArray(ej.imagenes) ? ej.imagenes : [];
         row.innerHTML = `
             <input type="hidden" class="ex-id" value="${escapeHtml(ej.id || '')}">
-            <div class="col-md-4">
+            <input type="hidden" class="ex-imagenes" value="${escapeHtml(JSON.stringify(fotos))}">
+            <div class="col-md-4 d-flex align-items-center gap-2">
+                ${fotos.length ? `<img src="${escapeHtml(fotos[0])}" alt="" class="ejercicio-foto ejercicio-foto-sm" loading="lazy">` : ''}
                 <input type="text" class="form-control form-control-sm ex-nombre" placeholder="Ejercicio" value="${escapeHtml(ej.nombre || '')}">
             </div>
             <div class="col-md-3">
@@ -94,7 +97,8 @@ function initMachines() {
             musculo: r.querySelector('.ex-musculo').value.trim(),
             series: r.querySelector('.ex-series').value ? parseInt(r.querySelector('.ex-series').value, 10) : null,
             repeticiones: r.querySelector('.ex-reps').value.trim(),
-            instrucciones: r.querySelector('.ex-instrucciones').value.trim() || null
+            instrucciones: r.querySelector('.ex-instrucciones').value.trim() || null,
+            imagenes: JSON.parse(r.querySelector('.ex-imagenes').value || '[]')
         })).filter(ej => ej.nombre);
 
         const payload = {
@@ -141,6 +145,26 @@ function initMachines() {
    trae sus ejercicios con músculo, series y cómo se hacen; el dueño marca los
    que sí se hacen en su gimnasio y la máquina se agrega (o se completa si ya
    la tenía). Esos ejercicios son los que luego elige en las rutinas. */
+// Las fotos de cómo se hace un ejercicio: posición inicial y final.
+function fotosEjercicio(e) {
+    const fotos = (e.imagenes || []).slice(0, 2);
+    if (!fotos.length) return '';
+    const pasos = ['Inicio', 'Final'];
+    return `<span class="ejercicio-fotos">${fotos.map((src, i) => `
+        <figure class="mb-0">
+            <img src="${escapeHtml(src)}" alt="${escapeHtml(e.nombre)}: ${pasos[i].toLowerCase()}" class="ejercicio-foto" loading="lazy" width="120" height="90">
+            <figcaption>${pasos[i]}</figcaption>
+        </figure>`).join('')}</span>`;
+}
+
+// La foto de portada de una máquina del catálogo: la de su primer ejercicio con foto.
+function portadaMaquina(m) {
+    const ej = (m.ejercicios || []).find(e => (e.imagenes || []).length);
+    return ej
+        ? `<img src="${escapeHtml(ej.imagenes[0])}" alt="" class="catalogo-portada mb-3" loading="lazy">`
+        : '<div class="catalogo-portada ejercicio-sin-foto mb-3" aria-hidden="true"><i class="bx bx-dumbbell"></i></div>';
+}
+
 function initCatalogoMaquinas() {
     const modal = new bootstrap.Modal(document.getElementById('catalogoModal'));
     const chips = document.getElementById('catalogo-categorias');
@@ -186,8 +210,9 @@ function initCatalogoMaquinas() {
             const musculos = [...new Set(m.ejercicios.map(e => e.musculo))];
             const abiertaAqui = abierta === m.nombre;
             return `
-                <div class="col-md-6 col-xl-4">
-                    <div class="border rounded-4 p-3 h-100 d-flex flex-column ${m.machineId ? 'border-success-subtle' : ''}">
+                <div class="${abiertaAqui ? 'col-12' : 'col-md-6 col-xl-4'}">
+                    <div class="catalogo-maquina border rounded-4 p-3 h-100 d-flex flex-column ${m.machineId ? 'border-success-subtle' : ''} ${abiertaAqui ? 'es-abierta' : ''}">
+                        ${abiertaAqui ? '' : portadaMaquina(m)}
                         <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
                             <h6 class="fw-bold mb-0">${escapeHtml(m.nombre)}</h6>
                             ${m.machineId ? '<span class="badge rounded-pill bg-success-subtle text-success-emphasis flex-shrink-0">' + (completa ? 'Ya la tienes' : 'La tienes · faltan ejercicios') + '</span>' : ''}
@@ -195,16 +220,17 @@ function initCatalogoMaquinas() {
                         <p class="text-body-secondary small mb-2">${escapeHtml(m.descripcion || '')}</p>
                         <div class="d-flex flex-wrap gap-1 mb-3">${musculos.map(mu => '<span class="badge rounded-pill bg-body-secondary text-body-secondary">' + escapeHtml(mu) + '</span>').join('')}</div>
                         ${abiertaAqui ? `
-                            <div class="mb-3 small">
+                            <div class="catalogo-ejercicios mb-3 small">
                                 ${m.ejercicios.map((e, i) => {
                                     const ya = tiene.has(e.nombre.trim().toLowerCase());
                                     const id = 'cat-' + btoa(unescape(encodeURIComponent(m.nombre))).replace(/[^a-z0-9]/gi, '') + '-' + i;
-                                    return `<div class="form-check border-bottom py-1">
+                                    return `<div class="form-check catalogo-ejercicio">
                                         <input class="form-check-input" type="checkbox" id="${id}" data-ej="${escapeHtml(e.nombre)}" ${ya ? 'checked disabled' : 'checked'}>
                                         <label class="form-check-label d-block" for="${id}">
                                             <span class="fw-semibold">${escapeHtml(e.nombre)}</span>
                                             <span class="text-body-secondary"> · ${escapeHtml(e.musculo)} · ${e.series} × ${escapeHtml(e.repeticiones)}${ya ? ' · ya la tienes' : ''}</span>
-                                            <span class="d-block text-body-secondary fst-italic">${escapeHtml(e.instrucciones || '')}</span>
+                                            ${fotosEjercicio(e)}
+                                            <span class="d-block text-body-secondary">${escapeHtml(e.instrucciones || '')}</span>
                                         </label>
                                     </div>`;
                                 }).join('')}
@@ -238,11 +264,16 @@ function initCatalogoMaquinas() {
 
     lista.addEventListener('click', e => {
         const abrir = e.target.closest('[data-abrir]');
-        if (abrir) { abierta = abrir.dataset.abrir; pintar(); return; }
+        if (abrir) {
+            abierta = abrir.dataset.abrir;
+            pintar();
+            lista.querySelector('.es-abierta')?.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+            return;
+        }
         if (e.target.closest('[data-cerrar]')) { abierta = null; pintar(); return; }
         const agregar = e.target.closest('[data-agregar]');
         if (!agregar) return;
-        const tarjeta = agregar.closest('.border');
+        const tarjeta = agregar.closest('.catalogo-maquina');
         const ejercicios = [...tarjeta.querySelectorAll('input[data-ej]:checked:not(:disabled)')].map(i => i.dataset.ej);
         if (!ejercicios.length) { avisar('Marca al menos un ejercicio.', 'warning'); return; }
         agregar.disabled = true;
@@ -304,8 +335,11 @@ function loadMachines(gymId) {
                                 <div class="mb-3">
                                     ${(m.ejercicios || []).length
                                         ? (m.ejercicios || []).map(ej => `
-                                            <div class="d-flex justify-content-between align-items-center border-bottom py-1">
-                                                <span class="small">${escapeHtml(ej.nombre)}
+                                            <div class="maquina-ejercicio">
+                                                ${(ej.imagenes || []).length
+                                                    ? `<img src="${escapeHtml(ej.imagenes[0])}" alt="" class="ejercicio-foto ejercicio-foto-sm" loading="lazy">`
+                                                    : '<span class="ejercicio-foto ejercicio-foto-sm ejercicio-sin-foto" aria-hidden="true"><i class="bx bx-dumbbell"></i></span>'}
+                                                <span class="small flex-grow-1">${escapeHtml(ej.nombre)}
                                                     ${ej.musculo ? '<span class="text-body-secondary"> · ' + escapeHtml(ej.musculo) + '</span>' : ''}
                                                 </span>
                                                 <span class="text-body-secondary small flex-shrink-0 ps-2">${ej.series || '-'}${ej.repeticiones ? ' x ' + escapeHtml(ej.repeticiones) : ''}</span>

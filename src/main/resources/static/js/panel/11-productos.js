@@ -301,9 +301,12 @@ function renderProductos() {
                     </div>
                     <small class="text-body-secondary mb-2">${escapeHtml(p.categoria ? p.categoria.nombre : 'Sin categoría')} · desde <strong>${dinero(p.precioDesde)}</strong></small>
                     <div class="small mb-3">${lineas}${mas}</div>
-                    <div class="mt-auto d-flex gap-2">
-                        <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-editar-producto="${escapeHtml(p.id)}">Editar</button>
-                        <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-3" data-borrar-producto="${escapeHtml(p.id)}">Eliminar</button>
+                    <div class="mt-auto d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3 flex-grow-1" data-editar-producto="${escapeHtml(p.id)}"><i class="bx bx-edit-alt" aria-hidden="true"></i> Editar</button>
+                        ${menuMas(p.nombre, `
+                            <li><a class="dropdown-item" href="producto.html?id=${encodeURIComponent(p.id)}" target="_blank" rel="noopener"><i class="bx bx-show me-2" aria-hidden="true"></i>Ver en la tienda</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><button type="button" class="dropdown-item text-danger" data-borrar-producto="${escapeHtml(p.id)}"><i class="bx bx-trash me-2" aria-hidden="true"></i>Eliminar producto</button></li>`)}
                     </div>
                 </div>
             </div>

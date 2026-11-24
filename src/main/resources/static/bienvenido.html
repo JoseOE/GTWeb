@@ -12,20 +12,22 @@
     <link rel="stylesheet" href="css/editorial.css">
     <link rel="stylesheet" href="css/panel.css">
     <link rel="stylesheet" href="css/portada.css">
+    <link rel="stylesheet" href="css/tema-oscuro.css">
+    <script src="js/tema.js"></script>
     <script src="js/sesion.js" data-protegida></script>
 </head>
 <body class="gym-interior panel-pagina bg-body-tertiary d-flex flex-column">
 
     <nav class="navbar navbar-dark bg-dark panel-barra">
         <div class="container-fluid px-3 px-lg-4">
-            <a class="navbar-brand fw-bold fs-3 d-flex align-items-center gap-2" href="index.html">
-                <i class='bx bx-dumbbell text-primary fs-2'></i>
+            <a class="navbar-brand fw-bold fs-3 d-flex align-items-center gap-2" href="bienvenido.html" aria-label="GymTrack: ir al Resumen">
+                <i class='bx bx-dumbbell text-primary fs-2' aria-hidden="true"></i>
                 <span>Gym<span class="text-primary">Track</span></span>
             </a>
             <div class="ms-auto d-flex align-items-center gap-1 gap-sm-2">
-                <a href="index.html" class="panel-barra-enlace d-none d-sm-inline-flex">
-                    <i class='bx bx-globe' aria-hidden="true"></i> Ver sitio público
-                </a>
+                <button type="button" class="panel-barra-enlace panel-tema" data-tema-alternar aria-label="Cambiar a tema oscuro">
+                    <i class='bx bx-moon' aria-hidden="true"></i>
+                </button>
                 <a href="cuenta.html" class="panel-cuenta" title="Mi cuenta">
                     <span class="panel-avatar" id="nav-avatar" aria-hidden="true"></span>
                     <span class="panel-cuenta-texto d-none d-md-flex">
