@@ -316,7 +316,7 @@ function pintarIdentidad(nombre, logo) {
 }
 
 function unlockGymFeatures(gymId) {
-    ['routine-new-btn', 'member-new-btn', 'machine-new-btn', 'machine-import-btn', 'producto-nuevo-btn', 'plan-nuevo-btn']
+    ['routine-new-btn', 'member-new-btn', 'machine-catalogo-btn', 'producto-nuevo-btn', 'plan-nuevo-btn']
         .forEach(id => { document.getElementById(id).disabled = false; });
     loadRoutines(gymId);
     loadMembers(gymId);

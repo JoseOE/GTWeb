@@ -1132,40 +1132,36 @@
                         <h3 class="fw-bold mb-1"><i class='bx bx-cog text-primary me-1'></i> Máquinas y ejercicios</h3>
                         <p class="text-body-secondary mb-0">Cada máquina de tu gimnasio con los ejercicios que sí se pueden hacer en ella. Es lo que tus usuarios eligen al registrar un entrenamiento.</p>
                     </div>
-                    <div class="d-flex flex-wrap gap-2">
-                        <button type="button" class="btn btn-outline-primary rounded-pill px-3" id="machine-catalogo-btn" disabled>
-                            <i class='bx bx-library'></i> Catálogo de máquinas
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary rounded-pill px-3" id="machine-import-btn" disabled>
-                            <i class='bx bx-download'></i> Importar básicas
-                        </button>
-                        <button type="button" class="btn btn-primary rounded-pill px-4" id="machine-new-btn" disabled>
-                            <i class='bx bx-plus'></i> Nueva máquina
-                        </button>
-                    </div>
+                    <button type="button" class="btn btn-primary rounded-pill px-4" id="machine-catalogo-btn" disabled>
+                        <i class='bx bx-plus'></i> Agregar máquina
+                    </button>
                 </div>
                 <div id="machines-container"></div>
             </div>
 
-            <!-- ─── MODAL: CATÁLOGO DE MÁQUINAS ───
-                 GET/POST /api/gyms/{id}/machines/catalogo: máquinas comunes por
-                 categoría; el dueño elige cuáles agregar y con qué ejercicios. -->
+            <!-- ─── MODAL: AGREGAR MÁQUINA (js/panel/04-maquinas.js) ───
+                 Tres pasos sobre el catálogo (GET/POST /api/gyms/{id}/machines/catalogo):
+                 el músculo, la máquina y los ejercicios que sí se hacen en ella.
+                 Si no está en el catálogo, "Crear una a mano" abre el formulario. -->
             <div class="modal fade" id="catalogoModal" tabindex="-1" aria-labelledby="catalogoModalLabel" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
                     <div class="modal-content border-0 rounded-4">
-                        <div class="modal-header border-0 pb-0">
-                            <div>
-                                <h5 class="modal-title fw-bold" id="catalogoModalLabel">Catálogo de máquinas</h5>
-                                <p class="text-body-secondary small mb-0">Elige la categoría, abre una máquina y marca los ejercicios que sí se hacen en tu gimnasio. Después los usas en las rutinas.</p>
+                        <div class="modal-header border-0 pb-0 align-items-start">
+                            <div class="flex-grow-1 min-w-0">
+                                <h5 class="modal-title fw-bold" id="catalogoModalLabel">Agregar máquina</h5>
+                                <ol class="agregar-pasos" id="agregar-pasos" aria-label="Pasos">
+                                    <li data-paso="1"><span>1</span> Músculo</li>
+                                    <li data-paso="2"><span>2</span> Máquina</li>
+                                    <li data-paso="3"><span>3</span> Ejercicios</li>
+                                </ol>
                             </div>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                         </div>
                         <div class="modal-body">
-                            <div class="d-flex flex-wrap gap-2 mb-3" id="catalogo-categorias" role="tablist" aria-label="Categorías de máquinas"></div>
-                            <input type="search" class="form-control form-control-sm mb-3" id="catalogo-buscar" placeholder="Buscar máquina o ejercicio (ej. sentadilla, poleas, bíceps)" aria-label="Buscar en el catálogo">
                             <div id="catalogo-alert" class="alert d-none py-2 small" role="alert"></div>
-                            <div class="row g-3" id="catalogo-lista"></div>
+                            <div id="agregar-contenido" aria-live="polite"></div>
                         </div>
+                        <div class="modal-footer border-0 pt-0 justify-content-between" id="agregar-pie"></div>
                     </div>
                 </div>
             </div>

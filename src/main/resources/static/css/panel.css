@@ -388,19 +388,63 @@ a.panel-cuenta:focus-visible { background: rgba(244, 242, 235, .1); color: var(-
 .ejercicio-sin-foto { display: grid; place-items: center; color: var(--muted); font-size: 1.1rem; }
 .ejercicio-fotos { display: flex; gap: 8px; margin: 8px 0 6px; }
 .ejercicio-fotos figcaption { font-size: .6875rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
-/* Al abrir una máquina ocupa todo el ancho y sus ejercicios van en cuadrícula. */
+/* ─── Agregar máquina: músculo → máquina → ejercicios ─── */
+.agregar-pasos { display: flex; flex-wrap: wrap; gap: 4px 16px; list-style: none; padding: 0; margin: 8px 0 0; font-size: .8125rem; color: var(--muted); }
+.agregar-pasos li { display: inline-flex; align-items: center; gap: 6px; }
+.agregar-pasos li span {
+    display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+    border: 1.5px solid currentColor; font-size: .75rem; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.agregar-pasos li.es-actual { color: var(--ink); font-weight: 600; }
+.agregar-pasos li.es-actual span { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.agregar-pasos li.es-hecho { color: var(--ink); }
+.agregar-pasos li.es-hecho span { background: rgba(var(--brand-rgb), .14); border-color: transparent; color: var(--brand-dark, #b73511); }
+
+/* Paso 1: un mosaico por músculo con la ilustración de uno de sus ejercicios. */
+.agregar-musculos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.agregar-musculo {
+    position: relative; display: block; padding: 0; overflow: hidden; text-align: left;
+    aspect-ratio: 5 / 4; border: 1px solid var(--line); border-radius: 14px; background: #0d0d0f; color: #fff;
+    transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.agregar-musculo img, .agregar-musculo .ejercicio-sin-foto { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.agregar-musculo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, .78)); }
+.agregar-musculo-nombre, .agregar-musculo-conteo { position: absolute; left: 12px; z-index: 1; }
+.agregar-musculo-nombre { bottom: 26px; font-weight: 700; font-size: 1.05rem; }
+.agregar-musculo-conteo { bottom: 9px; font-size: .75rem; opacity: .8; }
+.agregar-musculo:hover:not(:disabled) { border-color: var(--brand); box-shadow: 0 6px 18px rgba(0, 0, 0, .18); }
+.agregar-musculo:active:not(:disabled) { transform: scale(.98); }
+.agregar-musculo:focus-visible, .agregar-maquina:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.agregar-musculo:disabled { opacity: .45; }
+
+/* Paso 2: tarjetas de máquina (todo el botón es el clic). */
+.agregar-maquina {
+    display: flex; flex-direction: column; width: 100%; height: 100%; padding: 0; overflow: hidden; text-align: left;
+    border: 1px solid var(--line); border-radius: 14px; background: var(--surface, #fff); color: inherit;
+    transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.agregar-maquina:hover { border-color: var(--brand); box-shadow: 0 6px 18px rgba(0, 0, 0, .12); }
+.agregar-maquina:active { transform: scale(.99); }
+.agregar-portada { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; object-position: 50% 30%; background: #0d0d0f; }
+.agregar-portada.ejercicio-sin-foto { display: grid; font-size: 2rem; }
+.agregar-maquina-texto { display: block; padding: 12px 14px 14px; }
+
+/* Paso 3: los ejercicios con casilla. */
 .catalogo-ejercicios { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .catalogo-ejercicio { margin: 0; padding: 12px 12px 12px 2.25em; border: 1px solid var(--line); border-radius: 10px; }
-.catalogo-ejercicio:has(.form-check-input:checked:not(:disabled)) { border-color: rgba(var(--brand-rgb), .55); }
-.catalogo-maquina.es-abierta { border-color: var(--ink) !important; }
-.catalogo-portada {
-    width: 100%;
-    aspect-ratio: 16 / 9;
-    object-fit: cover;
-    border-radius: 10px;
-    background: var(--surface-2, #e8e9df);
+.catalogo-ejercicio:has(.form-check-input:checked:not(:disabled)) { border-color: rgba(var(--brand-rgb), .55); background: rgba(var(--brand-rgb), .04); }
+.catalogo-ejercicio.es-propio { opacity: .7; }
+
+/* Listo. */
+.agregar-listo { text-align: center; padding: 32px 16px 16px; }
+.agregar-listo-icono {
+    display: inline-grid; place-items: center; width: 64px; height: 64px; margin-bottom: 14px; border-radius: 50%;
+    background: var(--bs-success-bg-subtle); color: var(--bs-success-text-emphasis); font-size: 2.2rem;
 }
-.catalogo-portada.ejercicio-sin-foto { font-size: 2rem; }
+@media (prefers-reduced-motion: reduce) {
+    .agregar-musculo, .agregar-maquina { transition: none; }
+    .agregar-musculo:active:not(:disabled), .agregar-maquina:active { transform: none; }
+}
 .maquina-ejercicio {
     display: flex;
     align-items: center;

@@ -134,6 +134,6 @@ html.tema-cambiando *::after {
 [data-bs-theme="dark"] .dropdown-menu { background: #1d1f22; }
 
 /* Fotos de ejercicios y del catálogo. */
-[data-bs-theme="dark"] .ejercicio-foto,
-[data-bs-theme="dark"] .catalogo-portada { background: var(--surface-2); }
-[data-bs-theme="dark"] .catalogo-maquina.es-abierta { border-color: #6d7068 !important; }
+[data-bs-theme="dark"] .ejercicio-foto { background: var(--surface-2); }
+[data-bs-theme="dark"] .agregar-maquina { background: var(--surface-2); }
+[data-bs-theme="dark"] .agregar-pasos li.es-hecho span { color: #ff8c66; }
