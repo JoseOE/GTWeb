@@ -45,7 +45,9 @@ function initMachines() {
 
     document.getElementById('exercise-add-btn').addEventListener('click', () => addExerciseRow());
 
-    document.getElementById('machine-new-btn').addEventListener('click', () => {
+    // Una máquina que no está en el catálogo: el formulario a mano (desde
+    // "¿No la encuentras? Crear una a mano" en Agregar máquina).
+    function nuevaAMano() {
         form.reset();
         rows.innerHTML = '';
         document.getElementById('machine-id').value = '';
@@ -54,15 +56,7 @@ function initMachines() {
         alertBox.classList.add('d-none');
         addExerciseRow();
         modal.show();
-    });
-
-    document.getElementById('machine-import-btn').addEventListener('click', () => {
-        const gymId = localStorage.getItem('gymId');
-        if (!confirm('Se agregarán las máquinas más comunes con sus ejercicios. Las que ya tengas no se duplican. ¿Continuar?')) return;
-        fetch('/api/gyms/' + gymId + '/machines/import', { method: 'POST' })
-            .then(res => res.json())
-            .then(data => { alert(data.message); loadMachines(gymId); });
-    });
+    }
 
     document.getElementById('machines-container').addEventListener('click', (e) => {
         const editBtn = e.target.closest('[data-edit-machine]');
@@ -128,26 +122,29 @@ function initMachines() {
         });
     });
 
-    initCatalogoMaquinas();
+    initAgregarMaquina(nuevaAMano);
 
     const gymId = localStorage.getItem('gymId');
-    if (gymId) {
-        document.getElementById('machine-new-btn').disabled = false;
-        document.getElementById('machine-import-btn').disabled = false;
-        document.getElementById('machine-catalogo-btn').disabled = false;
-    }
+    if (gymId) document.getElementById('machine-catalogo-btn').disabled = false;
     // Sin gimnasio, loadMachines pinta el aviso para configurarlo.
     loadMachines(gymId);
 }
 
-/* ─── Catálogo de máquinas — /api/gyms/{id}/machines/catalogo ───
-   Máquinas comunes por categoría (Pecho, Espalda, Hombro, Bíceps…). Cada una
-   trae sus ejercicios con músculo, series y cómo se hacen; el dueño marca los
-   que sí se hacen en su gimnasio y la máquina se agrega (o se completa si ya
-   la tenía). Esos ejercicios son los que luego elige en las rutinas. */
-// Las fotos de cómo se hace un ejercicio: posición inicial y final.
-// Las ilustraciones traen 2 cuadros (inicio y final), 3 (con uno intermedio)
-// o 1 (planchas y estiramientos): se muestran el primero y el último.
+/* ─── Agregar máquina — /api/gyms/{id}/machines/catalogo ───
+   Tres pasos sobre el catálogo de máquinas (todas con sus ilustraciones):
+     1. El músculo (Pecho, Tríceps, Hombro…) o buscar por nombre.
+     2. La máquina: todas las que tienen algún ejercicio para ese músculo.
+     3. Los ejercicios que sí se hacen en ella, con casillas: vienen marcados
+        los de ese músculo y se pueden marcar los demás.
+   La máquina se agrega (o se completa si ya la tenía) y sus ejercicios son
+   los que luego se eligen en las rutinas. Si no está en el catálogo,
+   "Crear una a mano" abre el formulario de siempre. */
+
+const MUSCULOS = ['Pecho', 'Espalda', 'Hombro', 'Bíceps', 'Tríceps', 'Pierna', 'Glúteo', 'Core', 'Cardio'];
+
+// Las fotos de cómo se hace un ejercicio. Las ilustraciones traen 2 cuadros
+// (inicio y final), 3 (con uno intermedio) o 1 (planchas y estiramientos):
+// se muestran el primero y el último.
 function fotosEjercicio(e) {
     const todas = e.imagenes || [];
     const fotos = todas.length > 2 ? [todas[0], todas[todas.length - 1]] : todas;
@@ -155,152 +152,261 @@ function fotosEjercicio(e) {
     const pasos = fotos.length === 1 ? ['Posición'] : ['Inicio', 'Final'];
     return `<span class="ejercicio-fotos">${fotos.map((src, i) => `
         <figure class="mb-0">
-            <img src="${escapeHtml(src)}" alt="${escapeHtml(e.nombre)}: ${pasos[i].toLowerCase()}" class="ejercicio-foto" loading="lazy" width="120" height="90">
+            <img src="${escapeHtml(src)}" alt="${escapeHtml(e.nombre)}: ${pasos[i].toLowerCase()}" class="ejercicio-foto" loading="lazy" width="120" height="96">
             <figcaption>${pasos[i]}</figcaption>
         </figure>`).join('')}</span>`;
 }
 
-// La foto de portada de una máquina del catálogo: la de su primer ejercicio con foto.
-function portadaMaquina(m) {
-    const ej = (m.ejercicios || []).find(e => (e.imagenes || []).length);
-    return ej
-        ? `<img src="${escapeHtml(ej.imagenes[0])}" alt="" class="catalogo-portada mb-3" loading="lazy">`
-        : '<div class="catalogo-portada ejercicio-sin-foto mb-3" aria-hidden="true"><i class="bx bx-dumbbell"></i></div>';
-}
+const sinAcento = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
-function initCatalogoMaquinas() {
-    const modal = new bootstrap.Modal(document.getElementById('catalogoModal'));
-    const chips = document.getElementById('catalogo-categorias');
-    const lista = document.getElementById('catalogo-lista');
-    const buscar = document.getElementById('catalogo-buscar');
+function initAgregarMaquina(crearAMano) {
+    const modalEl = document.getElementById('catalogoModal');
+    const modal = new bootstrap.Modal(modalEl);
+    const contenido = document.getElementById('agregar-contenido');
+    const pie = document.getElementById('agregar-pie');
+    const pasos = document.getElementById('agregar-pasos');
     const alerta = document.getElementById('catalogo-alert');
     let datos = null;
-    let categoria = null;
-    let abierta = null;     // nombre de la máquina con sus ejercicios desplegados
+    let paso = 1;
+    let musculo = null;     // null: vino de la búsqueda, se marcan todos
+    let maquina = null;     // la máquina del catálogo elegida
+    let busqueda = '';
 
     const avisar = (texto, tipo) => {
         alerta.className = 'alert py-2 small alert-' + tipo;
         alerta.textContent = texto;
     };
+    const ocultarAviso = () => { alerta.className = 'alert d-none py-2 small'; };
+    const suave = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    const loTiene = m => new Set((m.ejerciciosQueTienes || []).map(sinAcento));
+    const ejerciciosDe = (m, mu) => m.ejercicios.filter(e => e.musculo === mu);
+    const linkAMano = '<button type="button" class="btn btn-link btn-sm px-0" data-a-mano>¿No la encuentras? Crear una a mano</button>';
 
     function cargar() {
         const gymId = localStorage.getItem('gymId');
-        lista.innerHTML = '<div class="text-center text-body-secondary py-5"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Cargando catálogo…</div>';
+        contenido.innerHTML = '<div class="text-center text-body-secondary py-5"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Cargando máquinas…</div>';
+        pie.innerHTML = '';
         return fetch('/api/gyms/' + gymId + '/machines/catalogo')
             .then(res => res.ok ? res.json() : Promise.reject())
-            .then(d => { datos = d; categoria = categoria || d.categorias[0]; pintar(); })
-            .catch(() => { lista.innerHTML = '<div class="text-danger small">No se pudo cargar el catálogo.</div>'; });
+            .then(d => { datos = d; pintar(); })
+            .catch(() => { contenido.innerHTML = '<div class="text-danger small">No se pudieron cargar las máquinas. Cierra y vuelve a intentarlo.</div>'; });
+    }
+
+    function irA(n) {
+        paso = n;
+        ocultarAviso();
+        pintar();
+        modalEl.querySelector('.modal-body').scrollTo({ top: 0, behavior: suave() });
+    }
+
+    function marcarPasos() {
+        pasos.querySelectorAll('li').forEach(li => {
+            const n = Number(li.dataset.paso);
+            li.classList.toggle('es-actual', n === paso);
+            li.classList.toggle('es-hecho', n < paso);
+            if (n === paso) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current');
+        });
     }
 
     function pintar() {
-        const q = buscar.value.trim().toLowerCase();
-        chips.innerHTML = datos.categorias.map(c => {
-            const n = datos.maquinas.filter(m => m.categoria === c).length;
-            const activa = !q && c === categoria;
-            return `<button type="button" class="btn btn-sm rounded-pill ${activa ? 'btn-primary' : 'btn-outline-secondary'}" data-cat="${escapeHtml(c)}" role="tab" aria-selected="${activa}">${escapeHtml(c)} <span class="opacity-75">${n}</span></button>`;
-        }).join('');
-        // Con búsqueda se ve todo el catálogo; si no, la categoría elegida.
-        const visibles = datos.maquinas.filter(m => q
-            ? (m.nombre + ' ' + m.categoria + ' ' + m.ejercicios.map(e => e.nombre + ' ' + e.musculo).join(' ')).toLowerCase().includes(q)
-            : m.categoria === categoria);
-        if (!visibles.length) {
-            lista.innerHTML = '<div class="col-12 text-body-secondary small">No hay máquinas que coincidan.</div>';
-            return;
-        }
-        lista.innerHTML = visibles.map(m => {
-            const tiene = new Set((m.ejerciciosQueTienes || []).map(n => n.trim().toLowerCase()));
-            const completa = m.machineId && m.ejercicios.every(e => tiene.has(e.nombre.trim().toLowerCase()));
-            const musculos = [...new Set(m.ejercicios.map(e => e.musculo))];
-            const abiertaAqui = abierta === m.nombre;
-            return `
-                <div class="${abiertaAqui ? 'col-12' : 'col-md-6 col-xl-4'}">
-                    <div class="catalogo-maquina border rounded-4 p-3 h-100 d-flex flex-column ${m.machineId ? 'border-success-subtle' : ''} ${abiertaAqui ? 'es-abierta' : ''}">
-                        ${abiertaAqui ? '' : portadaMaquina(m)}
-                        <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
-                            <h6 class="fw-bold mb-0">${escapeHtml(m.nombre)}</h6>
-                            ${m.machineId ? '<span class="badge rounded-pill bg-success-subtle text-success-emphasis flex-shrink-0">' + (completa ? 'Ya la tienes' : 'La tienes · faltan ejercicios') + '</span>' : ''}
-                        </div>
-                        <p class="text-body-secondary small mb-2">${escapeHtml(m.descripcion || '')}</p>
-                        <div class="d-flex flex-wrap gap-1 mb-3">${musculos.map(mu => '<span class="badge rounded-pill bg-body-secondary text-body-secondary">' + escapeHtml(mu) + '</span>').join('')}</div>
-                        ${abiertaAqui ? `
-                            <div class="catalogo-ejercicios mb-3 small">
-                                ${m.ejercicios.map((e, i) => {
-                                    const ya = tiene.has(e.nombre.trim().toLowerCase());
-                                    const id = 'cat-' + btoa(unescape(encodeURIComponent(m.nombre))).replace(/[^a-z0-9]/gi, '') + '-' + i;
-                                    return `<div class="form-check catalogo-ejercicio">
-                                        <input class="form-check-input" type="checkbox" id="${id}" data-ej="${escapeHtml(e.nombre)}" ${ya ? 'checked disabled' : 'checked'}>
-                                        <label class="form-check-label d-block" for="${id}">
-                                            <span class="fw-semibold">${escapeHtml(e.nombre)}</span>
-                                            <span class="text-body-secondary"> · ${escapeHtml(e.musculo)} · ${e.series} × ${escapeHtml(e.repeticiones)}${ya ? ' · ya la tienes' : ''}</span>
-                                            ${fotosEjercicio(e)}
-                                            <span class="d-block text-body-secondary">${escapeHtml(e.instrucciones || '')}</span>
-                                        </label>
-                                    </div>`;
-                                }).join('')}
-                            </div>
-                            <div class="mt-auto d-flex gap-2">
-                                <button type="button" class="btn btn-primary btn-sm rounded-pill px-3" data-agregar="${escapeHtml(m.nombre)}" ${completa ? 'disabled' : ''}>
-                                    <i class='bx bx-plus'></i> ${m.machineId ? 'Agregar los marcados' : 'Agregar al gimnasio'}
-                                </button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-cerrar>Cerrar</button>
-                            </div>` : `
-                            <ul class="small text-body-secondary ps-3 mb-3">${m.ejercicios.slice(0, 4).map(e => '<li>' + escapeHtml(e.nombre) + '</li>').join('')}${m.ejercicios.length > 4 ? '<li>y ' + (m.ejercicios.length - 4) + ' más</li>' : ''}</ul>
-                            <div class="mt-auto">
-                                <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-abrir="${escapeHtml(m.nombre)}">
-                                    ${completa ? 'Ver ejercicios' : 'Elegir ejercicios'}
-                                </button>
-                            </div>`}
-                    </div>
-                </div>`;
-        }).join('');
+        marcarPasos();
+        if (paso === 1) pintarMusculos();
+        else if (paso === 2) pintarMaquinas();
+        else pintarEjercicios();
     }
 
-    chips.addEventListener('click', e => {
-        const b = e.target.closest('[data-cat]');
-        if (!b) return;
-        categoria = b.dataset.cat;
-        buscar.value = '';
-        abierta = null;
-        pintar();
-    });
-    buscar.addEventListener('input', () => { abierta = null; pintar(); });
+    // La tarjeta de una máquina: su ilustración, nombre y cuántos ejercicios tiene para el músculo.
+    function tarjetaMaquina(m, mu) {
+        const tiene = loTiene(m);
+        const completa = m.machineId && m.ejercicios.every(e => tiene.has(sinAcento(e.nombre)));
+        const delMusculo = mu ? ejerciciosDe(m, mu) : m.ejercicios;
+        const portada = (delMusculo.find(e => (e.imagenes || []).length) || m.ejercicios.find(e => (e.imagenes || []).length));
+        return `
+            <div class="col-sm-6 col-lg-4">
+                <button type="button" class="agregar-maquina" data-maquina="${escapeHtml(m.nombre)}">
+                    ${portada ? `<img src="${escapeHtml(portada.imagenes[0])}" alt="" class="agregar-portada" loading="lazy">` : '<span class="agregar-portada ejercicio-sin-foto" aria-hidden="true"><i class="bx bx-dumbbell"></i></span>'}
+                    <span class="agregar-maquina-texto">
+                        <span class="fw-bold d-block">${escapeHtml(m.nombre)}</span>
+                        <span class="small text-body-secondary d-block">${mu
+                            ? delMusculo.length + ' ' + (delMusculo.length === 1 ? 'ejercicio' : 'ejercicios') + ' para ' + escapeHtml(mu) + (m.ejercicios.length > delMusculo.length ? ' · ' + m.ejercicios.length + ' en total' : '')
+                            : m.ejercicios.length + ' ' + (m.ejercicios.length === 1 ? 'ejercicio' : 'ejercicios')}</span>
+                        ${m.machineId ? '<span class="badge rounded-pill bg-success-subtle text-success-emphasis mt-2">' + (completa ? 'Ya la tienes' : 'La tienes · faltan ejercicios') + '</span>' : ''}
+                    </span>
+                </button>
+            </div>`;
+    }
 
-    lista.addEventListener('click', e => {
-        const abrir = e.target.closest('[data-abrir]');
-        if (abrir) {
-            abierta = abrir.dataset.abrir;
-            pintar();
-            lista.querySelector('.es-abierta')?.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
-            return;
+    /* Paso 1: el músculo (o buscar por nombre). */
+    function pintarMusculos() {
+        const q = sinAcento(busqueda);
+        const resultados = q ? datos.maquinas.filter(m => sinAcento(m.nombre + ' ' + m.ejercicios.map(e => e.nombre + ' ' + e.musculo).join(' ')).includes(q)) : [];
+        contenido.innerHTML = `
+            <p class="text-body-secondary mb-3">¿Qué músculo se trabaja en la máquina que quieres agregar?</p>
+            <div class="agregar-musculos" role="list">
+                ${MUSCULOS.map(mu => {
+                    const maquinas = datos.maquinas.filter(m => ejerciciosDe(m, mu).length);
+                    const ej = maquinas.flatMap(m => ejerciciosDe(m, mu)).find(e => (e.imagenes || []).length);
+                    return `<button type="button" class="agregar-musculo" data-musculo="${escapeHtml(mu)}" role="listitem" ${maquinas.length ? '' : 'disabled'}>
+                        ${ej ? `<img src="${escapeHtml(ej.imagenes[0])}" alt="" loading="lazy">` : '<span class="ejercicio-sin-foto" aria-hidden="true"><i class="bx bx-dumbbell"></i></span>'}
+                        <span class="agregar-musculo-nombre">${escapeHtml(mu)}</span>
+                        <span class="agregar-musculo-conteo">${maquinas.length} ${maquinas.length === 1 ? 'máquina' : 'máquinas'}</span>
+                    </button>`;
+                }).join('')}
+            </div>
+            <div class="mt-4">
+                <label for="agregar-buscar" class="form-label small fw-semibold">O búscala por nombre</label>
+                <input type="search" class="form-control" id="agregar-buscar" placeholder="Ej. poleas, prensa, Smith, sentadilla" value="${escapeHtml(busqueda)}" autocomplete="off">
+            </div>
+            ${q ? (resultados.length
+                ? '<div class="row g-3 mt-1">' + resultados.map(m => tarjetaMaquina(m, null)).join('') + '</div>'
+                : '<p class="small text-body-secondary mt-3 mb-0">No hay máquinas con ese nombre. Puedes crearla a mano.</p>') : ''}`;
+        pie.innerHTML = linkAMano + '<span></span>';
+        const campo = document.getElementById('agregar-buscar');
+        if (busqueda) { campo.focus(); campo.setSelectionRange(campo.value.length, campo.value.length); }
+    }
+
+    /* Paso 2: las máquinas que trabajan ese músculo. */
+    function pintarMaquinas() {
+        const maquinas = datos.maquinas
+            .filter(m => ejerciciosDe(m, musculo).length)
+            .sort((a, b) => ejerciciosDe(b, musculo).length - ejerciciosDe(a, musculo).length || a.nombre.localeCompare(b.nombre));
+        contenido.innerHTML = `
+            <p class="text-body-secondary mb-3">Máquinas con ejercicios para <strong>${escapeHtml(musculo)}</strong>. Elige la que tienes en tu gimnasio.</p>
+            <div class="row g-3">${maquinas.map(m => tarjetaMaquina(m, musculo)).join('')}</div>`;
+        pie.innerHTML = `<button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-atras><i class="bx bx-chevron-left" aria-hidden="true"></i> Músculo</button>${linkAMano}`;
+    }
+
+    /* Paso 3: los ejercicios, con casillas. */
+    function pintarEjercicios() {
+        const m = datos.maquinas.find(x => x.nombre === maquina);
+        const tiene = loTiene(m);
+        const musculos = [...new Set(m.ejercicios.map(e => e.musculo))];
+        contenido.innerHTML = `
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                <div class="min-w-0">
+                    <h6 class="fw-bold mb-1 fs-5">${escapeHtml(m.nombre)}</h6>
+                    <p class="text-body-secondary small mb-2">${escapeHtml(m.descripcion || '')}</p>
+                    <div class="d-flex flex-wrap gap-1">${musculos.map(mu => '<span class="badge rounded-pill bg-body-secondary text-body-secondary">' + escapeHtml(mu) + '</span>').join('')}</div>
+                </div>
+                <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-todos></button>
+            </div>
+            <p class="small text-body-secondary mb-2">Marca los ejercicios que sí se hacen en tu gimnasio${musculo ? '; ya vienen marcados los de ' + escapeHtml(musculo) : ''}.</p>
+            <div class="catalogo-ejercicios small">
+                ${m.ejercicios.map((e, i) => {
+                    const ya = tiene.has(sinAcento(e.nombre));
+                    const marcado = ya || !musculo || e.musculo === musculo;
+                    const id = 'agregar-ej-' + i;
+                    return `<div class="form-check catalogo-ejercicio${ya ? ' es-propio' : ''}">
+                        <input class="form-check-input" type="checkbox" id="${id}" data-ej="${escapeHtml(e.nombre)}" ${marcado ? 'checked' : ''} ${ya ? 'disabled' : ''}>
+                        <label class="form-check-label d-block" for="${id}">
+                            <span class="fw-semibold">${escapeHtml(e.nombre)}</span>
+                            <span class="text-body-secondary"> · ${escapeHtml(e.musculo)} · ${e.series} × ${escapeHtml(e.repeticiones)}${ya ? ' · ya la tienes' : ''}</span>
+                            ${fotosEjercicio(e)}
+                            <span class="d-block text-body-secondary">${escapeHtml(e.instrucciones || '')}</span>
+                        </label>
+                    </div>`;
+                }).join('')}
+            </div>`;
+        pie.innerHTML = `<button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-atras><i class="bx bx-chevron-left" aria-hidden="true"></i> ${musculo ? 'Máquinas' : 'Buscar'}</button>
+            <button type="button" class="btn btn-primary rounded-pill px-4" data-agregar></button>`;
+        actualizarConteo();
+    }
+
+    function actualizarConteo() {
+        const libres = [...contenido.querySelectorAll('input[data-ej]:not(:disabled)')];
+        const marcados = libres.filter(i => i.checked).length;
+        const boton = pie.querySelector('[data-agregar]');
+        const todos = contenido.querySelector('[data-todos]');
+        if (boton) {
+            boton.disabled = marcados === 0;
+            boton.innerHTML = '<i class="bx bx-plus" aria-hidden="true"></i> ' + (marcados
+                ? 'Agregar ' + marcados + ' ' + (marcados === 1 ? 'ejercicio' : 'ejercicios')
+                : (libres.length ? 'Marca al menos uno' : 'Ya tienes todos'));
         }
-        if (e.target.closest('[data-cerrar]')) { abierta = null; pintar(); return; }
-        const agregar = e.target.closest('[data-agregar]');
-        if (!agregar) return;
-        const tarjeta = agregar.closest('.catalogo-maquina');
-        const ejercicios = [...tarjeta.querySelectorAll('input[data-ej]:checked:not(:disabled)')].map(i => i.dataset.ej);
-        if (!ejercicios.length) { avisar('Marca al menos un ejercicio.', 'warning'); return; }
-        agregar.disabled = true;
+        if (todos) {
+            todos.hidden = libres.length < 2;
+            todos.textContent = marcados === libres.length ? 'Quitar todos' : 'Marcar todos';
+        }
+    }
+
+    function agregar(boton) {
+        const ejercicios = [...contenido.querySelectorAll('input[data-ej]:checked:not(:disabled)')].map(i => i.dataset.ej);
+        if (!ejercicios.length) return;
+        boton.disabled = true;
+        boton.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Agregando…';
         const gymId = localStorage.getItem('gymId');
         fetch('/api/gyms/' + gymId + '/machines/catalogo', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nombre: agregar.dataset.agregar, ejercicios })
+            body: JSON.stringify({ nombre: maquina, ejercicios })
         })
             .then(res => res.json().then(body => ({ ok: res.ok, body })))
             .then(({ ok, body }) => {
                 if (!ok) throw new Error(body.error || 'No se pudo agregar.');
-                avisar(body.maquina.nombre + ': ' + body.agregados + ' ejercicio(s) agregados. Ya puedes usarlos en tus rutinas.', 'success');
-                abierta = null;
                 loadMachines(gymId);
-                return cargar();
+                return fetch('/api/gyms/' + gymId + '/machines/catalogo').then(r => r.json()).then(d => {
+                    datos = d;
+                    paso = 3;
+                    marcarPasos();
+                    pasos.querySelectorAll('li').forEach(li => li.classList.add('es-hecho'));
+                    contenido.innerHTML = `
+                        <div class="agregar-listo" role="status">
+                            <span class="agregar-listo-icono" aria-hidden="true"><i class="bx bx-check"></i></span>
+                            <h6 class="fw-bold fs-5 mb-1">${escapeHtml(body.maquina.nombre)} ya está en tu gimnasio</h6>
+                            <p class="text-body-secondary mb-0">Se ${body.agregados === 1 ? 'agregó 1 ejercicio' : 'agregaron ' + body.agregados + ' ejercicios'}. Ya puedes usarlos en tus rutinas.</p>
+                        </div>`;
+                    pie.innerHTML = `<button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-otra><i class="bx bx-plus" aria-hidden="true"></i> Agregar otra máquina</button>
+                        <button type="button" class="btn btn-primary rounded-pill px-4" data-bs-dismiss="modal">Listo</button>`;
+                });
             })
-            .catch(err => { avisar(err.message || 'Error de conexión con el servidor.', 'danger'); agregar.disabled = false; });
+            .catch(err => {
+                avisar(err.message || 'Error de conexión con el servidor.', 'danger');
+                actualizarConteo();
+            });
+    }
+
+    contenido.addEventListener('click', e => {
+        const mu = e.target.closest('[data-musculo]');
+        if (mu) { musculo = mu.dataset.musculo; irA(2); return; }
+        const maq = e.target.closest('[data-maquina]');
+        if (maq) {
+            maquina = maq.dataset.maquina;
+            if (paso === 1) musculo = null;   // vino de la búsqueda
+            irA(3);
+            return;
+        }
+        if (e.target.closest('[data-todos]')) {
+            const libres = [...contenido.querySelectorAll('input[data-ej]:not(:disabled)')];
+            const todos = libres.every(i => i.checked);
+            libres.forEach(i => { i.checked = !todos; });
+            actualizarConteo();
+        }
+    });
+    contenido.addEventListener('change', e => { if (e.target.matches('input[data-ej]')) actualizarConteo(); });
+    contenido.addEventListener('input', e => {
+        if (e.target.id !== 'agregar-buscar') return;
+        busqueda = e.target.value;
+        pintarMusculos();
+    });
+
+    pie.addEventListener('click', e => {
+        if (e.target.closest('[data-atras]')) { irA(paso === 3 && musculo ? 2 : 1); return; }
+        const boton = e.target.closest('[data-agregar]');
+        if (boton) { agregar(boton); return; }
+        if (e.target.closest('[data-otra]')) { musculo = null; maquina = null; busqueda = ''; irA(1); return; }
+        if (e.target.closest('[data-a-mano]')) {
+            modalEl.addEventListener('hidden.bs.modal', () => crearAMano(), { once: true });
+            modal.hide();
+        }
     });
 
     document.getElementById('machine-catalogo-btn').addEventListener('click', () => {
-        alerta.className = 'alert d-none py-2 small';
-        buscar.value = '';
-        abierta = null;
+        paso = 1;
+        musculo = null;
+        maquina = null;
+        busqueda = '';
+        ocultarAviso();
+        marcarPasos();
         modal.show();
         cargar();
     });
@@ -318,7 +424,7 @@ function loadMachines(gymId) {
             resumenConteos.maquinas = machines.length;
             pintarPasos();
             if (!machines.length) {
-                container.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-cog fs-1 d-block mb-2 opacity-50"></i>Aún no registras máquinas. Usa "Catálogo de máquinas" para elegirlas por categoría con sus ejercicios, o "Importar básicas" para empezar rápido.</div>';
+                container.innerHTML = '<div class="dash-empty text-center text-body-secondary py-5"><i class="bx bx-cog fs-1 d-block mb-2 opacity-50"></i>Aún no registras máquinas. Usa "Agregar máquina": eliges el músculo, la máquina y los ejercicios que se hacen en ella.</div>';
                 return;
             }
             const zonas = {};
