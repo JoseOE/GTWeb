@@ -2,8 +2,8 @@
 //
 // Cada tag que lee se lo pregunta a GTWeb (POST /api/lectores/accesos) y hace
 // lo que el servidor responda:
-//   ENTRADA  -> LED verde y 1 pitido (acceso permitido)
-//   SALIDA   -> LED azul y 2 pitidos
+//   ENTRADA  -> LED verde, 1 pitido y el servo abre la puerta 3 s
+//   SALIDA   -> LED azul, 2 pitidos y el servo abre la puerta 3 s
 //   NEGADO   -> LED rojo y 3 pitidos. Si la membresía venció, al socio le llega
 //               un aviso al teléfono para renovar; al pagar, vuelve a pasar
 //               su tarjeta y ya entra.
@@ -26,7 +26,8 @@
 // Comandos por el monitor serie (115200):
 //   a  red automática (WiFi y si no, datos)   w  solo WiFi
 //   l  solo LTE-M                             g  solo 2G
-//   r  estado de la red    p  probar LEDs y buzzer    n  simular un tag desconocido
+//   r  estado de la red    p  probar LEDs, buzzer y servo    n  simular un tag desconocido
+//   o  abrir la puerta (servo) 3 s
 //   +  subir la potencia 1 dBm      -  bajarla 1 dBm
 //
 // Placa: "ESP32 Wrover Module". Librerías: TinyGSM y ArduinoHttpClient.
@@ -69,6 +70,7 @@
 #define LED_AZUL        19   // salida, registro y "sin internet"
 #define LED_ROJO        21   // negado
 #define BUZZER          22   // buzzer pasivo (suena con un tono)
+#define SERVO           23   // señal del servo de la puerta (SG90 / MG90S)
 #define MODEM_RX        26   // llega del TX del módem (dentro de la placa)
 #define MODEM_TX        27
 #define MODEM_PWR       4    // pulso para encender el módem
@@ -208,13 +210,74 @@ bool fijarPotencia(int dbm) {
 }
 
 // ============================================================
-// SECCIÓN 3 · Señales: LEDs y buzzer
-// Sin mecanismo de puerta por ahora: el acceso se indica con el LED verde y
-// el pitido.
+// SECCIÓN 3 · Señales: puerta (servo), LEDs y buzzer
+// El servo se alimenta con 5 V externos (el Arduino o una fuente), con su
+// GND unido al de la LILYGO; la señal sale del GPIO 23. Abre la puerta
+// (ANGULO_ABIERTA) y la cierra sola a los PUERTA_ABIERTA_MS, sin detener el
+// lector mientras tanto. Ya cerrada, deja de mandarle pulsos para que no
+// zumbe ni se caliente.
 // ============================================================
-// Por ahora solo se anuncia en el monitor (aquí iría la chapa eléctrica).
+const int ANGULO_CERRADA       = 0;
+const int ANGULO_ABIERTA       = 90;
+const uint32_t PUERTA_ABIERTA_MS = 3000;
+const int SERVO_PULSO_MIN      = 500;    // µs a 0°   (si choca al cerrar, súbelo a 600)
+const int SERVO_PULSO_MAX      = 2400;   // µs a 180° (si choca al abrir, bájalo a 2300)
+const int SERVO_HZ             = 50;
+const int SERVO_BITS           = 14;
+// Canal 4 = temporizador 2 del LEDC. tone() (el buzzer) usa el canal 0 /
+// temporizador 0: si compartieran temporizador, cada pitido le cambiaría la
+// frecuencia al servo y temblaría.
+const int SERVO_CANAL          = 4;
+
+uint32_t puertaAbiertaDesde = 0;   // 0 = cerrada
+uint32_t soltarServoEn = 0;        // cuándo dejar de mandar pulsos (0 = ya suelto)
+
+void servoDuty(uint32_t duty) {
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+  ledcWrite(SERVO, duty);
+#else
+  ledcWrite(SERVO_CANAL, duty);
+#endif
+}
+
+void moverServo(int grados) {
+  grados = constrain(grados, 0, 180);
+  uint32_t us = map(grados, 0, 180, SERVO_PULSO_MIN, SERVO_PULSO_MAX);
+  servoDuty(us * ((1UL << SERVO_BITS) - 1) / 20000UL);
+}
+
+void iniciarServo() {
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+  ledcAttachChannel(SERVO, SERVO_HZ, SERVO_BITS, SERVO_CANAL);
+#else
+  ledcSetup(SERVO_CANAL, SERVO_HZ, SERVO_BITS);
+  ledcAttachPin(SERVO, SERVO_CANAL);
+#endif
+  moverServo(ANGULO_CERRADA);
+  soltarServoEn = millis() + 700;
+}
+
 void abrirPuerta() {
-  Serial.println("         [puerta] acceso permitido");
+  Serial.println("         [puerta] abierta");
+  moverServo(ANGULO_ABIERTA);
+  puertaAbiertaDesde = millis();
+  if (puertaAbiertaDesde == 0) puertaAbiertaDesde = 1;
+  soltarServoEn = 0;
+}
+
+// Desde loop(): cierra la puerta a su tiempo y suelta el servo ya cerrada.
+void atenderPuerta() {
+  uint32_t ahora = millis();
+  if (puertaAbiertaDesde && ahora - puertaAbiertaDesde >= PUERTA_ABIERTA_MS) {
+    moverServo(ANGULO_CERRADA);
+    puertaAbiertaDesde = 0;
+    soltarServoEn = ahora + 700;
+    Serial.println("         [puerta] cerrada");
+  }
+  if (soltarServoEn && (int32_t)(ahora - soltarServoEn) >= 0) {
+    servoDuty(0);
+    soltarServoEn = 0;
+  }
 }
 
 // El buzzer es pasivo: necesita un tono (2.7 kHz), con voltaje fijo no suena.
@@ -841,6 +904,7 @@ void setup() {
 
   pinMode(LED_VERDE, OUTPUT); pinMode(LED_AZUL, OUTPUT);
   pinMode(LED_ROJO, OUTPUT);  pinMode(BUZZER, OUTPUT);
+  iniciarServo();
   probarSalidas();
 
   // El YRM puede tardar en encender más que la LILYGO: se reintenta unos segundos.
@@ -868,7 +932,7 @@ void setup() {
   // respuesta sin soltar el procesador, y en el núcleo 0 eso dispara el
   // watchdog del sistema (task_wdt) y reinicia la placa.
   xTaskCreatePinnedToCore(tareaComandos, "comandos", 10240, nullptr, 1, nullptr, 1);
-  Serial.println("Listo. Comandos: a / w / l / g (red), r (estado), p (probar LEDs y buzzer), n (tag desconocido), + / - (potencia)");
+  Serial.println("Listo. Comandos: a / w / l / g (red), r (estado), p (probar LEDs, buzzer y servo), o (abrir la puerta), n (tag desconocido), + / - (potencia)");
 }
 
 void loop() {
@@ -881,15 +945,17 @@ void loop() {
     if (c == 'r') mostrarEstado();
     if (c == 'p') {
       // Las mismas señales que un acceso real: entrada, salida y negado.
-      Serial.println("PRUEBA   entrada (verde, 1 pitido)");  senal(LED_VERDE, 1);
+      Serial.println("PRUEBA   entrada (puerta, verde, 1 pitido)");  abrirPuerta(); senal(LED_VERDE, 1);
       Serial.println("PRUEBA   salida (azul, 2 pitidos)");   senal(LED_AZUL, 2);
       Serial.println("PRUEBA   negado (rojo, 3 pitidos)");   senal(LED_ROJO, 3);
     }
+    if (c == 'o') { Serial.println("PRUEBA   puerta"); abrirPuerta(); }
     if (c == 'n') alLeerTag(EPC_SIMULADO, 0, true);
     if (c == '+' && potenciaDbm < 26) fijarPotencia(++potenciaDbm);
     if (c == '-' && potenciaDbm > 5)  fijarPotencia(--potenciaDbm);
   }
   atenderComando();
+  atenderPuerta();
   // Con WiFi pero sin poder preguntar por los comandos tanto tiempo: se
   // reinicia la placa (así se recupera si se quedó sin memoria para el https).
   if (redLista && red == RED_WIFI && WiFi.status() == WL_CONNECTED &&

@@ -1,6 +1,6 @@
 # Lector de acceso RFID (LILYGO T-SIM7070G + YRM1004)
 
-La puerta del gimnasio: lee el tag UHF de cada socio, le pregunta a GTWeb si puede pasar y responde con LEDs y un buzzer. Se conecta por WiFi y, si no hay, por datos móviles.
+La puerta del gimnasio: lee el tag UHF de cada socio, le pregunta a GTWeb si puede pasar y responde con LEDs, un buzzer y un servo que abre la puerta. Se conecta por WiFi y, si no hay, por datos móviles.
 
 | Programa | Para qué |
 |---|---|
@@ -24,11 +24,14 @@ La puerta del gimnasio: lee el tag UHF de cada socio, le pregunta a GTWeb si pue
 | Los 3 LEDs | cátodo (pata corta) | GND común |
 | Buzzer pasivo | + | GPIO 22 |
 | | − | GND común |
+| Servo (SG90 / MG90S) | señal (naranja o amarillo) | GPIO 23 |
+| | + (rojo) | **5 V externos** (el 5V de un Arduino conectado por USB, o una fuente) |
+| | − (café o negro) | GND común |
 
 - **Tierra común:** el GND de la fuente de 5 V, el del YRM y el de la LILYGO van juntos. Sin eso el YRM manda tramas con error.
 - **Fuente externa:** solo alimenta al YRM. No lo conectes al 3V3 de la LILYGO: no da la corriente suficiente.
 - **Buzzer:** es pasivo, así que el programa lo hace sonar con un tono de 2.7 kHz (con voltaje fijo no suena). Un buzzer activo también funciona.
-- **Sin mecanismo de puerta por ahora:** el acceso se indica con el LED verde y el pitido. El GPIO 23 queda libre para un servo o una chapa.
+- **Servo de la puerta:** abre (90°) al permitir una entrada o una salida y cierra solo (0°) a los 3 s; ya cerrado deja de recibir pulsos para que no zumbe. Se alimenta con 5 V externos, **con su GND unido al de la LILYGO** (sin tierra común solo vibra o cruje). Si se reinicia o tiembla al moverse, pon un capacitor de 100–470 µF entre 5 V y GND cerca del servo. Los ángulos y el tiempo están al inicio de la sección 3 de `lector_wifi.ino`.
 
 ## Internet
 
@@ -56,7 +59,8 @@ La puerta del gimnasio: lee el tag UHF de cada socio, le pregunta a GTWeb si pue
 | `a` | Red automática (WiFi y, si no hay, datos) |
 | `w` · `l` · `g` | Solo WiFi · solo LTE-M · solo 2G |
 | `r` | Estado de la red, del servidor y de la lista local |
-| `p` | Probar las señales: entrada (verde, 1 pitido), salida (azul, 2) y negado (rojo, 3) |
+| `p` | Probar las señales: entrada (puerta, verde, 1 pitido), salida (azul, 2) y negado (rojo, 3) |
+| `o` | Abrir la puerta (servo) 3 s |
 | `n` | Simular un tag desconocido (crea una alerta en el panel) |
 | `+` · `-` | Subir o bajar 1 dBm la potencia del YRM |
 
