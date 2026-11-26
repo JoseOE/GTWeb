@@ -51,6 +51,8 @@ public class PagosService {
 
     private static final Logger log = LoggerFactory.getLogger(PagosService.class);
     public static final String SANDBOX = "sandbox";
+    // Canal de los pagos que un gimnasio le hace a GymTrack (SuscripcionService).
+    public static final String CANAL_SUSCRIPCION = "suscripcion";
     private static final DateTimeFormatter FECHA_OPENPAY = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
     // Una partida tal como se muestra en la página de pago del proveedor.
@@ -130,7 +132,7 @@ public class PagosService {
             f.add(p + "[price_data][product_data][name]", recortar(c.nombre(), 120));
         }
         f.add("payment_intent_data[capture_method]", "manual");
-        f.add("payment_intent_data[description]", recortar("Compra en " + comercio + " (GymTrack)", 300));
+        f.add("payment_intent_data[description]", recortar(descripcion(canal, comercio), 300));
         f.add("payment_intent_data[statement_descriptor_suffix]", "GYMTRACK");
         for (String p : List.of("metadata", "payment_intent_data[metadata]")) {
             f.add(p + "[userId]", quien.getId());
@@ -214,7 +216,7 @@ public class PagosService {
         String comercio = comercio(gymId);
 
         Map<String, Object> contexto = new LinkedHashMap<>();
-        contexto.put("brand_name", recortar(comercio, 120));
+        contexto.put("brand_name", recortar(CANAL_SUSCRIPCION.equals(canal) ? "GymTrack" : comercio, 120));
         contexto.put("locale", "es-MX");
         contexto.put("shipping_preference", "NO_SHIPPING");
         contexto.put("user_action", "PAY_NOW");
@@ -223,7 +225,7 @@ public class PagosService {
         Map<String, Object> unidad = new LinkedHashMap<>();
         unidad.put("reference_id", gymId);
         unidad.put("custom_id", comprador.getId());
-        unidad.put("description", recortar("Compra en " + comercio + " (GymTrack)", 120));
+        unidad.put("description", recortar(descripcion(canal, comercio), 120));
         unidad.put("amount", Map.of("currency_code", "MXN", "value", monto(total)));
         Map<String, Object> cuerpo = new LinkedHashMap<>();
         cuerpo.put("intent", "CAPTURE");
@@ -342,6 +344,23 @@ public class PagosService {
             case MetodosPago.PAYNET -> fichaOpenpay(v, orderId, total);
             default -> throw new TiendaException(HttpStatus.BAD_REQUEST, "Elige cómo quieres pagar.");
         };
+    }
+
+    // La suscripción de un gimnasio a GymTrack: no hay pedido ni inventario, así
+    // que se cobra directo con lo que dejó consumirStripe / consumirPaypal.
+    public SimuladorPagoService.Resultado cobrarSuscripcion(String proveedor, Map<String, Object> datos, double total) {
+        if (!MetodosPago.STRIPE.equals(proveedor) && !MetodosPago.PAYPAL.equals(proveedor)) {
+            throw new TiendaException(HttpStatus.BAD_REQUEST, "La suscripción se paga con tarjeta o con PayPal.");
+        }
+        if (!sandbox && MetodosPago.PAYPAL.equals(proveedor) && datos != null && datos.get("simular") != null) {
+            throw rechazoPaypal(SIMULACIONES_PAYPAL.get(datos.get("simular").toString()));
+        }
+        if (!sandbox) return simuladores.autorizar(proveedor, datos, total);
+        return MetodosPago.STRIPE.equals(proveedor) ? capturarStripe(datos, total) : capturarPaypal(datos, total);
+    }
+
+    private static String descripcion(String canal, String comercio) {
+        return CANAL_SUSCRIPCION.equals(canal) ? "Suscripción de GymTrack para " + comercio : "Compra en " + comercio + " (GymTrack)";
     }
 
     // Qué decirle al comprador cuando PayPal rechaza la captura.
