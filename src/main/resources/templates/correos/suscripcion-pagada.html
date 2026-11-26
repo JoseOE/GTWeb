@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{correos/base :: correo('Recibimos tu pago de GymTrack', ~{::#cuerpo})}">
+<body>
+<div id="cuerpo">
+    <p style="margin:0 0 16px;" th:text="|${saludo}:|">Hola, Juan:</p>
+    <p style="margin:0 0 20px;" th:text="|Gracias. Recibimos el pago de la suscripción de ${gimnasio} a GymTrack.|">Gracias por tu pago.</p>
+    <table role="presentation" style="border-collapse:collapse;margin:0 0 20px;font-size:15px;">
+        <tr><td style="padding:4px 16px 4px 0;color:#62645d;">Plan</td><td style="padding:4px 0;font-weight:600;" th:text="${plan}">Anual</td></tr>
+        <tr><td style="padding:4px 16px 4px 0;color:#62645d;">Cubre</td><td style="padding:4px 0;font-weight:600;" th:text="|del ${desde} al ${hasta}|">del 1 al 31</td></tr>
+        <tr><td style="padding:4px 16px 4px 0;color:#62645d;">Total</td><td style="padding:4px 0;font-weight:600;" th:text="|${monto} MXN (IVA incluido)|">$4,990.00</td></tr>
+    </table>
+    <p style="margin:0;">Pagos en modo de prueba: no se cobró dinero real.</p>
+</div>
+</body>
+</html>

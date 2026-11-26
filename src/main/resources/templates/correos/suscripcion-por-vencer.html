@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{correos/base :: correo('Tu suscripción a GymTrack está por vencer', ~{::#cuerpo})}">
+<body>
+<div id="cuerpo">
+    <p style="margin:0 0 16px;" th:text="|${saludo}:|">Hola, Juan:</p>
+    <p style="margin:0 0 20px;" th:text="|La suscripción de ${gimnasio} a GymTrack vence el ${fecha} (en ${dias} ${dias == 1 ? 'día' : 'días'}).|">Tu suscripción vence pronto.</p>
+    <p style="margin:0 0 20px;">Renuévala desde tu panel, en <strong>Suscripción</strong>, con tarjeta o PayPal. Puedes elegir el plan anual o el mensual.</p>
+    <p style="margin:0;"><a th:href="${enlace}" href="#" style="color:#b73511;font-weight:600;">Abrir mi panel</a></p>
+</div>
+</body>
+</html>
