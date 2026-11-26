@@ -15,7 +15,7 @@
     const POR_PAGINA = 50;
     const moneda = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
     const numero = new Intl.NumberFormat('es-MX');
-    const datos = { resumen: null, gimnasios: null, usuarios: null, resenas: null, bitacora: null };
+    const datos = { resumen: null, gimnasios: null, usuarios: null, resenas: null, bitacora: null, suscripciones: null };
     const visibles = { cuentas: POR_PAGINA, resenas: POR_PAGINA, bitacora: POR_PAGINA };
 
     // ═══════════════════════════ AYUDANTES ═══════════════════════════
@@ -514,9 +514,143 @@
     document.getElementById('bitacora-buscar').addEventListener('input', () => { visibles.bitacora = POR_PAGINA; datos.bitacora && pintarBitacora(); });
     document.getElementById('bitacora-mas').addEventListener('click', () => { visibles.bitacora += POR_PAGINA; pintarBitacora(); });
 
+    // ═══════════════════════════ SUSCRIPCIONES ═══════════════════════════
+
+    const ESTADOS_SUSCRIPCION = {
+        AL_DIA: { texto: 'Al día', clase: 'es-al-dia' },
+        POR_VENCER: { texto: 'Por vencer', clase: 'es-por-vencer' },
+        GRACIA: { texto: 'En gracia', clase: 'es-gracia' },
+        VENCIDA: { texto: 'Solo lectura', clase: 'es-vencida' }
+    };
+    const PLANES_SUSCRIPCION = { anual: 'Anual', mensual: 'Mensual', cortesia: 'Cortesía' };
+    let cortesiaGym = null;
+
+    function fechaIso(iso) {
+        if (!iso) return '—';
+        const d = new Date(String(iso).slice(0, 10) + 'T12:00:00Z');
+        return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+    }
+
+    function cargarSuscripciones(forzar) {
+        const tbody = document.getElementById('suscripciones-tbody');
+        if (!forzar && datos.suscripciones) return pintarSuscripciones();
+        cargando(tbody, 'Cargando las suscripciones…', 5);
+        api('/api/admin/suscripciones')
+            .then(s => { datos.suscripciones = s; pintarSuscripciones(); llenarPrecios(); })
+            .catch(err => error(tbody, err.message, () => cargarSuscripciones(true), 5));
+    }
+
+    function pintarSuscripciones() {
+        const s = datos.suscripciones;
+        const c = s.conteo;
+        const pendientes = c.GRACIA + c.VENCIDA;
+        const marca = document.getElementById('suscripciones-nav-vencidas');
+        marca.textContent = pendientes;
+        marca.classList.toggle('d-none', !pendientes);
+        document.getElementById('suscripciones-kpis').innerHTML = [
+            { valor: moneda.format(s.cobradoAnio), texto: 'Cobrado este año', nota: numero.format(s.pagosAnio) + ' pagos · ' + moneda.format(s.cobradoMes) + ' este mes', icono: 'bx-line-chart', color: 'icon-success' },
+            { valor: numero.format(c.AL_DIA + c.POR_VENCER), texto: 'Al día', nota: numero.format(c.POR_VENCER) + ' vencen en 30 días o menos', icono: 'bx-check-circle', color: 'icon-success' },
+            { valor: numero.format(pendientes), texto: 'Deben su suscripción', nota: numero.format(c.GRACIA) + ' en gracia · ' + numero.format(c.VENCIDA) + ' en solo lectura', icono: 'bx-error', color: pendientes ? 'icon-danger' : 'icon-success' },
+            { valor: moneda.format(s.porCobrarAnual), texto: 'Por renovar el año siguiente', nota: numero.format(s.porRenovar) + ' gimnasios × ' + moneda.format(s.precios.anual), icono: 'bx-calendar', color: 'icon-brand' }
+        ].map(tile).join('');
+
+        const pagos = s.pagos || [];
+        document.getElementById('suscripciones-pagos').innerHTML = pagos.length
+            ? '<ul class="list-unstyled mb-0">' + pagos.slice(0, 6).map(p => `
+                <li class="admin-fila d-flex justify-content-between gap-3">
+                    <div style="min-width:0">
+                        <div class="fw-semibold text-truncate">${escapeHtml(p.gimnasio || 'Gimnasio')}</div>
+                        <div class="small text-body-secondary">${PLANES_SUSCRIPCION[p.plan] || p.plan} · ${p.metodo === 'paypal' ? 'PayPal' : 'Tarjeta'} · cubre hasta ${fechaIso(p.hasta)}</div>
+                    </div>
+                    <div class="text-end text-nowrap"><strong>${moneda.format(p.monto)}</strong><div class="small text-body-secondary">${fechaIso(p.pagadoEn)}</div></div>
+                </li>`).join('') + '</ul>'
+            : '<p class="text-body-secondary px-4 pb-4 mb-0">Todavía ningún gimnasio ha pagado su suscripción.</p>';
+
+        const q = document.getElementById('suscripciones-buscar').value;
+        const lista = s.gimnasios.filter(g => contiene(q, g.nombre, g.dueno && g.dueno.nombre, g.dueno && g.dueno.email));
+        document.getElementById('suscripciones-tbody').innerHTML = lista.length ? lista.map(g => {
+            const e = ESTADOS_SUSCRIPCION[g.estado];
+            const dias = g.diasRestantes;
+            const cuando = g.nuncaPagada ? 'Nunca ha pagado'
+                : dias >= 0 ? (dias === 0 ? 'Vence hoy' : 'Faltan ' + numero.format(dias) + (dias === 1 ? ' día' : ' días'))
+                : 'Venció hace ' + numero.format(-dias) + (dias === -1 ? ' día' : ' días');
+            return `
+            <tr>
+                <td class="ps-4 admin-celda-principal">
+                    <div class="fw-semibold">${escapeHtml(g.nombre || 'Sin nombre')}</div>
+                    <div class="small text-body-secondary">${g.dueno ? escapeHtml(g.dueno.nombre) + ' · ' + escapeHtml(g.dueno.email) : 'Sin dueño'}</div>
+                </td>
+                <td><span class="suscripcion-chip ${e.clase}">${e.texto}</span></td>
+                <td>${PLANES_SUSCRIPCION[g.plan] || '<span class="text-body-secondary">Sin plan</span>'}</td>
+                <td class="text-nowrap">${fechaIso(g.hasta)}<div class="small text-body-secondary">${cuando}</div></td>
+                <td class="pe-4 text-end"><button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-cortesia="${escapeHtml(g.id)}">Dar cortesía</button></td>
+            </tr>`;
+        }).join('') : vacio('Ningún gimnasio coincide con la búsqueda.', 'bx-search', 5);
+    }
+
+    function llenarPrecios() {
+        const p = datos.suscripciones.precios;
+        document.getElementById('precio-anual').value = p.anual;
+        document.getElementById('precio-mensual').value = p.mensual;
+        document.getElementById('precio-gracia').value = p.diasGracia;
+        document.getElementById('precios-nota').textContent = p.ahorroAnual > 0
+            ? 'Con estos precios, pagar el año ahorra ' + moneda.format(p.ahorroAnual) + ' contra 12 mensualidades.'
+            : 'Ojo: el plan anual cuesta igual o más que 12 mensualidades.';
+    }
+
+    document.getElementById('suscripciones-actualizar').addEventListener('click', () => cargarSuscripciones(true));
+    document.getElementById('suscripciones-buscar').addEventListener('input', () => datos.suscripciones && pintarSuscripciones());
+
+    document.getElementById('precios-form').addEventListener('submit', e => {
+        e.preventDefault();
+        const boton = document.getElementById('precios-guardar');
+        boton.disabled = true;
+        api('/api/admin/suscripciones/precios', {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                anual: Number(document.getElementById('precio-anual').value),
+                mensual: Number(document.getElementById('precio-mensual').value),
+                diasGracia: Number(document.getElementById('precio-gracia').value)
+            })
+        }).then(() => { avisar('Precios guardados.'); cargarSuscripciones(true); })
+          .catch(err => avisar(err.message))
+          .finally(() => { boton.disabled = false; });
+    });
+
+    document.getElementById('suscripciones-tbody').addEventListener('click', e => {
+        const boton = e.target.closest('[data-cortesia]');
+        if (!boton) return;
+        cortesiaGym = datos.suscripciones.gimnasios.find(g => g.id === boton.dataset.cortesia);
+        if (!cortesiaGym) return;
+        document.getElementById('cortesia-gimnasio').innerHTML = '<strong>' + escapeHtml(cortesiaGym.nombre) + '</strong> · pagado hasta el ' + fechaIso(cortesiaGym.hasta);
+        const base = new Date(Math.max(Date.now(), new Date(String(cortesiaGym.hasta) + 'T12:00:00Z').getTime()));
+        base.setUTCMonth(base.getUTCMonth() + 1);
+        document.getElementById('cortesia-hasta').value = base.toISOString().slice(0, 10);
+        document.getElementById('cortesia-error').classList.add('d-none');
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('cortesiaModal')).show();
+    });
+
+    document.getElementById('cortesia-form').addEventListener('submit', e => {
+        e.preventDefault();
+        const boton = document.getElementById('cortesia-guardar');
+        const aviso = document.getElementById('cortesia-error');
+        boton.disabled = true;
+        api('/api/admin/suscripciones/' + encodeURIComponent(cortesiaGym.id) + '/cortesia', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ hasta: document.getElementById('cortesia-hasta').value })
+        }).then(r => {
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('cortesiaModal')).hide();
+            avisar(r.nombre + ' queda sin cobro hasta el ' + fechaIso(r.hasta) + '.');
+            cargarSuscripciones(true);
+        }).catch(err => {
+            aviso.textContent = err.message;
+            aviso.classList.remove('d-none');
+        }).finally(() => { boton.disabled = false; });
+    });
+
     // ═══════════════════════════ ARRANQUE ═══════════════════════════
 
-    const CARGAS = { resumen: cargarResumen, gimnasios: cargarGimnasios, cuentas: cargarCuentas, resenas: cargarResenas, bitacora: cargarBitacora };
+    const CARGAS = { resumen: cargarResumen, gimnasios: cargarGimnasios, cuentas: cargarCuentas, resenas: cargarResenas, bitacora: cargarBitacora, suscripciones: cargarSuscripciones };
 
     const nombre = localStorage.getItem('userName') || 'equipo';
     document.getElementById('nav-user-name').textContent = nombre;
