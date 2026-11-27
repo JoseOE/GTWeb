@@ -30,6 +30,7 @@ GitHub Pages solo sirve archivos estáticos, así que ahí funcionan la página 
 - [Estructura del proyecto](#-estructura-del-proyecto)
 - [API](#-api)
 - [Seguridad y sesiones](#-seguridad-y-sesiones)
+- [Suscripción a GymTrack](#-suscripción-a-gymtrack)
 - [Correos de la cuenta](#-correos-de-la-cuenta)
 - [Tienda](#-tienda)
 - [Control de acceso RFID](#-control-de-acceso-rfid)
@@ -386,6 +387,33 @@ El equipo de GymTrack entra en `login.html` con la cuenta de administrador y lle
 Pruebas: `pruebas/admin.mjs`.
 
 ---
+
+## 💳 Suscripción a GymTrack
+
+Cada gimnasio paga a GymTrack por usar la plataforma (panel, tienda, app de sus socios y control de acceso).
+
+| | |
+|---|---|
+| **Planes** | Anual (cubre hasta el 31 de diciembre) o mensual (hasta el último día del mes). Así todos renuevan en las mismas fechas. |
+| **Precios de arranque** | $4,990 al año o $499 al mes, con IVA incluido. El equipo los cambia en su panel (pestaña **Suscripciones**). |
+| **Proporcional** | Quien entra a medio periodo paga solo los días que faltan. Si quedan menos de 31 días del año (o 5 del mes), el pago cubre también el periodo siguiente completo. |
+| **Cómo se paga** | En línea, desde la pestaña **Suscripción** del panel del dueño: tarjeta (Stripe Checkout) o PayPal, en su modo de prueba. Se puede renovar desde 45 días antes de vencer. |
+| **Avisos** | Aviso en el panel 30 días antes y correos a 30, 7 y 1 día de vencer, y el día que el panel queda en solo lectura. |
+| **Al vencer** | 7 días de gracia (configurable). Después el panel queda en **solo lectura**: se puede ver todo, pero los cambios (`POST/PUT/PATCH/DELETE` en `/api/gyms/{id}/...`) responden `402` con `suscripcionVencida: true` hasta renovar. La puerta, la tienda y la app de los socios siguen funcionando. |
+| **Gimnasios existentes** | Al desplegar, los que ya existían quedan con **cortesía hasta el 31 dic 2026**. Uno nuevo empieza sin pagar y tiene los días de gracia para activar su suscripción. |
+| **Cortesía** | El equipo puede dar días sin cobro a un gimnasio (demos, acuerdos) desde Suscripciones. |
+
+| Método | Ruta | Para qué |
+|---|---|---|
+| GET | `/api/gyms/{gymId}/suscripcion` | Estado, precios, lo que pagaría con cada plan y sus pagos (dueño) |
+| POST | `/api/gyms/{gymId}/suscripcion/stripe/sesion` | `{plan, returnUrl, cancelUrl}` → página de pago de Stripe |
+| POST | `/api/gyms/{gymId}/suscripcion/paypal/orden` | `{plan, returnUrl, cancelUrl}` → página de PayPal |
+| POST | `/api/gyms/{gymId}/suscripcion/pagar` | `{plan, metodo: tarjeta|paypal, datos}`: cobra y extiende la suscripción |
+| GET | `/api/admin/suscripciones` | Todos los gimnasios, lo cobrado y los últimos pagos (equipo) |
+| PUT | `/api/admin/suscripciones/precios` | `{anual, mensual, diasGracia}` |
+| POST | `/api/admin/suscripciones/{gymId}/cortesia` | `{hasta: "2027-01-31"}` |
+
+Prueba de punta a punta: `pruebas/suscripciones.mjs`.
 
 ## 📧 Correos de la cuenta
 

@@ -4,6 +4,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.index.Indexed;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -46,6 +47,15 @@ public class Gym {
     // ─── Cobranza ───
     // Cuota mensual sugerida, para prellenar el registro de pagos.
     private Double cuotaMensual;
+
+    // ─── Suscripción a GymTrack (SuscripcionService) ───
+    // Hasta qué día está pagado el servicio. null = gimnasio nuevo que todavía no
+    // paga: cuenta como vencido el día antes de crearse (entra en los días de gracia).
+    private LocalDate suscripcionHasta;
+    // "anual", "mensual" o "cortesia" (los gimnasios de antes de cobrar, hasta el 31 dic 2026).
+    private String suscripcionPlan;
+    // Recordatorios ya enviados ("2026-12-31:30"), para no repetirlos.
+    private List<String> suscripcionAvisos = new ArrayList<>();
 
     // ─── Datos del vendedor ───
     // Quién vende en la tienda del gimnasio. La ley de comercio electrónico pide
@@ -114,6 +124,15 @@ public class Gym {
 
     public Boolean getEnDirectorio() { return enDirectorio; }
     public void setEnDirectorio(Boolean enDirectorio) { this.enDirectorio = enDirectorio; }
+
+    public LocalDate getSuscripcionHasta() { return suscripcionHasta; }
+    public void setSuscripcionHasta(LocalDate suscripcionHasta) { this.suscripcionHasta = suscripcionHasta; }
+
+    public String getSuscripcionPlan() { return suscripcionPlan; }
+    public void setSuscripcionPlan(String suscripcionPlan) { this.suscripcionPlan = suscripcionPlan; }
+
+    public List<String> getSuscripcionAvisos() { return suscripcionAvisos; }
+    public void setSuscripcionAvisos(List<String> suscripcionAvisos) { this.suscripcionAvisos = suscripcionAvisos; }
 
     public Double getCuotaMensual() { return cuotaMensual; }
     public void setCuotaMensual(Double cuotaMensual) { this.cuotaMensual = cuotaMensual; }

@@ -64,4 +64,5 @@ document.addEventListener("DOMContentLoaded", () => {
     initResumen();
     initBitacora();
     initAccesos();
+    initSuscripcion();
 });

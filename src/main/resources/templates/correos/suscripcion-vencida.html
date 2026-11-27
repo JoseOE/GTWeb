@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{correos/base :: correo('Tu panel de GymTrack está en solo lectura', ~{::#cuerpo})}">
+<body>
+<div id="cuerpo">
+    <p style="margin:0 0 16px;" th:text="|${saludo}:|">Hola, Juan:</p>
+    <p style="margin:0 0 20px;" th:text="|La suscripción de ${gimnasio} a GymTrack venció el ${fecha} y terminaron los días de gracia.|">Tu suscripción venció.</p>
+    <p style="margin:0 0 20px;">Tu panel queda en <strong>solo lectura</strong>: puedes ver todo, pero no vender ni registrar cambios hasta renovar. La puerta, la tienda y la app de tus socios siguen funcionando.</p>
+    <p style="margin:0;"><a th:href="${enlace}" href="#" style="color:#b73511;font-weight:600;">Renovar ahora</a></p>
+</div>
+</body>
+</html>

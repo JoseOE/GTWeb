@@ -145,6 +145,25 @@ public class CorreoService {
                 List.of(new Adjunto("recibo-" + folio + ".pdf", recibo)));
     }
 
+    // ─── Suscripción del gimnasio a GymTrack (SuscripcionService) ───
+
+    public boolean suscripcionPorVencer(User dueno, String nombreGym, LocalDate fecha, long dias) {
+        return enviar(dueno.getEmail(), "La suscripción de " + nombreGym + " a GymTrack vence en " + dias + (dias == 1 ? " día" : " días"),
+                "suscripcion-por-vencer", Map.of("saludo", saludo(dueno), "gimnasio", nombreGym, "fecha", fecha(fecha),
+                        "dias", dias, "enlace", enlace("bienvenido.html")));
+    }
+
+    public boolean suscripcionVencida(User dueno, String nombreGym, LocalDate fecha) {
+        return enviar(dueno.getEmail(), "Tu panel de GymTrack está en solo lectura", "suscripcion-vencida",
+                Map.of("saludo", saludo(dueno), "gimnasio", nombreGym, "fecha", fecha(fecha), "enlace", enlace("bienvenido.html")));
+    }
+
+    public boolean suscripcionPagada(User dueno, String nombreGym, String plan, double monto, LocalDate desde, LocalDate hasta) {
+        return enviar(dueno.getEmail(), "Recibimos tu pago de GymTrack", "suscripcion-pagada",
+                Map.of("saludo", saludo(dueno), "gimnasio", nombreGym, "plan", plan,
+                        "monto", String.format(ES_MX, "$%,.2f", monto), "desde", fecha(desde), "hasta", fecha(hasta)));
+    }
+
     // Archivo adjunto: Brevo lo recibe en base64.
     public record Adjunto(String nombre, byte[] contenido) {}
 

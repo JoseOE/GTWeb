@@ -64,6 +64,9 @@
                 <button type="button" class="dash-nav-link" role="tab" id="tab-cuentas" aria-controls="panel-cuentas" aria-selected="false" data-panel="cuentas">
                     <i class='bx bx-group'></i><span>Cuentas</span>
                 </button>
+                <button type="button" class="dash-nav-link" role="tab" id="tab-suscripciones" aria-controls="panel-suscripciones" aria-selected="false" data-panel="suscripciones">
+                    <i class='bx bx-badge-check'></i><span>Suscripciones</span><span class="badge rounded-pill bg-danger ms-auto d-none" id="suscripciones-nav-vencidas" aria-label="Gimnasios con la suscripción vencida"></span>
+                </button>
                 <span class="dash-nav-grupo" aria-hidden="true">Calidad</span>
                 <button type="button" class="dash-nav-link" role="tab" id="tab-resenas" aria-controls="panel-resenas" aria-selected="false" data-panel="resenas">
                     <i class='bx bx-star'></i><span>Reseñas y opiniones</span><span class="badge rounded-pill bg-danger ms-auto d-none" id="resenas-nav-malas" aria-label="Reseñas malas"></span>
@@ -309,6 +312,104 @@
                     <div class="p-3 border-top text-center d-none" id="bitacora-mas-caja">
                         <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="bitacora-mas">Ver más</button>
                     </div>
+                </div>
+            </div>
+
+            <!-- ─── SUSCRIPCIONES ───
+                 Lo que cada gimnasio le paga a GymTrack. -->
+            <div class="dash-panel" id="panel-suscripciones" data-panel="suscripciones" role="tabpanel" aria-labelledby="tab-suscripciones" tabindex="0">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-4">
+                    <div>
+                        <h3 class="fw-bold mb-1"><i class='bx bx-badge-check text-primary me-1'></i> Suscripciones</h3>
+                        <p class="text-body-secondary mb-0">Lo que cada gimnasio le paga a GymTrack: quién está al día, quién debe y cuánto se ha cobrado.</p>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" id="suscripciones-actualizar">
+                        <i class='bx bx-refresh'></i> Actualizar
+                    </button>
+                </div>
+                <div class="row g-3 mb-4" id="suscripciones-kpis"></div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-lg-5">
+                        <section class="dash-empty text-start p-4 h-100" aria-labelledby="precios-titulo">
+                            <h4 class="fw-bold fs-6 mb-1" id="precios-titulo">Precios</h4>
+                            <p class="small text-body-secondary mb-3">En pesos, con IVA incluido. Cambian lo que paga cada gimnasio desde su siguiente pago.</p>
+                            <form id="precios-form" class="row g-3" novalidate>
+                                <div class="col-6">
+                                    <label for="precio-anual" class="form-label small fw-semibold">Plan anual</label>
+                                    <div class="input-group"><span class="input-group-text">$</span><input type="number" min="1" step="1" class="form-control" id="precio-anual" required></div>
+                                </div>
+                                <div class="col-6">
+                                    <label for="precio-mensual" class="form-label small fw-semibold">Plan mensual</label>
+                                    <div class="input-group"><span class="input-group-text">$</span><input type="number" min="1" step="1" class="form-control" id="precio-mensual" required></div>
+                                </div>
+                                <div class="col-6">
+                                    <label for="precio-gracia" class="form-label small fw-semibold">Días de gracia</label>
+                                    <input type="number" min="0" max="60" step="1" class="form-control" id="precio-gracia" required>
+                                </div>
+                                <div class="col-6 d-flex align-items-end">
+                                    <button type="submit" class="btn btn-primary w-100 tocable" id="precios-guardar">Guardar precios</button>
+                                </div>
+                                <p class="small text-body-secondary mb-0" id="precios-nota"></p>
+                            </form>
+                        </section>
+                    </div>
+                    <div class="col-lg-7">
+                        <section class="dash-empty text-start p-0 h-100 overflow-hidden" aria-labelledby="suscripciones-pagos-titulo">
+                            <div class="p-4 pb-2"><h4 class="fw-bold fs-6 mb-0" id="suscripciones-pagos-titulo">Últimos pagos</h4></div>
+                            <div id="suscripciones-pagos"></div>
+                        </section>
+                    </div>
+                </div>
+
+                <div class="dash-empty text-start p-0 overflow-hidden">
+                    <div class="p-4 border-bottom d-flex flex-wrap gap-2 justify-content-between align-items-center">
+                        <div>
+                            <h4 class="fw-bold mb-0 fs-6">Gimnasios</h4>
+                            <small class="text-body-secondary d-block">Primero los que piden atención: vencidos, en días de gracia y por vencer.</small>
+                        </div>
+                        <div class="admin-buscar">
+                            <i class='bx bx-search' aria-hidden="true"></i>
+                            <input type="search" class="form-control rounded-pill" id="suscripciones-buscar" placeholder="Buscar gimnasio o dueño" aria-label="Buscar en suscripciones">
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table dash-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th class="ps-4">Gimnasio</th>
+                                    <th>Estado</th>
+                                    <th>Plan</th>
+                                    <th>Pagado hasta</th>
+                                    <th class="pe-4 text-end">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="suscripciones-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cortesía: días sin cobro para un gimnasio (demos, acuerdos). -->
+            <div class="modal fade" id="cortesiaModal" tabindex="-1" aria-labelledby="cortesiaTitulo" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <form class="modal-content" id="cortesia-form" novalidate>
+                        <div class="modal-header">
+                            <h5 class="modal-title fw-bold" id="cortesiaTitulo">Dar cortesía</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="mb-3" id="cortesia-gimnasio"></p>
+                            <label for="cortesia-hasta" class="form-label small fw-semibold">Sin cobro hasta</label>
+                            <input type="date" class="form-control" id="cortesia-hasta" required>
+                            <div class="form-text">Su suscripción queda pagada hasta ese día sin registrar un cobro.</div>
+                            <div class="alert alert-danger small py-2 mt-3 mb-0 d-none" id="cortesia-error" role="alert"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary tocable" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary tocable" id="cortesia-guardar">Dar cortesía</button>
+                        </div>
+                    </form>
                 </div>
             </div>
 

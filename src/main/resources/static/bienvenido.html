@@ -98,11 +98,17 @@
                 <button type="button" class="dash-nav-link" role="tab" id="tab-bitacora" aria-controls="panel-bitacora" aria-selected="false" data-panel="bitacora">
                     <i class='bx bx-shield-quarter'></i><span>Bitácora</span>
                 </button>
+                <span class="dash-nav-grupo" aria-hidden="true">Cuenta</span>
+                <button type="button" class="dash-nav-link" role="tab" id="tab-suscripcion" aria-controls="panel-suscripcion" aria-selected="false" data-panel="suscripcion">
+                    <i class='bx bx-badge-check'></i><span>Suscripción</span><span class="badge rounded-pill bg-danger ms-auto d-none" id="suscripcion-nav-aviso">!</span>
+                </button>
             </nav>
         </aside>
 
         <!-- ═══════ CONTENIDO ═══════ -->
         <main class="dash-content">
+            <!-- Aviso de la suscripción a GymTrack (por vencer, en gracia o en solo lectura). -->
+            <div class="suscripcion-aviso d-none" id="suscripcion-aviso" role="status"></div>
 
             <!-- ─── RESUMEN ───
                  Lo que el dueño necesita hoy: primeros pasos (mientras falte alguno),
@@ -187,6 +193,16 @@
                         </section>
                     </div>
                 </div>
+            </div>
+
+            <!-- ─── SUSCRIPCIÓN A GYMTRACK ───
+                 Lo que el gimnasio le paga a GymTrack: estado, planes y pagos. -->
+            <div class="dash-panel" id="panel-suscripcion" data-panel="suscripcion" role="tabpanel" aria-labelledby="tab-suscripcion" tabindex="0">
+                <div class="mb-4">
+                    <h2 class="fw-bold mb-1"><i class='bx bx-badge-check text-primary'></i> Suscripción</h2>
+                    <p class="text-body-secondary mb-0">Lo que pagas a GymTrack por el panel, la tienda, la app de tus socios y el control de acceso.</p>
+                </div>
+                <div id="suscripcion-contenido"></div>
             </div>
 
             <!-- ─── MI GIMNASIO ─── -->
@@ -1416,6 +1432,7 @@
     <script src="js/panel/11-productos.js"></script>
     <script src="js/panel/12-planes.js"></script>
     <script src="js/panel/13-mostrador.js"></script>
+    <script src="js/panel/14-suscripcion.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/pagos/metodos.js"></script>
     <script src="js/opinion.js"></script>

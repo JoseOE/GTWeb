@@ -137,3 +137,14 @@ html.tema-cambiando *::after {
 [data-bs-theme="dark"] .ejercicio-foto { background: var(--surface-2); }
 [data-bs-theme="dark"] .agregar-maquina { background: var(--surface-2); }
 [data-bs-theme="dark"] .agregar-pasos li.es-hecho span { color: #ff8c66; }
+
+/* Suscripción a GymTrack */
+[data-bs-theme="dark"] .suscripcion-aviso.es-por-vencer { background: rgba(242, 165, 65, .12); border-color: rgba(242, 165, 65, .4); color: #f3c97a; }
+[data-bs-theme="dark"] .suscripcion-aviso.es-gracia { background: rgba(244, 81, 36, .12); border-color: rgba(255, 140, 102, .45); color: #ffb199; }
+[data-bs-theme="dark"] .suscripcion-aviso.es-vencida { background: #2a1a14; border-color: rgba(255, 140, 102, .5); color: #f4f2eb; }
+[data-bs-theme="dark"] .suscripcion-aviso.es-por-vencer .btn-outline-dark { color: #f3c97a; border-color: #f3c97a; }
+[data-bs-theme="dark"] .suscripcion-chip.es-al-dia,
+[data-bs-theme="dark"] .suscripcion-ahorro { background: rgba(46, 139, 87, .16); color: #8fd6a8; }
+[data-bs-theme="dark"] .suscripcion-chip.es-por-vencer { background: rgba(242, 165, 65, .14); color: #f3c97a; }
+[data-bs-theme="dark"] .suscripcion-chip.es-gracia { background: rgba(244, 81, 36, .16); color: #ff9a7a; }
+[data-bs-theme="dark"] .suscripcion-chip.es-vencida { background: #ecebe6; color: #121315; }

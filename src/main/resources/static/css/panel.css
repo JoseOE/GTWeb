@@ -453,3 +453,80 @@ a.panel-cuenta:focus-visible { background: rgba(244, 242, 235, .1); color: var(-
     border-bottom: 1px solid var(--line);
 }
 .maquina-ejercicio:last-child { border-bottom: 0; }
+
+/* ═══════════════════════════════════════
+   Suscripción a GymTrack (js/panel/14-suscripcion.js y admin.js)
+═══════════════════════════════════════ */
+
+/* Aviso arriba de todas las pestañas: por vencer, en gracia o en solo lectura. */
+.suscripcion-aviso {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 1280px;
+    margin: 0 auto 20px;
+    padding: 12px 16px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    font-size: .9375rem;
+}
+.suscripcion-aviso > .bx { font-size: 1.5rem; flex-shrink: 0; }
+.suscripcion-aviso > p { flex: 1 1 auto; min-width: 0; }
+.suscripcion-aviso.es-por-vencer { background: #fdf3dc; border-color: #f0d28a; color: #5c4200; }
+.suscripcion-aviso.es-gracia { background: #fde8de; border-color: #f2b49b; color: #7a2408; }
+.suscripcion-aviso.es-vencida { background: #20221f; border-color: #20221f; color: #f4f2eb; }
+.suscripcion-aviso.es-vencida .btn-dark { background: var(--brand); border-color: var(--brand); color: #20221f; }
+@media (max-width: 575.98px) {
+    .suscripcion-aviso { flex-wrap: wrap; }
+    .suscripcion-aviso > .btn { width: 100%; }
+}
+
+/* Estado actual */
+.suscripcion-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: .8125rem;
+    font-weight: 700;
+}
+.suscripcion-chip.es-al-dia { background: #e4f1e6; color: #1d5a32; }
+.suscripcion-chip.es-por-vencer { background: #fdf0d2; color: #6b4a00; }
+.suscripcion-chip.es-gracia { background: #fde3db; color: #8f260a; }
+.suscripcion-chip.es-vencida { background: #20221f; color: #f4f2eb; }
+.suscripcion-estado.es-vencida { border-color: rgba(183, 53, 17, .45); }
+.suscripcion-candado { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--brand-dark); }
+
+/* Los dos planes, para elegir uno */
+.suscripcion-planes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 767.98px) { .suscripcion-planes { grid-template-columns: 1fr; } }
+.suscripcion-plan {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px 18px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface, #fff);
+    cursor: pointer;
+    transition: border-color .2s var(--ease-out), box-shadow .2s var(--ease-out);
+}
+.suscripcion-plan:hover { border-color: var(--ink); }
+.suscripcion-plan.es-elegido { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand) inset; }
+.suscripcion-plan:has(input:focus-visible) { outline: 2px solid var(--brand); outline-offset: 2px; }
+.suscripcion-plan-cabeza { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.suscripcion-ahorro { padding: 2px 8px; border-radius: 999px; background: #e4f1e6; color: #1d5a32; font-size: .75rem; font-weight: 700; }
+.suscripcion-precio { font-family: var(--identity); font-size: 1.75rem; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+.suscripcion-precio small { font-family: var(--body); font-size: .875rem; font-weight: 500; color: var(--muted); }
+.suscripcion-cotizacion { margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--line); font-size: .875rem; }
+.suscripcion-pagar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+}
